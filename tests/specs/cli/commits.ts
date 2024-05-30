@@ -1,5 +1,5 @@
 import { testSuite, expect } from 'manten';
-import { assertOpenAiToken, createFixture, createGit, files } from '../../utils.js';
+import { assertOpenAiToken, assertOpenAIBaseUrl, createFixture, createGit, files } from '../../utils.js';
 
 export default testSuite(({ describe }) => {
     if (process.platform === 'win32') {
@@ -9,6 +9,7 @@ export default testSuite(({ describe }) => {
     }
 
     assertOpenAiToken();
+    assertOpenAIBaseUrl();
 
     describe('Commits', async ({ test, describe }) => {
         test('Excludes files', async () => {

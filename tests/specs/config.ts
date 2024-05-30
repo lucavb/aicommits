@@ -8,6 +8,7 @@ export default testSuite(({ describe }) => {
         const { fixture, aicommits } = await createFixture();
         const configPath = path.join(fixture.path, '.aicommits');
         const openAiToken = 'OPENAI_KEY=sk-abc';
+        const openAiBaseUrl = 'OPENAI_BASE_URL=https://api.openai.com/v1';
 
         test('set unknown config file', async () => {
             const { stderr } = await aicommits(['config', 'set', 'UNKNOWN=1'], {
@@ -27,14 +28,18 @@ export default testSuite(({ describe }) => {
 
         await test('set config file', async () => {
             await aicommits(['config', 'set', openAiToken]);
+            await aicommits(['config', 'set', openAiBaseUrl]);
 
             const configFile = await fs.readFile(configPath, 'utf8');
             expect(configFile).toMatch(openAiToken);
+            expect(configFile).toMatch(openAiBaseUrl);
         });
 
         await test('get config file', async () => {
             const { stdout } = await aicommits(['config', 'get', 'OPENAI_KEY']);
             expect(stdout).toBe(openAiToken);
+            const { stdout: urlStdout } = await aicommits(['config', 'get', 'OPENAI_BASE_URL']);
+            expect(urlStdout).toBe(openAiBaseUrl);
         });
 
         await test('reading unknown config', async () => {
@@ -103,16 +108,20 @@ export default testSuite(({ describe }) => {
 
         await test('set config file', async () => {
             await aicommits(['config', 'set', openAiToken]);
+            await aicommits(['config', 'set', openAiBaseUrl]);
 
             const configFile = await fs.readFile(configPath, 'utf8');
             expect(configFile).toMatch(openAiToken);
+            expect(configFile).toMatch(openAiBaseUrl);
         });
 
         await test('get config file', async () => {
             const { stdout } = await aicommits(['config', 'get', 'OPENAI_KEY']);
             expect(stdout).toBe(openAiToken);
-        });
+            const { stdout: urlStdout } = await aicommits(['config', 'get', 'OPENAI_BASE_URL']);
+            expect(urlStdout).toBe(openAiBaseUrl);
 
-        await fixture.rm();
+            await fixture.rm();
+        });
     });
 });

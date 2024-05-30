@@ -43,6 +43,7 @@ jobs:
                   tinyproxy
             - name: Test
               env:
+                  OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
                   OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
               run: |
                   pnpm test
