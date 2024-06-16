@@ -15,21 +15,21 @@
 
 1. Install _aicommits_:
 
-   ```sh
-   npm install -g aicommits
-   ```
+    ```sh
+    npm install -g aicommits
+    ```
 
 2. Retrieve your API key from [OpenAI](https://platform.openai.com/account/api-keys)
 
-   > Note: If you haven't already, you'll have to create an account and set up billing.
+    > Note: If you haven't already, you'll have to create an account and set up billing.
 
 3. Set the key so aicommits can use it:
 
-   ```sh
-   aicommits config set OPENAI_KEY=<your token>
-   ```
+    ```sh
+    aicommits config set OPENAI_KEY=<your token>
+    ```
 
-   This will create a `.aicommits` file in your home directory.
+    This will create a `.aicommits` file in your home directory.
 
 ### Upgrading
 
@@ -110,12 +110,12 @@ aicommits hook uninstall
 
 1. Stage your files and commit:
 
-   ```sh
-   git add <files...>
-   git commit # Only generates a message when it's not passed in
-   ```
+    ```sh
+    git add <files...>
+    git commit # Only generates a message when it's not passed in
+    ```
 
-   > If you ever want to write your own message instead of generating one, you can simply pass one in: `git commit -m "My message"`
+    > If you ever want to write your own message instead of generating one, you can simply pass one in: `git commit -m "My message"`
 
 2. Aicommits will generate the commit message for you and pass it back to Git. Git will open it with the [configured editor](https://docs.github.com/en/get-started/getting-started-with-git/associating-text-editors-with-git) for you to review/edit it.
 
@@ -247,9 +247,9 @@ Video coming soon where I rebuild it from scratch to show you how to easily buil
 
 ## Maintainers
 
-- **Hassan El Mghari**: [@Nutlope](https://github.com/Nutlope) [<img src="https://img.shields.io/twitter/follow/nutlope?style=flat&label=nutlope&logo=twitter&color=0bf&logoColor=fff" align="center">](https://twitter.com/nutlope)
+-   **Hassan El Mghari**: [@Nutlope](https://github.com/Nutlope) [<img src="https://img.shields.io/twitter/follow/nutlope?style=flat&label=nutlope&logo=twitter&color=0bf&logoColor=fff" align="center">](https://twitter.com/nutlope)
 
-- **Hiroki Osame**: [@privatenumber](https://github.com/privatenumber) [<img src="https://img.shields.io/twitter/follow/privatenumbr?style=flat&label=privatenumbr&logo=twitter&color=0bf&logoColor=fff" align="center">](https://twitter.com/privatenumbr)
+-   **Hiroki Osame**: [@privatenumber](https://github.com/privatenumber) [<img src="https://img.shields.io/twitter/follow/privatenumbr?style=flat&label=privatenumbr&logo=twitter&color=0bf&logoColor=fff" align="center">](https://twitter.com/privatenumbr)
 
 ## Contributing
 
