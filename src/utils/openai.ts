@@ -46,7 +46,10 @@ const httpsPost = async (
                 });
             },
         );
-        request.on('error', reject);
+        request.on('error', (error) => {
+            console.error(error);
+            reject(error);
+        });
         request.on('timeout', () => {
             request.destroy();
             reject(

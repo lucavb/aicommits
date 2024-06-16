@@ -27,8 +27,6 @@ const configParsers = {
             return 'https://api.openai.com/v1';
         }
 
-        parseAssert('OPENAI_BASE_URL', /^https?:\/\//.test(url), 'Must be a valid URL');
-
         return url;
     },
     OPENAI_KEY(key?: string) {
