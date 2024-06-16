@@ -19,7 +19,6 @@ const httpsPost = async (
         response: IncomingMessage;
         data: string;
     }>((resolve, reject) => {
-        console.log({ hostname, path });
         const postContent = JSON.stringify(json);
         const request = https.request(
             {
