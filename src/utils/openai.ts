@@ -1,11 +1,7 @@
 import https from 'https';
 import type { ClientRequest, IncomingMessage } from 'http';
 import type { CreateChatCompletionRequest, CreateChatCompletionResponse } from 'openai';
-import {
-    type TiktokenModel,
-    // encoding_for_model,
-} from '@dqbd/tiktoken';
-import createHttpsProxyAgent from 'https-proxy-agent';
+import { type TiktokenModel } from '@dqbd/tiktoken';
 import { KnownError } from './error.js';
 import type { CommitType } from './config.js';
 import { generatePrompt } from './prompt.js';
@@ -23,6 +19,7 @@ const httpsPost = async (
         response: IncomingMessage;
         data: string;
     }>((resolve, reject) => {
+        console.log({ hostname, path });
         const postContent = JSON.stringify(json);
         const request = https.request(
             {
@@ -36,7 +33,6 @@ const httpsPost = async (
                     'Content-Length': Buffer.byteLength(postContent),
                 },
                 timeout,
-                agent: proxy ? createHttpsProxyAgent(proxy) : undefined,
             },
             (response) => {
                 const body: Buffer[] = [];
