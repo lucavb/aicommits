@@ -6,7 +6,8 @@ const commitTypeFormats: Record<CommitType, string> = {
     '': '<commit message>',
     conventional: '<type>(<optional scope>): <commit message>',
 };
-const specifyCommitFormat = (type: CommitType) => `The output response must be in format:\n${commitTypeFormats[type]}`;
+const specifyCommitFormat = (type: CommitType): string =>
+    `The output response must be in format:\n${commitTypeFormats[type]}`;
 
 const commitTypes: Record<CommitType, string> = {
     '': '',
@@ -21,24 +22,34 @@ const commitTypes: Record<CommitType, string> = {
      */
     conventional: `Choose a type from the type-to-description JSON below that best describes the git diff:\n${JSON.stringify(
         {
-            docs: 'Documentation only changes',
-            style: 'Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc)',
-            refactor: 'A code change that neither fixes a bug nor adds a feature',
-            perf: 'A code change that improves performance',
-            test: 'Adding missing tests or correcting existing tests',
             build: 'Changes that affect the build system or external dependencies',
-            ci: 'Changes to our CI configuration files and scripts',
             chore: "Other changes that don't modify src or test files",
-            revert: 'Reverts a previous commit',
+            ci: 'Changes to our CI configuration files and scripts',
+            docs: 'Documentation only changes',
             feat: 'A new feature',
             fix: 'A bug fix',
+            perf: 'A code change that improves performance',
+            refactor: 'A code change that neither fixes a bug nor adds a feature',
+            revert: 'Reverts a previous commit',
+            style: 'Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc)',
+            test: 'Adding missing tests or correcting existing tests',
         },
         null,
         2,
     )}`,
 };
 
-export const generatePrompt = (locale: string, maxLength: number, type: CommitType) =>
+export const generateSummaryPrompt = (locale: string) =>
+    [
+        'Generate a concise git commit body written in present tense for the following code diff with the given specifications below:',
+        `Message language: ${locale}`,
+        'Use bullet points for the items.',
+        'Return only the bullet points. Your entire response will be passed directly into git commit.',
+    ]
+        .filter((entry) => !!entry)
+        .join('\n');
+
+export const generateCommitMessagePrompt = (locale: string, maxLength: number, type: CommitType) =>
     [
         'Generate a concise git commit message written in present tense for the following code diff with the given specifications below:',
         `Message language: ${locale}`,

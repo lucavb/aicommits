@@ -1,18 +1,39 @@
-import { execa } from 'execa';
 import { bgCyan, black, dim, green, red } from 'kolorist';
 import { confirm, intro, isCancel, outro, select, spinner } from '@clack/prompts';
-import { assertGitRepo, getDetectedMessage, getStagedDiff } from '../utils/git.js';
+import { assertGitRepo, commitChanges, getDetectedMessage, getStagedDiff } from '../utils/git.js';
 import { generateCommitMessage } from '../utils/openai.js';
 import { handleCliError, KnownError } from '../utils/error.js';
 import { Config } from '../utils/config';
 
+const chooseOption = async (message: string, options: string[]): Promise<string | null> => {
+    const selected = await select({
+        message: `${message} ${dim('(Ctrl+c to exit)')}`,
+        options: options.map((value, index) => ({ label: value, value: index })),
+    });
+
+    if (typeof selected !== 'number') {
+        outro('Unable to understand the selected option');
+        return null;
+    }
+
+    if (isCancel(selected)) {
+        outro('Commit cancelled');
+        return null;
+    }
+
+    return options[selected];
+};
+
+const isError = (error: unknown): error is Error => {
+    return error instanceof Error;
+};
+
 export const aiCommits = async (config: Config) => {
-    (async () => {
-        intro(bgCyan(black(' aicommits ')));
+    try {
+        intro(bgCyan(black(' gencommit ')));
         await assertGitRepo();
 
         const detectingFiles = spinner();
-
         detectingFiles.start('Detecting staged files');
         const staged = await getStagedDiff(config.exclude);
 
@@ -29,9 +50,12 @@ export const aiCommits = async (config: Config) => {
 
         const s = spinner();
         s.start('The AI is analyzing your changes');
-        let messages: string[];
+        let messages: string[] = [];
+        let commitBodies: string[] = [];
         try {
-            messages = await generateCommitMessage({ ...config, diff: staged.diff });
+            const { commitMessage, bodies } = await generateCommitMessage({ ...config, diff: staged.diff });
+            messages = commitMessage;
+            commitBodies = bodies;
         } finally {
             s.stop('Changes analyzed');
         }
@@ -41,10 +65,12 @@ export const aiCommits = async (config: Config) => {
         }
 
         let message: string;
-        if (messages.length === 1) {
+        let body: string;
+        if (messages.length === 1 && commitBodies.length === 1) {
             [message] = messages;
+            [body] = commitBodies;
             const confirmed = await confirm({
-                message: `Use this commit message?\n\n   ${message}\n`,
+                message: `Use this commit message?\n\n   ${message}\n\nWith this body?\n\n   ${body}\n`,
             });
 
             if (!confirmed || isCancel(confirmed)) {
@@ -52,30 +78,32 @@ export const aiCommits = async (config: Config) => {
                 return;
             }
         } else {
-            const selected = await select({
-                message: `Pick a commit message to use: ${dim('(Ctrl+c to exit)')}`,
-                options: messages.map((value) => ({ label: value, value })),
-            });
-
-            if (typeof selected !== 'string') {
-                outro('Unable to understand the selected option');
+            message = (await chooseOption('Pick a commit message to use:', messages)) ?? '';
+            if (!message) {
                 return;
             }
 
-            if (isCancel(selected)) {
-                outro('Commit cancelled');
-                return;
+            if (commitBodies.length > 0) {
+                body = (await chooseOption('Pick a commit body to use:', commitBodies)) ?? '';
+                if (!body) {
+                    return;
+                }
+            } else {
+                body = '';
             }
-
-            message = selected;
         }
 
-        await execa('git', ['commit', '-m', message]);
+        const fullMessage = `${message}\n\n${body}`;
+        await commitChanges(fullMessage);
 
-        outro(`${green('✔')} Successfully committed!`);
-    })().catch((error) => {
-        outro(`${red('✖')} ${error.message}`);
+        outro(`${green('✔')} Successfully committed with message:\n\n   ${message}\n\nand body:\n\n   ${body}`);
+    } catch (error) {
+        if (isError(error)) {
+            outro(`${red('✖')} ${error.message}`);
+        } else {
+            outro(`${red('✖')} An unknown error occurred`);
+        }
         handleCliError(error);
         process.exit(1);
-    });
+    }
 };

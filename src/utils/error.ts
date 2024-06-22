@@ -5,7 +5,7 @@ export class KnownError extends Error {}
 
 const indent = '    ';
 
-export const handleCliError = (error: any) => {
+export const handleCliError = (error: unknown) => {
     if (error instanceof Error && !(error instanceof KnownError)) {
         if (error.stack) {
             console.error(dim(error.stack.split('\n').slice(1).join('\n')));

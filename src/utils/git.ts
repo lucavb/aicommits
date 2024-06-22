@@ -3,6 +3,14 @@ import { KnownError } from './error';
 
 const git = simpleGit();
 
+export const commitChanges = async (message: string) => {
+    try {
+        await git.commit(message);
+    } catch (error) {
+        throw new KnownError('Failed to commit changes');
+    }
+};
+
 export const assertGitRepo = async () => {
     try {
         const topLevel = await git.revparse(['--show-toplevel']);

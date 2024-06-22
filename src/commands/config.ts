@@ -6,7 +6,7 @@ const configSetCommand = new Command('set')
     .addArgument(new Argument('name').choices(configKeys))
     .argument('<value>', 'Value of the configuration property')
     .action(async (name, value) => {
-        const config = { ...(await readConfig()), [name]: value };
+        const config = { ...(await readConfig()), [name]: JSON.parse(value) };
         await writeConfig(config);
         console.log(`Configuration property "${name}" set to "${value}".`);
     });

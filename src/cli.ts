@@ -10,6 +10,7 @@ program
     .addOption(new Option('--api-key <apiKey>'))
     .addOption(new Option('--base-url <baseUrl>'))
     .addOption(new Option('--exclude <exclude>'))
+    .addOption(new Option('--generate <generate>'))
     .addOption(new Option('--locale <locale>'))
     .addOption(new Option('--max-length <maxLength>'))
     .addOption(new Option('--model <model>'))
@@ -19,7 +20,9 @@ program
         const rawConfig = {
             ...savedConfig,
             ...shake(options),
-            exclude: [...(savedConfig.exclude ?? []), options.exclude],
+            exclude: [...(savedConfig.exclude ?? []), options.exclude].filter(
+                (arg): arg is string => typeof arg === 'string',
+            ),
         };
         const parseResult = configSchema.safeParse(rawConfig);
         if (parseResult.success) {

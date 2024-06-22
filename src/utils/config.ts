@@ -10,7 +10,7 @@ export const configSchema = z.object({
     apiKey: z.string().min(1).optional(),
     baseUrl: z.string().url(),
     exclude: z.array(z.string().min(1)).optional(),
-    generate: z.number().int().min(1).default(1),
+    generate: z.coerce.number().int().min(1).default(1),
     locale: z
         .string()
         .length(2)
