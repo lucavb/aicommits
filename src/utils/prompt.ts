@@ -1,4 +1,4 @@
-import type { Config } from './config.js';
+import type { Config } from './config';
 
 type CommitType = NonNullable<Config['type']>;
 

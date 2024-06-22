@@ -1,8 +1,8 @@
 import { bgCyan, black, dim, green, red } from 'kolorist';
 import { confirm, intro, isCancel, outro, select, spinner } from '@clack/prompts';
-import { assertGitRepo, commitChanges, getDetectedMessage, getStagedDiff } from '../utils/git.js';
-import { generateCommitMessage } from '../utils/openai.js';
-import { handleCliError, KnownError } from '../utils/error.js';
+import { assertGitRepo, commitChanges, getDetectedMessage, getStagedDiff, stageAllFiles } from '../utils/git';
+import { generateCommitMessage } from '../utils/openai';
+import { handleCliError, KnownError } from '../utils/error';
 import { Config } from '../utils/config';
 
 const chooseOption = async (message: string, options: string[]): Promise<string | null> => {
