@@ -29,7 +29,7 @@ export const configSchema = z.object({
 
 export type Config = z.TypeOf<typeof configSchema>;
 
-const configFilePath = join(process.env.HOME || process.env.USERPROFILE || '.', '.commitgen.yaml');
+const configFilePath = join(process.env.HOME || process.env.USERPROFILE || '.', '.aicommits.yaml');
 
 export const readConfig = async (): Promise<Partial<Config>> => {
     try {

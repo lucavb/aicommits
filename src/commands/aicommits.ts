@@ -28,7 +28,7 @@ const isError = (error: unknown): error is Error => error instanceof Error;
 
 export const aiCommits = async (config: Config) => {
     try {
-        intro(bgCyan(black(' gencommit ')));
+        intro(bgCyan(black(' aicommits ')));
         await assertGitRepo();
 
         if (config.stageAll) {
