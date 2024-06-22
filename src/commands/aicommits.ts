@@ -31,6 +31,13 @@ export const aiCommits = async (config: Config) => {
         intro(bgCyan(black(' gencommit ')));
         await assertGitRepo();
 
+        if (config.stageAll) {
+            const stagingSpinner = spinner();
+            stagingSpinner.start('Staging all files');
+            await stageAllFiles();
+            stagingSpinner.stop('All files staged');
+        }
+
         const detectingFiles = spinner();
         detectingFiles.start('Detecting staged files');
         const staged = await getStagedDiff(config.exclude);

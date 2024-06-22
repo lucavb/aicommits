@@ -3,6 +3,14 @@ import { KnownError } from './error';
 
 const git = simpleGit();
 
+export const stageAllFiles = async (): Promise<void> => {
+    try {
+        await git.add('.');
+    } catch (error) {
+        throw new Error('Failed to stage all files');
+    }
+};
+
 export const commitChanges = async (message: string) => {
     try {
         await git.commit(message);
