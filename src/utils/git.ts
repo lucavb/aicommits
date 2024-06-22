@@ -1,14 +1,15 @@
-import { execa } from 'execa';
-import { KnownError } from './error.js';
+import simpleGit from 'simple-git';
+import { KnownError } from './error';
+
+const git = simpleGit();
 
 export const assertGitRepo = async () => {
-    const { stdout, failed } = await execa('git', ['rev-parse', '--show-toplevel'], { reject: false });
-
-    if (failed) {
+    try {
+        const topLevel = await git.revparse(['--show-toplevel']);
+        return topLevel.trim();
+    } catch (error) {
         throw new KnownError('The current directory must be a Git repository!');
     }
-
-    return stdout;
 };
 
 const excludeFromDiff = (path: string) => `:(exclude)${path}`;
@@ -16,35 +17,29 @@ const excludeFromDiff = (path: string) => `:(exclude)${path}`;
 const filesToExclude = [
     'package-lock.json',
     'pnpm-lock.yaml',
-
-    // yarn.lock, Cargo.lock, Gemfile.lock, Pipfile.lock, etc.
-    '*.lock',
+    '*.lock', // yarn.lock, Cargo.lock, Gemfile.lock, Pipfile.lock, etc.
 ].map(excludeFromDiff);
 
-export const getStagedDiff = async (excludeFiles?: string[]) => {
-    const diffCached = ['diff', '--cached', '--diff-algorithm=minimal'];
-    const { stdout: files } = await execa('git', [
-        ...diffCached,
-        '--name-only',
-        ...filesToExclude,
-        ...(excludeFiles ? excludeFiles.map(excludeFromDiff) : []),
-    ]);
+export const getStagedDiff = async (excludeFiles: string[] = []) => {
+    const diffCached = ['--cached', '--diff-algorithm=minimal'];
+    const excludeArgs = [...filesToExclude, ...excludeFiles.map(excludeFromDiff)];
 
-    if (!files) {
-        return;
+    try {
+        const files = await git.diff([...diffCached, '--name-only', ...excludeArgs]);
+        if (!files) {
+            return;
+        }
+
+        const diff = await git.diff([...diffCached, ...excludeArgs]);
+
+        return {
+            files: files.split('\n').filter(Boolean),
+            diff,
+        };
+    } catch (error) {
+        throw new KnownError('Failed to get staged diff');
     }
-
-    const { stdout: diff } = await execa('git', [
-        ...diffCached,
-        ...filesToExclude,
-        ...(excludeFiles ? excludeFiles.map(excludeFromDiff) : []),
-    ]);
-
-    return {
-        files: files.split('\n'),
-        diff,
-    };
 };
 
-export const getDetectedMessage = (files: string[]) =>
+export const getDetectedMessage = (files: unknown[]) =>
     `Detected ${files.length.toLocaleString()} staged file${files.length > 1 ? 's' : ''}`;

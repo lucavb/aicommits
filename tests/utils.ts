@@ -67,7 +67,6 @@ export const assertOpenAiToken = () => {
 
 export const assertOpenAIBaseUrl = () => {
     if (!process.env.OPENAI_KEY) {
-        // eslint-disable-next-line no-console
         process.env.OPENAI_KEY = 'https://api.openai.com/v1';
     }
 };

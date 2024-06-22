@@ -1,4 +1,6 @@
-import type { CommitType } from './config.js';
+import type { Config } from './config.js';
+
+type CommitType = NonNullable<Config['type']>;
 
 const commitTypeFormats: Record<CommitType, string> = {
     '': '<commit message>',
@@ -45,5 +47,5 @@ export const generatePrompt = (locale: string, maxLength: number, type: CommitTy
         commitTypes[type],
         specifyCommitFormat(type),
     ]
-        .filter(Boolean)
+        .filter((entry) => !!entry)
         .join('\n');

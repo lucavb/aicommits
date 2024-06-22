@@ -1,31 +1,20 @@
 import { execa } from 'execa';
-import { black, dim, green, red, bgCyan } from 'kolorist';
-import { intro, outro, spinner, select, confirm, isCancel } from '@clack/prompts';
-import { assertGitRepo, getStagedDiff, getDetectedMessage } from '../utils/git.js';
-import { getConfig } from '../utils/config.js';
+import { bgCyan, black, dim, green, red } from 'kolorist';
+import { confirm, intro, isCancel, outro, select, spinner } from '@clack/prompts';
+import { assertGitRepo, getDetectedMessage, getStagedDiff } from '../utils/git.js';
 import { generateCommitMessage } from '../utils/openai.js';
-import { KnownError, handleCliError } from '../utils/error.js';
+import { handleCliError, KnownError } from '../utils/error.js';
+import { Config } from '../utils/config';
 
-export default async (
-    generate: number | undefined,
-    excludeFiles: string[],
-    stageAll: boolean,
-    commitType: string | undefined,
-    rawArgv: string[],
-) =>
+export const aiCommits = async (config: Config) => {
     (async () => {
         intro(bgCyan(black(' aicommits ')));
         await assertGitRepo();
 
         const detectingFiles = spinner();
 
-        if (stageAll) {
-            // This should be equivalent behavior to `git commit --all`
-            await execa('git', ['add', '--update']);
-        }
-
         detectingFiles.start('Detecting staged files');
-        const staged = await getStagedDiff(excludeFiles);
+        const staged = await getStagedDiff(config.exclude);
 
         if (!staged) {
             detectingFiles.stop('Detecting staged files');
@@ -38,31 +27,11 @@ export default async (
             `${getDetectedMessage(staged.files)}:\n${staged.files.map((file) => `     ${file}`).join('\n')}`,
         );
 
-        const { env } = process;
-        const config = await getConfig({
-            OPENAI_KEY: env.OPENAI_KEY || env.OPENAI_API_KEY,
-            OPENAI_BASE_URL: env.OPENAI_BASE_URL || env.OPENAI_API_BASE_URL,
-            proxy: env.https_proxy || env.HTTPS_PROXY || env.http_proxy || env.HTTP_PROXY,
-            generate: generate?.toString(),
-            type: commitType?.toString(),
-        });
-
         const s = spinner();
         s.start('The AI is analyzing your changes');
         let messages: string[];
         try {
-            messages = await generateCommitMessage(
-                config.OPENAI_KEY,
-                config.OPENAI_BASE_URL,
-                config.model,
-                config.locale,
-                staged.diff,
-                config.generate,
-                config['max-length'],
-                config.type,
-                config.timeout,
-                config.proxy,
-            );
+            messages = await generateCommitMessage({ ...config, diff: staged.diff });
         } finally {
             s.stop('Changes analyzed');
         }
@@ -88,15 +57,20 @@ export default async (
                 options: messages.map((value) => ({ label: value, value })),
             });
 
+            if (typeof selected !== 'string') {
+                outro('Unable to understand the selected option');
+                return;
+            }
+
             if (isCancel(selected)) {
                 outro('Commit cancelled');
                 return;
             }
 
-            message = selected as string;
+            message = selected;
         }
 
-        await execa('git', ['commit', '-m', message, ...rawArgv]);
+        await execa('git', ['commit', '-m', message]);
 
         outro(`${green('✔')} Successfully committed!`);
     })().catch((error) => {
@@ -104,3 +78,4 @@ export default async (
         handleCliError(error);
         process.exit(1);
     });
+};

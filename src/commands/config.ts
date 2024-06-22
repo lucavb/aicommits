@@ -1,38 +1,17 @@
-import { command } from 'cleye';
-import { red } from 'kolorist';
-import { hasOwn, getConfig, setConfigs } from '../utils/config.js';
-import { KnownError, handleCliError } from '../utils/error.js';
+import { Argument, Command } from '@commander-js/extra-typings';
+import { configKeys, readConfig, writeConfig } from '../utils/config';
 
-export default command(
-    {
-        name: 'config',
+const configSetCommand = new Command('set')
+    .description('Set a configuration property')
+    .addArgument(new Argument('name').choices(configKeys))
+    .argument('<value>', 'Value of the configuration property')
+    .action(async (name, value) => {
+        const config = { ...(await readConfig()), [name]: value };
+        await writeConfig(config);
+        console.log(`Configuration property "${name}" set to "${value}".`);
+    });
 
-        parameters: ['<mode>', '<key=value...>'],
-    },
-    (argv) => {
-        (async () => {
-            const { mode, keyValue: keyValues } = argv._;
-
-            if (mode === 'get') {
-                const config = await getConfig({}, true);
-                for (const key of keyValues) {
-                    if (hasOwn(config, key)) {
-                        console.log(`${key}=${config[key as keyof typeof config]}`);
-                    }
-                }
-                return;
-            }
-
-            if (mode === 'set') {
-                await setConfigs(keyValues.map((keyValue) => keyValue.split('=') as [string, string]));
-                return;
-            }
-
-            throw new KnownError(`Invalid mode: ${mode}`);
-        })().catch((error) => {
-            console.error(`${red('✖')} ${error.message}`);
-            handleCliError(error);
-            process.exit(1);
-        });
-    },
-);
+// Define the config command
+export const configCommand = new Command('config')
+    .description('Manage configuration properties')
+    .addCommand(configSetCommand);

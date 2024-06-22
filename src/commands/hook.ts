@@ -2,7 +2,6 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { green, red } from 'kolorist';
-import { command } from 'cleye';
 import { assertGitRepo } from '../utils/git.js';
 import { fileExists } from '../utils/fs.js';
 import { KnownError, handleCliError } from '../utils/error.js';
@@ -13,7 +12,7 @@ const symlinkPath = `.git/hooks/${hookName}`;
 const hookPath = fileURLToPath(new URL('cli.mjs', import.meta.url));
 
 export const isCalledFromGitHook = process.argv[1]
-    .replace(/\\/g, '/') // Replace Windows back slashes with forward slashes
+    .replace(/\\/g, '/') // Replace Windows backslashes with forward slashes
     .endsWith(`/${symlinkPath}`);
 
 const isWindows = process.platform === 'win32';
@@ -37,7 +36,7 @@ export default command(
             if (mode === 'install') {
                 if (hookExists) {
                     // If the symlink is broken, it will throw an error
-                    // eslint-disable-next-line @typescript-eslint/no-empty-function
+
                     const realpath = await fs.realpath(absoltueSymlinkPath).catch(() => {});
                     if (realpath === hookPath) {
                         console.warn('The hook is already installed');
