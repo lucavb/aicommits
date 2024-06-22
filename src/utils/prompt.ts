@@ -44,7 +44,7 @@ export const generateSummaryPrompt = (locale: string) =>
         'Generate a concise git commit body written in present tense for the following code diff with the given specifications below:',
         `Message language: ${locale}`,
         'Use bullet points for the items.',
-        'Return only the bullet points. Your entire response will be passed directly into git commit.',
+        'Return only the bullet points using the ascii character "*". Your entire response will be passed directly into git commit.',
     ]
         .filter((entry) => !!entry)
         .join('\n');
