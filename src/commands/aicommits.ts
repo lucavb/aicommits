@@ -55,15 +55,12 @@ export const aiCommits = async (config: Config) => {
 
         const s = spinner();
         s.start('The AI is analyzing your changes');
-        let messages: string[] = [];
-        let commitBodies: string[] = [];
-        try {
-            const { commitMessage, bodies } = await generateCommitMessage({ ...config, diff: staged.diff });
-            messages = commitMessage;
-            commitBodies = bodies;
-        } finally {
-            s.stop('Changes analyzed');
-        }
+        const { commitMessages: messages, bodies: commitBodies } = await generateCommitMessage({
+            ...config,
+            diff: staged.diff,
+        });
+
+        s.stop('Changes analyzed');
 
         if (messages.length === 0) {
             throw new KnownError('No commit messages were generated. Try again.');

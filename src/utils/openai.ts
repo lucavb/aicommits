@@ -66,7 +66,7 @@ export const generateCommitMessage = async ({
     ]);
 
     return {
-        commitMessage: deduplicateMessages(
+        commitMessages: deduplicateMessages(
             commitMessageCompletion.choices
                 .map((choice) => choice.message?.content)
                 .filter((content: string | null): content is string => typeof content === 'string')
