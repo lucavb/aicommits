@@ -8,6 +8,7 @@ import type { RollupOptions } from 'rollup';
 export default {
     input: 'src/cli.ts',
     output: {
+        banner: '#!/usr/bin/env node',
         file: 'dist/cli.mjs',
         format: 'esm',
         sourcemap: true,
