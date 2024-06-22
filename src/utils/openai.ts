@@ -73,7 +73,7 @@ export const generateCommitMessage = async ({
                 .map((content) => sanitizeMessage(content)),
         ),
         bodies: commitBodyCompletion.choices
-            .map((choice) => choice.message.content)
-            .filter((content: string | null): content is string => typeof content === 'string'),
+            .map((choice) => choice.message.content?.trim())
+            .filter((content): content is string => typeof content === 'string'),
     };
 };
