@@ -9,7 +9,18 @@
     ],
     "license": "MIT",
     "repository": "Nutlope/aicommits",
-    "author": "Hassan El Mghari (@nutlope)",
+    "contributors": [
+        {
+            "name": "Hassan El Mghari",
+            "email": "hassan4709@gmail.com",
+            "url": "https://github.com/nutlope"
+        },
+        {
+            "email": "luca.becker@sunbury.xyz",
+            "name": "Luca Becker",
+            "url": "https://sunbury.xyz"
+        }
+    ],
     "type": "module",
     "files": [
         "dist"
@@ -23,7 +34,8 @@
         "dev": "tsx src/cli.ts",
         "dev:5": "tsx src/cli.ts --generate 5",
         "dev:stage-all": "tsx src/cli.ts --stage-all",
-        "lint": "",
+        "eslint": "eslint .",
+        "eslint:fix": "eslint . --fix",
         "prepack": "npm run build && clean-pkg-json",
         "type-check": "tsc"
     },
@@ -42,24 +54,25 @@
     "devDependencies": {
         "@clack/prompts": "0.7.0",
         "@eslint/js": "9.5.0",
-        "@rollup/plugin-commonjs": "^26.0.1",
-        "@rollup/plugin-json": "^6.1.0",
-        "@rollup/plugin-node-resolve": "^15.2.3",
-        "@rollup/plugin-terser": "^0.4.4",
-        "@rollup/plugin-typescript": "^11.1.6",
-        "@types/eslint__js": "^8.42.3",
+        "@rollup/plugin-commonjs": "26.0.1",
+        "@rollup/plugin-json": "6.1.0",
+        "@rollup/plugin-node-resolve": "15.2.3",
+        "@rollup/plugin-terser": "0.4.4",
+        "@rollup/plugin-typescript": "11.1.6",
+        "@types/eslint__js": "8.42.3",
         "@types/ini": "4.1.1",
         "@types/inquirer": "9.0.7",
         "@types/node": "20.14.2",
         "clean-pkg-json": "1.2.0",
-        "eslint": "9.5.0",
+        "eslint": "8.57.0",
         "ini": "4.1.3",
         "manten": "1.3.0",
         "openai": "4.52.0",
         "prettier": "3.3.2",
-        "rollup": "^2.79.1",
+        "rollup": "2.79.1",
         "tsx": "4.15.5",
-        "typescript": "^5.4.5"
+        "typescript": "5.5.2",
+        "typescript-eslint": "7.13.1"
     },
     "release": {
         "branches": [

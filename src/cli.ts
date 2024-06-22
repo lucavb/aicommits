@@ -1,6 +1,6 @@
 import { Option, program } from '@commander-js/extra-typings';
 import { configCommand } from './commands/config';
-import { Config, configSchema, readConfig } from './utils/config';
+import { configSchema, readConfig } from './utils/config';
 import { shake } from 'radash';
 import { aiCommits } from './commands/aicommits';
 
