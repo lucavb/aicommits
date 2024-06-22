@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { Config } from './config';
 import { generateCommitMessagePrompt, generateSummaryPrompt } from './prompt';
+import { isString } from './typeguards';
 
 const sanitizeMessage = (message: string) =>
     message
@@ -26,38 +27,24 @@ export const generateCommitMessage = async ({
         openai.chat.completions.create({
             frequency_penalty: 0,
             messages: [
-                {
-                    role: 'system',
-                    content: generateCommitMessagePrompt(locale, maxLength, type ?? ''),
-                },
-                {
-                    role: 'user',
-                    content: diff,
-                },
+                { role: 'system', content: generateCommitMessagePrompt(locale, maxLength, type ?? '') },
+                { role: 'user', content: diff },
             ],
             model,
             n: generate,
             presence_penalty: 0,
-            stream: false,
             temperature: 0.7,
             top_p: 1,
         }),
         openai.chat.completions.create({
             frequency_penalty: 0,
             messages: [
-                {
-                    role: 'system',
-                    content: generateSummaryPrompt(locale),
-                },
-                {
-                    role: 'user',
-                    content: diff,
-                },
+                { role: 'system', content: generateSummaryPrompt(locale) },
+                { role: 'user', content: diff },
             ],
             model,
             n: generate,
             presence_penalty: 0,
-            stream: false,
             temperature: 0.7,
             top_p: 1,
         }),
@@ -67,11 +54,9 @@ export const generateCommitMessage = async ({
         commitMessages: deduplicateMessages(
             commitMessageCompletion.choices
                 .map((choice) => choice.message?.content)
-                .filter((content: string | null): content is string => typeof content === 'string')
+                .filter(isString)
                 .map((content) => sanitizeMessage(content)),
         ),
-        bodies: commitBodyCompletion.choices
-            .map((choice) => choice.message.content?.trim())
-            .filter((content): content is string => typeof content === 'string'),
+        bodies: commitBodyCompletion.choices.map((choice) => choice.message.content?.trim()).filter(isString),
     };
 };
