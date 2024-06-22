@@ -36,7 +36,7 @@ const filesToExclude = [
     '*.lock', // yarn.lock, Cargo.lock, Gemfile.lock, Pipfile.lock, etc.
 ].map(excludeFromDiff);
 
-export const getStagedDiff = async (excludeFiles: string[] = []) => {
+export const getStagedDiff = async (excludeFiles: string[] = [], contextLines: number) => {
     const diffCached = ['--cached', '--diff-algorithm=minimal'];
     const excludeArgs = [...filesToExclude, ...excludeFiles.map(excludeFromDiff)];
 
@@ -46,7 +46,7 @@ export const getStagedDiff = async (excludeFiles: string[] = []) => {
             return;
         }
 
-        const diff = await git.diff([...diffCached, ...excludeArgs]);
+        const diff = await git.diff([`-U${contextLines}`, ...diffCached, ...excludeArgs]);
 
         return {
             files: files.split('\n').filter(Boolean),

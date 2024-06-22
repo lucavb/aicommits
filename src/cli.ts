@@ -9,6 +9,7 @@ program.addCommand(configCommand);
 program
     .addOption(new Option('--api-key <apiKey>'))
     .addOption(new Option('--base-url <baseUrl>'))
+    .addOption(new Option('--context-lines <contextLines>'))
     .addOption(new Option('--exclude <exclude>'))
     .addOption(new Option('--generate <generate>'))
     .addOption(new Option('--locale <locale>'))

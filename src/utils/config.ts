@@ -4,11 +4,22 @@ import { z, ZodType } from 'zod';
 import { promises as fs } from 'fs';
 import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
 
-export const configKeys = ['apiKey', 'baseUrl', 'exclude', 'generate', 'locale', 'maxLength', 'model', 'type'] as const;
+export const configKeys = [
+    'apiKey',
+    'baseUrl',
+    'contextLines',
+    'exclude',
+    'generate',
+    'locale',
+    'maxLength',
+    'model',
+    'type',
+] as const;
 
 export const configSchema = z.object({
     apiKey: z.string().min(1).optional(),
     baseUrl: z.string().url(),
+    contextLines: z.coerce.number().positive().default(10),
     exclude: z.array(z.string().min(1)).optional(),
     generate: z.coerce.number().int().min(1).default(1),
     locale: z

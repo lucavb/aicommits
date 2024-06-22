@@ -3,7 +3,7 @@ import { confirm, intro, isCancel, outro, select, spinner } from '@clack/prompts
 import { assertGitRepo, commitChanges, getDetectedMessage, getStagedDiff, stageAllFiles } from '../utils/git';
 import { generateCommitMessage } from '../utils/openai';
 import { handleCliError, KnownError } from '../utils/error';
-import { Config } from '../utils/config';
+import { Config, configSchema } from '../utils/config';
 import { isError } from '../utils/typeguards';
 
 const chooseOption = async (message: string, options: string[]): Promise<string | null> => {
@@ -39,7 +39,7 @@ export const aiCommits = async (config: Config) => {
 
         const detectingFiles = spinner();
         detectingFiles.start('Detecting staged files');
-        const staged = await getStagedDiff(config.exclude);
+        const staged = await getStagedDiff(config.exclude, config.contextLines);
 
         if (!staged) {
             detectingFiles.stop('Detecting staged files');
