@@ -14,6 +14,7 @@ program
     .addOption(new Option('--locale <locale>'))
     .addOption(new Option('--max-length <maxLength>'))
     .addOption(new Option('--model <model>'))
+    .addOption(new Option('--stage-all'))
     .addOption(new Option('--type <type>'))
     .action(async (options) => {
         const savedConfig = await readConfig();

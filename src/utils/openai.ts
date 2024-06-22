@@ -25,7 +25,6 @@ export const generateCommitMessage = async ({
     const [commitMessageCompletion, commitBodyCompletion] = await Promise.all([
         openai.chat.completions.create({
             frequency_penalty: 0,
-            max_tokens: 4000,
             messages: [
                 {
                     role: 'system',
@@ -45,7 +44,6 @@ export const generateCommitMessage = async ({
         }),
         openai.chat.completions.create({
             frequency_penalty: 0,
-            max_tokens: 4000,
             messages: [
                 {
                     role: 'system',

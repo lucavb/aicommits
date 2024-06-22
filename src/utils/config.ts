@@ -18,10 +18,12 @@ export const configSchema = z.object({
         .refine((str: string): str is LanguageCode => iso6391.validate(str)),
     maxLength: z.number().int().positive().default(140),
     model: z.string().min(1),
-    stageAll: z
-        .string()
-        .optional()
-        .transform((str) => str === 'true'),
+    stageAll: z.boolean().or(
+        z
+            .string()
+            .optional()
+            .transform((str) => str === 'true'),
+    ),
     type: z.enum(['conventional', ''] as const).optional(),
 } satisfies Record<(typeof configKeys)[number], ZodType> & Record<string, ZodType>);
 
