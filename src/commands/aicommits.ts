@@ -24,9 +24,7 @@ const chooseOption = async (message: string, options: string[]): Promise<string 
     return options[selected];
 };
 
-const isError = (error: unknown): error is Error => {
-    return error instanceof Error;
-};
+const isError = (error: unknown): error is Error => error instanceof Error;
 
 export const aiCommits = async (config: Config) => {
     try {
