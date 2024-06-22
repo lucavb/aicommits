@@ -1,4 +1,4 @@
-import { bgCyan, black, dim, green, red } from 'kolorist';
+import { bgCyan, black, dim, green, red, cyan } from 'kolorist';
 import { confirm, intro, isCancel, outro, select, spinner } from '@clack/prompts';
 import { assertGitRepo, commitChanges, getDetectedMessage, getStagedDiff, stageAllFiles } from '../utils/git';
 import { generateCommitMessage } from '../utils/openai';
@@ -72,7 +72,7 @@ export const aiCommits = async (config: Config) => {
             [message] = messages;
             [body] = commitBodies;
             const confirmed = await confirm({
-                message: `Use this commit message?\n\n   ${message}\n\nWith this body?\n\n   ${body}\n`,
+                message: `Use this commit message?\n\n${cyan(message)}\n\n${cyan(body)}\n`,
             });
 
             if (!confirmed || isCancel(confirmed)) {
