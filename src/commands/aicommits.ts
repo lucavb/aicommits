@@ -95,7 +95,7 @@ export const aiCommits = async (config: Config) => {
             }
         }
 
-        const fullMessage = `${message}\n\n${body}`;
+        const fullMessage = `${message}\n\n${body}`.trim();
         await commitChanges(fullMessage);
 
         outro(`${green('✔')} Successfully committed with message:\n\n   ${message}\n\nand body:\n\n   ${body}`);
