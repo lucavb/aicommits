@@ -4,6 +4,7 @@ import typescript from '@rollup/plugin-typescript';
 import terser from '@rollup/plugin-terser';
 import json from '@rollup/plugin-json';
 import type { RollupOptions } from 'rollup';
+import packageJson from './package.json';
 
 export default {
     input: 'src/cli.ts',
@@ -14,7 +15,5 @@ export default {
         sourcemap: true,
     },
     plugins: [resolve(), commonjs(), typescript(), json(), terser()],
-    external: [
-        // List external dependencies here
-    ],
+    external: Object.keys(packageJson.dependencies),
 } satisfies RollupOptions;
