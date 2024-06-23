@@ -3,8 +3,10 @@ import { configCommand } from './commands/config';
 import { configSchema, readConfig } from './utils/config';
 import { shake } from 'radash';
 import { aiCommits } from './commands/aicommits';
+import { prepareCommitMsgCommand } from './commands/prepare-commit-msg';
 
 program.addCommand(configCommand);
+program.addCommand(prepareCommitMsgCommand);
 
 program
     .addOption(new Option('--api-key <apiKey>'))

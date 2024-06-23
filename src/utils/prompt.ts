@@ -54,7 +54,7 @@ export const generateCommitMessagePrompt = (locale: string, maxLength: number, t
         'Generate a concise git commit message written in present tense for the following code diff with the given specifications below:',
         `Message language: ${locale}`,
         `Commit message must be a maximum of ${maxLength} characters.`,
-        'Exclude anything unnecessary such as translation. Your entire response will be passed directly into git commit.',
+        'Exclude anything unnecessary. Your entire response will be passed directly into git commit.',
         commitTypes[type],
         specifyCommitFormat(type),
     ]
