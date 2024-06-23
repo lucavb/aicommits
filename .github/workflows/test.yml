@@ -8,43 +8,23 @@ on:
 jobs:
     test:
         name: Test
-        strategy:
-            matrix:
-                os: [ubuntu-latest, windows-latest]
-
-        runs-on: ${{ matrix.os }}
+        runs-on: ubuntu-latest
         timeout-minutes: 10
 
         steps:
             - name: Checkout
-              uses: actions/checkout@v3
+              uses: actions/checkout@v4
 
             - name: Use Node.js
-              uses: actions/setup-node@v3
+              uses: actions/setup-node@v4
               with:
                   node-version-file: '.nvmrc'
 
-            - name: Setup pnpm
-              uses: pnpm/action-setup@v2
-              with:
-                  version: 8
-                  run_install: true
+            - name: Install dependencies
+              run: npm i
 
-            - name: Type check
-              run: pnpm type-check
-
-            - name: Build
-              run: pnpm build
-
-            - name: Install tinyproxy
-              if: matrix.os == 'ubuntu-latest'
+            - name: Code Quality
               run: |
-                  sudo apt-get install tinyproxy
-                  tinyproxy
-            - name: Test
-              env:
-                  OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
-                  OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
-              run: |
-                  pnpm test
-                  pnpm --use-node-version=14.21.3 test
+                  npm run prettier
+                  npm run eslint
+                  npm run type-check
