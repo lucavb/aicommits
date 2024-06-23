@@ -37,6 +37,8 @@
         "eslint": "eslint .",
         "eslint:fix": "eslint . --fix",
         "prepack": "npm run build",
+        "prettier": "prettier -c --ignore-unknown .",
+        "prettier:fix": "prettier -w --ignore-unknown .",
         "type-check": "tsc"
     },
     "dependencies": {
