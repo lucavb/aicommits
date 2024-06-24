@@ -45,7 +45,7 @@ const configFilePath = join(process.env.HOME || process.env.USERPROFILE || '.', 
 export const readConfig = async (): Promise<Partial<Config>> => {
     try {
         const fileContents = await fs.readFile(configFilePath, 'utf8');
-        return yamlParse(fileContents);
+        return yamlParse(fileContents) ?? {};
     } catch (error) {
         return {};
     }
