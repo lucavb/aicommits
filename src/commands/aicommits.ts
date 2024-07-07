@@ -1,10 +1,12 @@
 import { bgCyan, black, cyan, dim, green, red } from 'kolorist';
 import { confirm, intro, isCancel, outro, select, spinner } from '@clack/prompts';
-import { assertGitRepo, commitChanges, getDetectedMessage, getStagedDiff, stageAllFiles } from '../utils/git';
-import { generateCommitMessage } from '../utils/openai';
 import { handleCliError, KnownError } from '../utils/error';
 import { Config } from '../utils/config';
 import { isError } from '../utils/typeguards';
+import { Container } from 'inversify';
+import { AICommitMessageService } from '../services/ai-commit-message.service';
+import { GitService } from '../services/git.service';
+import { ConfigService } from '../services/config.service';
 
 const chooseOption = async (message: string, options: string[]): Promise<string | null> => {
     const selected = await select({
@@ -25,21 +27,24 @@ const chooseOption = async (message: string, options: string[]): Promise<string 
     return options[selected];
 };
 
-export const aiCommits = async (config: Config) => {
+export const aiCommits = async ({ container, stageAll = false }: { container: Container; stageAll?: boolean }) => {
     try {
+        const gitService = container.get(GitService);
+        const aiCommitMessageService = container.get(AICommitMessageService);
+        const config = await container.get(ConfigService).getConfig();
         intro(bgCyan(black(' aicommits ')));
-        await assertGitRepo();
+        await gitService.assertGitRepo();
 
-        if (config.stageAll) {
+        if (stageAll) {
             const stagingSpinner = spinner();
             stagingSpinner.start('Staging all files');
-            await stageAllFiles();
+            await gitService.stageAllFiles();
             stagingSpinner.stop('All files staged');
         }
 
         const detectingFiles = spinner();
         detectingFiles.start('Detecting staged files');
-        const staged = await getStagedDiff(config.exclude, config.contextLines);
+        const staged = await gitService.getStagedDiff(config.exclude, config.contextLines);
 
         if (!staged) {
             detectingFiles.stop('Detecting staged files');
@@ -49,13 +54,12 @@ export const aiCommits = async (config: Config) => {
         }
 
         detectingFiles.stop(
-            `${getDetectedMessage(staged.files)}:\n${staged.files.map((file) => `     ${file}`).join('\n')}`,
+            `${gitService.getDetectedMessage(staged.files)}:\n${staged.files.map((file) => `     ${file}`).join('\n')}`,
         );
 
         const s = spinner();
         s.start('The AI is analyzing your changes');
-        const { commitMessages: messages, bodies: commitBodies } = await generateCommitMessage({
-            ...config,
+        const { commitMessages: messages, bodies: commitBodies } = await aiCommitMessageService.generateCommitMessage({
             diff: staged.diff,
         });
 
@@ -95,7 +99,7 @@ export const aiCommits = async (config: Config) => {
         }
 
         const fullMessage = `${message}\n\n${body}`.trim();
-        await commitChanges(fullMessage);
+        await gitService.commitChanges(fullMessage);
 
         outro(`${green('✔')} Successfully committed`);
     } catch (error) {

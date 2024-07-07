@@ -1,8 +1,5 @@
 import iso6391, { LanguageCode } from 'iso-639-1';
-import { join } from 'path';
 import { z, ZodType } from 'zod';
-import { promises as fs } from 'fs';
-import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
 
 export const configKeys = [
     'apiKey',
@@ -39,19 +36,3 @@ export const configSchema = z.object({
 } satisfies Record<(typeof configKeys)[number], ZodType> & Record<string, ZodType>);
 
 export type Config = z.TypeOf<typeof configSchema>;
-
-const configFilePath = join(process.env.HOME || process.env.USERPROFILE || '.', '.aicommits.yaml');
-
-export const readConfig = async (): Promise<Partial<Config>> => {
-    try {
-        const fileContents = await fs.readFile(configFilePath, 'utf8');
-        return yamlParse(fileContents) ?? {};
-    } catch (error) {
-        return {};
-    }
-};
-
-export const writeConfig = async (config: Partial<Config>): Promise<void> => {
-    const yamlStr = yamlStringify(config);
-    await fs.writeFile(configFilePath, yamlStr, 'utf8');
-};

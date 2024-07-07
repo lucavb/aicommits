@@ -1,4 +1,5 @@
-import type { Config } from './config';
+import type { Config } from '../utils/config';
+import { Injectable } from '../utils/inversify';
 
 type CommitType = NonNullable<Config['type']>;
 
@@ -39,24 +40,29 @@ const commitTypes: Record<CommitType, string> = {
     )}`,
 };
 
-export const generateSummaryPrompt = (locale: string) =>
-    [
-        'Generate a concise git commit body written in present tense for the following code diff with the given specifications below:',
-        `Message language: ${locale}`,
-        'Use bullet points for the items.',
-        'Return only the bullet points using the ascii character "*". Your entire response will be passed directly into git commit.',
-    ]
-        .filter((entry) => !!entry)
-        .join('\n');
+@Injectable()
+export class PromptService {
+    generateSummaryPrompt(locale: string) {
+        return [
+            'Generate a concise git commit body written in present tense for the following code diff with the given specifications below:',
+            `Message language: ${locale}`,
+            'Use bullet points for the items.',
+            'Return only the bullet points using the ascii character "*". Your entire response will be passed directly into git commit.',
+        ]
+            .filter((entry) => !!entry)
+            .join('\n');
+    }
 
-export const generateCommitMessagePrompt = (locale: string, maxLength: number, type: CommitType) =>
-    [
-        'Generate a concise git commit message written in present tense for the following code diff with the given specifications below:',
-        `Message language: ${locale}`,
-        `Commit message must be a maximum of ${maxLength} characters.`,
-        'Exclude anything unnecessary. Your entire response will be passed directly into git commit.',
-        commitTypes[type],
-        specifyCommitFormat(type),
-    ]
-        .filter((entry) => !!entry)
-        .join('\n');
+    generateCommitMessagePrompt(locale: string, maxLength: number, type: CommitType) {
+        return [
+            'Generate a concise git commit message written in present tense for the following code diff with the given specifications below:',
+            `Message language: ${locale}`,
+            `Commit message must be a maximum of ${maxLength} characters.`,
+            'Exclude anything unnecessary. Your entire response will be passed directly into git commit.',
+            commitTypes[type],
+            specifyCommitFormat(type),
+        ]
+            .filter((entry) => !!entry)
+            .join('\n');
+    }
+}

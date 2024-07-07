@@ -1,9 +1,10 @@
+import 'reflect-metadata';
 import { Option, program } from '@commander-js/extra-typings';
-import { configCommand } from './commands/config';
-import { configSchema, readConfig } from './utils/config';
-import { shake } from 'radash';
 import { aiCommits } from './commands/aicommits';
+import { configCommand } from './commands/config';
 import { prepareCommitMsgCommand } from './commands/prepare-commit-msg';
+import { container } from './utils/di';
+import { CLI_ARGUMENTS } from './services/config.service';
 
 program.addCommand(configCommand);
 program.addCommand(prepareCommitMsgCommand);
@@ -20,20 +21,8 @@ program
     .addOption(new Option('--stage-all'))
     .addOption(new Option('--type <type>'))
     .action(async (options) => {
-        const savedConfig = await readConfig();
-        const rawConfig = {
-            ...savedConfig,
-            ...shake(options),
-            exclude: [...(savedConfig.exclude ?? []), options.exclude].filter(
-                (arg): arg is string => typeof arg === 'string',
-            ),
-        };
-        const parseResult = configSchema.safeParse(rawConfig);
-        if (parseResult.success) {
-            await aiCommits(parseResult.data);
-        } else {
-            console.error(parseResult.error.errors);
-        }
+        container.bind(CLI_ARGUMENTS).toConstantValue(options);
+        await aiCommits({ container });
     });
 
 program.parse(process.argv);
