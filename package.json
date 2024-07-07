@@ -1,6 +1,6 @@
 {
     "name": "@lucavb/aicommits",
-    "version": "0.0.0-semantic-release",
+    "version": "0.0.1",
     "description": "Writes your git commit messages for you with AI",
     "keywords": [
         "ai",

@@ -22,7 +22,7 @@ program
     .addOption(new Option('--type <type>'))
     .action(async (options) => {
         container.bind(CLI_ARGUMENTS).toConstantValue(options);
-        await aiCommits({ container });
+        await aiCommits({ container, stageAll: options.stageAll });
     });
 
 program.parse(process.argv);

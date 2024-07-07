@@ -48,7 +48,7 @@ export const aiCommits = async ({ container, stageAll = false }: { container: Co
         if (!staged) {
             detectingFiles.stop('Detecting staged files');
             throw new KnownError(
-                'No staged changes found. Stage your changes manually, or automatically stage all changes with the `--all` flag.',
+                'No staged changes found. Stage your changes manually, or automatically stage all changes with the `--stage-all` flag.',
             );
         }
 
