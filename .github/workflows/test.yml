@@ -29,3 +29,6 @@ jobs:
                   npm run prettier
                   npm run eslint
                   npm run type-check
+
+            - name: Tests
+              run: npm run test
