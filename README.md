@@ -16,33 +16,38 @@
 1. Install _aicommits_:
 
     ```sh
-    npm install -g aicommits
+    npm install -g @lucavb/aicommits
     ```
 
-2. Retrieve your API key from [OpenAI](https://platform.openai.com/account/api-keys)
+2. Choose your provider:
+
+    For OpenAPI run:
+
+    ```shell
+    aic config set baseUrl "https://api.openai.com/v1"
+    ```
+
+    For any other provider replace the URL with yours. It needs to be compatible with the OpenAI API.
+
+3. Retrieve your API key from your provider (if necessary)
+   For OpenAI you can find your API Key [here](https://platform.openai.com/account/api-keys)
 
     > Note: If you haven't already, you'll have to create an account and set up billing.
 
-3. Set the key so aicommits can use it:
+4. Set the key so @lucavb/aicommits can use it:
 
     ```sh
-    aicommits config set OPENAI_KEY=<your token> OPENAI_BASE_URL=<your-custom-openai-server-address>
+    aicommits config set apiKey <your token>
     ```
 
     This will create a `.aicommits` file in your home directory.
 
 ### Upgrading
 
-Check the installed version with:
-
-```
-aicommits --version
-```
-
-If it's not the [latest version](https://github.com/Nutlope/aicommits/releases/latest), run:
+You can upgrade to the latest version by running:
 
 ```sh
-npm update -g aicommits
+npm update -g @lucavb/aicommits
 ```
 
 ## Usage
@@ -61,7 +66,7 @@ aicommits
 For example, you can stage all changes in tracked files with as you commit:
 
 ```sh
-aicommits --all # or -a
+aicommits --stage-all # or -a
 ```
 
 > 👉 **Tip:** Use the `aic` alias if `aicommits` is too long for you.
@@ -85,26 +90,6 @@ aicommits --type conventional # or -t conventional
 ```
 
 This feature can be useful if your project follows the Conventional Commits standard or if you're using tools that rely on this commit format.
-
-### Git hook
-
-You can also integrate _aicommits_ with Git via the [`prepare-commit-msg`](https://git-scm.com/docs/githooks#_prepare_commit_msg) hook. This lets you use Git like you normally would, and edit the commit message before committing.
-
-#### Install
-
-In the Git repository you want to install the hook in:
-
-```sh
-aicommits hook install
-```
-
-#### Uninstall
-
-In the Git repository you want to uninstall the hook from:
-
-```sh
-aicommits hook uninstall
-```
 
 #### Usage
 
@@ -133,22 +118,6 @@ aicommits config get <key>
 
 For example, to retrieve the API key, you can use:
 
-```sh
-aicommits config get OPENAI_KEY
-```
-
-For example, to retrieve the API URL, you can use:
-
-```sh
-aicommits config get OPENAI_BASE_URL
-```
-
-You can also retrieve multiple configuration options at once by separating them with spaces:
-
-```sh
-aicommits config get OPENAI_KEY OPENAI_BASE_URL generate
-```
-
 ### Setting a configuration value
 
 To set a configuration option, use the command:
@@ -159,34 +128,17 @@ aicommits config set <key>=<value>
 
 For example, to set the API key, you can use:
 
-```sh
-aicommits config set OPENAI_KEY=<your-api-key>
-```
-
-For example, to set the API URL, you can use:
-
-```sh
-aicommits config set OPENAI_BASE_URL=<your-custom-openai-server-address>
-```
-
-You can also set multiple configuration options at once by separating them with spaces, like
-
-```sh
-aicommits config set OPENAI_KEY=<your-api-key> OPENAI_BASE_URL=<your-custom-openai-server-address>  generate=3 locale=en
-```
-
 ### Options
 
-#### OPENAI_KEY
+#### apiKey
 
 Required
 
-The OpenAI API key. You can retrieve it from [OpenAI API Keys page](https://platform.openai.com/account/api-keys).
+The API key needed for your provider.
 
-#### OPENAI_BASE_URL
+#### baseUrl
 
-Default: `https://api.openai.com/v1`
-Optional
+Required
 
 The base URL for the OpenAI API. You can use this to point to a different API endpoint, such as a local development server.
 
@@ -204,33 +156,9 @@ The number of commit messages to generate to pick from.
 
 Note, this will use more tokens as it generates more results.
 
-#### proxy
-
-Set a HTTP/HTTPS proxy to use for requests.
-
-To clear the proxy option, you can use the command (note the empty value after the equals sign):
-
-```sh
-aicommits config set proxy=
-```
-
 #### model
 
-Default: `gpt-3.5-turbo`
-
-The Chat Completions (`/v1/chat/completions`) model to use. Consult the list of models available in the [OpenAI Documentation](https://platform.openai.com/docs/models/model-endpoint-compatibility).
-
-> Tip: If you have access, try upgrading to [`gpt-4`](https://platform.openai.com/docs/models/gpt-4) for next-level code analysis. It can handle double the input size, but comes at a higher cost. Check out OpenAI's website to learn more.
-
-#### timeout
-
-The timeout for network requests to the OpenAI API in milliseconds.
-
-Default: `10000` (10 seconds)
-
-```sh
-aicommits config set timeout=20000 # 20s
-```
+The Chat Completions (`/v1/chat/completions`) model to use.
 
 #### max-length
 
@@ -239,7 +167,7 @@ The maximum character length of the generated commit message.
 Default: `50`
 
 ```sh
-aicommits config set max-length=100
+aicommits config set maxLength 100
 ```
 
 #### type
@@ -249,13 +177,13 @@ Default: `""` (Empty string)
 The type of commit message to generate. Set this to "conventional" to generate commit messages that follow the Conventional Commits specification:
 
 ```sh
-aicommits config set type=conventional
+aicommits config set type conventional
 ```
 
 You can clear this option by setting it to an empty string:
 
 ```sh
-aicommits config set type=
+aicommits config set type ""
 ```
 
 ## How it works
