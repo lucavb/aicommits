@@ -81,7 +81,7 @@ describe('ConfigService', () => {
                 exclude: [],
                 generate: 1,
                 locale: 'en',
-                maxLength: 140,
+                maxLength: 50,
                 stageAll: false,
             });
         });

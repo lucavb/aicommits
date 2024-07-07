@@ -24,7 +24,7 @@ export const configSchema = z.object({
         .length(2)
         .default('en')
         .refine((str: string): str is LanguageCode => iso6391.validate(str)),
-    maxLength: z.number().int().positive().default(140),
+    maxLength: z.coerce.number().int().positive().default(50),
     model: z.string().min(1),
     stageAll: z.boolean().or(
         z
