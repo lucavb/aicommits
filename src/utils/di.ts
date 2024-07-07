@@ -4,7 +4,6 @@ import { AICommitMessageService } from '../services/ai-commit-message.service';
 import { ConfigService, FILE_SYSTEM_PROMISE_API } from '../services/config.service';
 import { GitService } from '../services/git.service';
 import { PromptService } from '../services/prompt.service';
-import OpenAI from 'openai';
 import { promises as fs } from 'fs';
 
 const container = new Container({ defaultScope: 'Singleton' });

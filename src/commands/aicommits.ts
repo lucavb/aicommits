@@ -1,7 +1,6 @@
 import { bgCyan, black, cyan, dim, green, red } from 'kolorist';
 import { confirm, intro, isCancel, outro, select, spinner } from '@clack/prompts';
 import { handleCliError, KnownError } from '../utils/error';
-import { Config } from '../utils/config';
 import { isError } from '../utils/typeguards';
 import { Container } from 'inversify';
 import { AICommitMessageService } from '../services/ai-commit-message.service';

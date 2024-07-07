@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import { Container } from 'inversify';
-import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
+import { stringify as yamlStringify } from 'yaml';
 import { CLI_ARGUMENTS, CONFIG_FILE_PATH, ConfigService, FILE_SYSTEM_PROMISE_API } from './config.service';
 import { Injectable } from '../utils/inversify';
 import { Config } from '../utils/config';

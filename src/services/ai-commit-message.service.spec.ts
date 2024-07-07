@@ -16,7 +16,8 @@ type DeepPartial<T> = T extends object
 @Injectable()
 class MockOpenAI implements DeepPartial<OpenAI> {
     public readonly chat = {
-        // @ts-ignore
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
         completions: {
             create: jest.fn().mockResolvedValue({}),
         } as const,
