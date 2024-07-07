@@ -1,13 +1,4 @@
-<div align="center">
-  <div>
-    <img src=".github/screenshot.png" alt="AI Commits"/>
-    <h1 align="center">AI Commits</h1>
-  </div>
-	<p>A CLI that writes your git commit messages for you with AI. Never write a commit message again.</p>
-	<a href="https://www.npmjs.com/package/aicommits"><img src="https://img.shields.io/npm/v/aicommits" alt="Current version"></a>
-</div>
-
----
+# @lucavb/aicommits
 
 ## Setup
 
@@ -200,4 +191,4 @@ Video coming soon where I rebuild it from scratch to show you how to easily buil
 
 ## Contributing
 
-If you want to help fix a bug or implement a feature in [Issues](https://github.com/Nutlope/aicommits/issues), checkout the [Contribution Guide](CONTRIBUTING.md) to learn how to setup and test the project
+If you want to help fix a bug or implement a feature in [Issues](https://github.com/lucavb/aicommits/issues), checkout the [Contribution Guide](CONTRIBUTING.md) to learn how to setup and test the project
