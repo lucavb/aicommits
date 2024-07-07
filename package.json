@@ -8,7 +8,10 @@
         "commit"
     ],
     "license": "MIT",
-    "repository": "github:lucavb/aicommits",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/lucavb/aicommits.git"
+    },
     "contributors": [
         {
             "name": "Hassan El Mghari",
@@ -26,8 +29,8 @@
         "dist"
     ],
     "bin": {
-        "aicommits": "./dist/cli.mjs",
-        "aic": "./dist/cli.mjs"
+        "aicommits": "dist/cli.mjs",
+        "aic": "dist/cli.mjs"
     },
     "scripts": {
         "build": "rollup --config rollup.config.ts --configPlugin typescript",
