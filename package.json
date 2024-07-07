@@ -12,6 +12,10 @@
         "type": "git",
         "url": "git+https://github.com/lucavb/aicommits.git"
     },
+    "publishConfig": {
+        "access": "public",
+        "registry": "https://registry.npmjs.org/"
+    },
     "contributors": [
         {
             "name": "Hassan El Mghari",
