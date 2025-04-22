@@ -45,6 +45,10 @@ export class AICommitMessageService {
                 messages: [
                     {
                         role: 'system',
+                        content: this.promptService.getCommitMessageSystemPrompt(),
+                    },
+                    {
+                        role: 'user',
                         content: this.promptService.generateCommitMessagePrompt(locale, maxLength, type ?? ''),
                     },
                     { role: 'user', content: diff },
@@ -98,6 +102,10 @@ export class AICommitMessageService {
                 messages: [
                     {
                         role: 'system',
+                        content: this.promptService.getCommitMessageSystemPrompt(),
+                    },
+                    {
+                        role: 'user',
                         content: this.promptService.generateCommitMessagePrompt(locale, maxLength, type ?? ''),
                     },
                     {
