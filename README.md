@@ -1,8 +1,33 @@
 # @lucavb/aicommits
 
-## Setup
+[![npm version](https://img.shields.io/npm/v/@lucavb/aicommits.svg?style=flat)](https://www.npmjs.com/package/@lucavb/aicommits)
+[![Build Status](https://github.com/lucavb/aicommits/actions/workflows/test.yml/badge.svg)](https://github.com/lucavb/aicommits/actions)
+
+## Quick Start
+
+Install globally:
+
+```sh
+npm install -g @lucavb/aicommits
+```
+
+Stage your changes and generate a commit message:
+
+```sh
+git add <files...>
+aicommits
+```
+
+Example output:
+
+```
+✔ Generating commit message...
+feat: Add user authentication and update login flow
+```
 
 > The minimum supported version of Node.js is the latest v14. Check your Node.js version with `node --version`.
+
+## Setup
 
 1. Install _aicommits_:
 
@@ -44,7 +69,7 @@
 
 ### Upgrading
 
-You can upgrade to the latest version by running:
+Upgrade to the latest version:
 
 ```sh
 npm update -g @lucavb/aicommits
@@ -198,11 +223,16 @@ Video coming soon where I rebuild it from scratch to show you how to easily buil
 ## Maintainers
 
 -   **Luca Becker**: [@lucavb](https://github.com/lucavb)
-
 -   **Hassan El Mghari**: [@Nutlope](https://github.com/Nutlope) [<img src="https://img.shields.io/twitter/follow/nutlope?style=flat&label=nutlope&logo=twitter&color=0bf&logoColor=fff" align="center">](https://twitter.com/nutlope)
-
 -   **Hiroki Osame**: [@privatenumber](https://github.com/privatenumber) [<img src="https://img.shields.io/twitter/follow/privatenumbr?style=flat&label=privatenumbr&logo=twitter&color=0bf&logoColor=fff" align="center">](https://twitter.com/privatenumbr)
 
 ## Contributing
 
 If you want to help fix a bug or implement a feature in [Issues](https://github.com/lucavb/aicommits/issues), checkout the [Contribution Guide](CONTRIBUTING.md) to learn how to setup and test the project
+
+## Support & Links
+
+-   [Documentation](https://github.com/lucavb/aicommits#readme)
+-   [Report Issues](https://github.com/lucavb/aicommits/issues)
+-   [NPM Package](https://www.npmjs.com/package/@lucavb/aicommits)
+-   [License](./LICENSE)
