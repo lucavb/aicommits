@@ -6,6 +6,7 @@ import { isString } from '../utils/typeguards';
 import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
 import { shake } from 'radash';
 import { Inject, Injectable, Optional } from '../utils/inversify';
+import type { ZodIssue } from 'zod';
 
 export const CLI_ARGUMENTS = Symbol.for('CLI_ARGUMENTS');
 export const CONFIG_FILE_PATH = Symbol.for('CONFIG_FILE_PATH');
@@ -40,13 +41,26 @@ export class ConfigService {
         await this.fs.writeFile(this.configFilePath, yamlStr, 'utf8');
     }
 
-    async getConfig(): Promise<Readonly<Config>> {
+    private async getRawConfig() {
         const savedConfig = await this.readConfig();
-        const rawConfig = {
+        return {
             ...savedConfig,
             ...shake(this.cliArguments),
             exclude: [...(savedConfig.exclude ?? []), this.cliArguments.exclude].filter(isString),
-        };
+        } as const;
+    }
+
+    async getConfig(): Promise<Readonly<Config>> {
+        const rawConfig = await this.getRawConfig();
         return configSchema.parse(rawConfig);
+    }
+
+    async validConfig(): Promise<{ valid: true } | { valid: false; errors: ZodIssue[] }> {
+        const rawConfig = await this.getRawConfig();
+        const parsedResult = configSchema.safeParse(rawConfig);
+        if (parsedResult.success) {
+            return { valid: true };
+        }
+        return { valid: false, errors: parsedResult.error.issues };
     }
 }
