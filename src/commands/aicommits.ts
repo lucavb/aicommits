@@ -1,5 +1,5 @@
 import { bgCyan, black, cyan, dim, green, red } from 'kolorist';
-import { confirm, intro, isCancel, outro, select, spinner } from '@clack/prompts';
+import { intro, isCancel, outro, select, spinner, text } from '@clack/prompts';
 import { handleCliError, KnownError } from '../utils/error';
 import { isError } from '../utils/typeguards';
 import { Container } from 'inversify';
@@ -24,6 +24,59 @@ const chooseOption = async (message: string, options: string[]): Promise<string 
     }
 
     return options[selected];
+};
+
+const reviewAndRevise = async (
+    aiCommitMessageService: AICommitMessageService,
+    message: string,
+    body: string,
+    diff: string,
+): Promise<{ accepted: boolean; message?: string; body?: string }> => {
+    let currentMessage = message;
+    let currentBody = body;
+
+    // Use a for loop with a maximum number of revisions to avoid infinite loops and lint errors.
+    for (let i = 0; i < 10; i++) {
+        const confirmed = await select({
+            message: `Proposed commit message:\n\n${cyan(
+                currentMessage,
+            )}\n\n${cyan(currentBody)}\n\nWhat would you like to do?`,
+            options: [
+                { label: 'Accept and commit', value: 'accept' },
+                { label: 'Revise with a prompt', value: 'revise' },
+                { label: 'Cancel', value: 'cancel' },
+            ],
+        });
+
+        if (confirmed === 'accept') {
+            return { accepted: true, message: currentMessage, body: currentBody };
+        }
+        if (confirmed === 'cancel' || isCancel(confirmed)) {
+            outro('Commit cancelled');
+            return { accepted: false };
+        }
+        if (confirmed === 'revise') {
+            const userPrompt = await text({
+                message:
+                    'Describe how you want to revise the commit message (e.g. "make it more descriptive", "use imperative mood", etc):',
+                placeholder: 'Enter revision prompt',
+            });
+            if (!userPrompt || isCancel(userPrompt)) {
+                outro('Commit cancelled');
+                return { accepted: false };
+            }
+            const s = spinner();
+            s.start('The AI is revising your commit message');
+            const { commitMessages: revisedMessages, bodies: revisedBodies } =
+                await aiCommitMessageService.reviseCommitMessage({ diff, userPrompt });
+            s.stop('Revision complete');
+            currentMessage = revisedMessages[0] ?? currentMessage;
+            currentBody = revisedBodies[0] ?? currentBody;
+        }
+    }
+    // If the user somehow exceeds the revision limit, cancel gracefully.
+    outro('Too many revisions requested, commit cancelled.');
+    return { accepted: false };
 };
 
 export const aiCommits = async ({ container, stageAll = false }: { container: Container; stageAll?: boolean }) => {
@@ -70,17 +123,16 @@ export const aiCommits = async ({ container, stageAll = false }: { container: Co
 
         let message: string;
         let body: string;
+
         if (messages.length === 1 && commitBodies.length === 1) {
             [message] = messages;
             [body] = commitBodies;
-            const confirmed = await confirm({
-                message: `Use this commit message?\n\n${cyan(message)}\n\n${cyan(body)}\n`,
-            });
-
-            if (!confirmed || isCancel(confirmed)) {
-                outro('Commit cancelled');
+            const result = await reviewAndRevise(aiCommitMessageService, message, body, staged.diff);
+            if (!result?.accepted) {
                 return;
             }
+            message = result.message ?? '';
+            body = result.body ?? '';
         } else {
             message = (await chooseOption('Pick a commit message to use:', messages)) ?? '';
             if (!message) {
@@ -95,6 +147,12 @@ export const aiCommits = async ({ container, stageAll = false }: { container: Co
             } else {
                 body = '';
             }
+            const result = await reviewAndRevise(aiCommitMessageService, message, body, staged.diff);
+            if (!result?.accepted) {
+                return;
+            }
+            message = result.message ?? '';
+            body = result.body ?? '';
         }
 
         const fullMessage = `${message}\n\n${body}`.trim();

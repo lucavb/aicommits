@@ -16,7 +16,7 @@ const deduplicateMessages = (array: string[]) => Array.from(new Set(array));
 @Injectable()
 export class AICommitMessageService {
     constructor(
-        @Optional() @Inject(OpenAI) private openai: Pick<OpenAI, 'chat'> | undefined,
+        @Optional() @Inject(OpenAI) private readonly openai: Pick<OpenAI, 'chat'> | undefined,
         private readonly configService: ConfigService,
         private readonly promptService: PromptService,
     ) {}
@@ -63,6 +63,68 @@ export class AICommitMessageService {
                 ],
                 model,
                 n: generateParam ?? generate,
+                presence_penalty: 0,
+                temperature: 0.7,
+                top_p: 1,
+            }),
+        ]);
+
+        return {
+            commitMessages: deduplicateMessages(
+                commitMessageCompletion.choices
+                    .map((choice) => choice.message?.content)
+                    .filter(isString)
+                    .map((content) => sanitizeMessage(content)),
+            ),
+            bodies: commitBodyCompletion.choices.map((choice) => choice.message.content?.trim()).filter(isString),
+        };
+    }
+
+    async reviseCommitMessage({
+        diff,
+        userPrompt,
+        generate,
+    }: {
+        diff: string;
+        userPrompt: string;
+        generate?: number;
+    }): Promise<{ commitMessages: string[]; bodies: string[] }> {
+        const { locale, maxLength, type, model } = await this.configService.getConfig();
+        const openAi = await this.getOpenAi();
+
+        const [commitMessageCompletion, commitBodyCompletion] = await Promise.all([
+            openAi.chat.completions.create({
+                frequency_penalty: 0,
+                messages: [
+                    {
+                        role: 'system',
+                        content: this.promptService.generateCommitMessagePrompt(locale, maxLength, type ?? ''),
+                    },
+                    {
+                        role: 'user',
+                        content: `${diff}\n\nUser revision prompt: ${userPrompt}`,
+                    },
+                ],
+                model,
+                n: generate,
+                presence_penalty: 0,
+                temperature: 0.7,
+                top_p: 1,
+            }),
+            openAi.chat.completions.create({
+                frequency_penalty: 0,
+                messages: [
+                    {
+                        role: 'system',
+                        content: this.promptService.generateSummaryPrompt(locale),
+                    },
+                    {
+                        role: 'user',
+                        content: `${diff}\n\nUser revision prompt: ${userPrompt}`,
+                    },
+                ],
+                model,
+                n: generate,
                 presence_penalty: 0,
                 temperature: 0.7,
                 top_p: 1,
