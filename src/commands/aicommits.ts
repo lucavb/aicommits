@@ -78,12 +78,10 @@ const reviewAndRevise = async (
 
         if (confirmed === 'accept') {
             return { accepted: true, message: currentMessage, body: currentBody };
-        }
-        if (confirmed === 'cancel' || isCancel(confirmed)) {
+        } else if (confirmed === 'cancel' || isCancel(confirmed)) {
             outro('Commit cancelled');
             return { accepted: false };
-        }
-        if (confirmed === 'revise') {
+        } else if (confirmed === 'revise') {
             const userPrompt = await text({
                 message:
                     'Describe how you want to revise the commit message (e.g. "make it more descriptive", "use imperative mood", etc):',
@@ -100,8 +98,7 @@ const reviewAndRevise = async (
             s.stop('Revision complete');
             currentMessage = revisedMessages[0] ?? currentMessage;
             currentBody = revisedBodies[0] ?? currentBody;
-        }
-        if (confirmed === 'edit') {
+        } else if (confirmed === 'edit') {
             const initial = `${currentMessage}\n\n${currentBody}`.trim();
             const edited = openInEditor(initial);
             if (edited === null) {
