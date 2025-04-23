@@ -33,6 +33,15 @@
 
     This will create a `.aicommits` file in your home directory.
 
+5. **Specify the model to use.**  
+   You must set the `model` property to a valid model name. This can be any model supported by your provider, such as `gpt-4o-mini`, `gpt-3.5-turbo`, or a custom model if you are using a custom OpenAI-compatible API.
+
+    ```sh
+    aicommits config set model gpt-4o-mini
+    ```
+
+    > Note: The model property is required. If you are using a custom provider, specify the model name as required by your API.
+
 ### Upgrading
 
 You can upgrade to the latest version by running:
@@ -149,7 +158,10 @@ Note, this will use more tokens as it generates more results.
 
 #### model
 
-The Chat Completions (`/v1/chat/completions`) model to use.
+**Required**
+
+The Chat Completions (`/v1/chat/completions`) model to use.  
+You must specify a model name, such as `gpt-4o-mini`, `gpt-3.5-turbo`, or a custom model if you are using a custom OpenAI-compatible API.
 
 #### max-length
 
