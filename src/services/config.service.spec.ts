@@ -86,4 +86,30 @@ describe('ConfigService', () => {
             });
         });
     });
+
+    describe('validConfig', () => {
+        it('should return { valid: true } for a valid config', async () => {
+            const savedConfig = { model: 'llama3' } satisfies Partial<Config>;
+            mockFsApi.readFile.mockResolvedValueOnce(yamlStringify(savedConfig));
+
+            const result = await configService.validConfig();
+
+            expect(result).toEqual({ valid: true });
+        });
+
+        it('should return { valid: false, errors } for an invalid config', async () => {
+            // model is required, so omit it to make config invalid
+            const invalidConfig = { model: undefined } satisfies Partial<Config>;
+            mockFsApi.readFile.mockResolvedValueOnce(yamlStringify(invalidConfig));
+
+            const result = await configService.validConfig();
+
+            if (result.valid) {
+                throw new Error();
+            }
+            expect(Array.isArray(result.errors)).toBe(true);
+            expect(result.errors.length).toBeGreaterThan(0);
+            expect(result.errors[0]).toHaveProperty('message');
+        });
+    });
 });

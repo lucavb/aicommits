@@ -7,7 +7,7 @@ import { AICommitMessageService } from '../services/ai-commit-message.service';
 import { GitService } from '../services/git.service';
 import { ConfigService } from '../services/config.service';
 import { tmpdir } from 'os';
-import { writeFileSync, readFileSync, unlinkSync } from 'fs';
+import { readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { spawnSync } from 'child_process';
 
@@ -119,8 +119,17 @@ export const aiCommits = async ({ container, stageAll = false }: { container: Co
     try {
         const gitService = container.get(GitService);
         const aiCommitMessageService = container.get(AICommitMessageService);
-        const config = await container.get(ConfigService).getConfig();
+        const configService = container.get(ConfigService);
         intro(bgCyan(black(' aicommits ')));
+        const validResult = await configService.validConfig();
+        if (!validResult.valid) {
+            outro(
+                `${red('✖')} Your configuration is invalid. Please update your .aicommits.yaml file or pass the required options as CLI parameters.\n` +
+                    (validResult.errors?.map((e) => `- ${e.path.join('.')}: ${e.message}`).join('\n') || ''),
+            );
+            process.exit(1);
+        }
+        const config = await configService.getConfig();
         await gitService.assertGitRepo();
 
         if (stageAll) {
