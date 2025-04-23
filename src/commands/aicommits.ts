@@ -6,6 +6,10 @@ import { Container } from 'inversify';
 import { AICommitMessageService } from '../services/ai-commit-message.service';
 import { GitService } from '../services/git.service';
 import { ConfigService } from '../services/config.service';
+import { tmpdir } from 'os';
+import { writeFileSync, readFileSync, unlinkSync } from 'fs';
+import { join } from 'path';
+import { spawnSync } from 'child_process';
 
 const chooseOption = async (message: string, options: string[]): Promise<string | null> => {
     const selected = await select({
@@ -26,6 +30,30 @@ const chooseOption = async (message: string, options: string[]): Promise<string 
     return options[selected];
 };
 
+const openInEditor = (initialContent: string): string | null => {
+    const editor = process.env.EDITOR || (process.platform === 'win32' ? 'notepad' : 'vi');
+    const tmpFile = join(tmpdir(), `aicommits-msg-${Date.now()}.txt`);
+    writeFileSync(tmpFile, initialContent, { encoding: 'utf8' });
+
+    const child = spawnSync(editor, [tmpFile], { stdio: 'inherit' });
+
+    if (child.error) {
+        outro(`Failed to launch editor: ${child.error.message}`);
+        unlinkSync(tmpFile);
+        return null;
+    }
+
+    try {
+        const edited = readFileSync(tmpFile, { encoding: 'utf8' });
+        unlinkSync(tmpFile);
+        return edited;
+    } catch (e) {
+        unlinkSync(tmpFile);
+        outro('Could not read edited commit message.');
+        return null;
+    }
+};
+
 const reviewAndRevise = async (
     aiCommitMessageService: AICommitMessageService,
     message: string,
@@ -35,7 +63,6 @@ const reviewAndRevise = async (
     let currentMessage = message;
     let currentBody = body;
 
-    // Use a for loop with a maximum number of revisions to avoid infinite loops and lint errors.
     for (let i = 0; i < 10; i++) {
         const confirmed = await select({
             message: `Proposed commit message:\n\n${cyan(
@@ -44,6 +71,7 @@ const reviewAndRevise = async (
             options: [
                 { label: 'Accept and commit', value: 'accept' },
                 { label: 'Revise with a prompt', value: 'revise' },
+                { label: 'Edit in $EDITOR', value: 'edit' },
                 { label: 'Cancel', value: 'cancel' },
             ],
         });
@@ -73,8 +101,19 @@ const reviewAndRevise = async (
             currentMessage = revisedMessages[0] ?? currentMessage;
             currentBody = revisedBodies[0] ?? currentBody;
         }
+        if (confirmed === 'edit') {
+            const initial = `${currentMessage}\n\n${currentBody}`.trim();
+            const edited = openInEditor(initial);
+            if (edited === null) {
+                outro('Commit cancelled');
+                return { accepted: false };
+            }
+            // Split edited message into subject and body (first line = subject, rest = body)
+            const [firstLine, ...rest] = edited.split('\n');
+            currentMessage = firstLine.trim();
+            currentBody = rest.join('\n').trim();
+        }
     }
-    // If the user somehow exceeds the revision limit, cancel gracefully.
     outro('Too many revisions requested, commit cancelled.');
     return { accepted: false };
 };
