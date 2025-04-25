@@ -33,6 +33,11 @@ class MockConfigService implements Partial<ConfigService> {
 class MockPromptService implements Partial<PromptService> {
     generateCommitMessagePrompt = jest.fn().mockReturnValue('generateCommitMessagePrompt');
     generateSummaryPrompt = jest.fn().mockReturnValue('generateSummaryPrompt');
+    getCommitMessageSystemPrompt = jest
+        .fn()
+        .mockReturnValue(
+            'You are a git commit message generator. Your task is to write clear, concise, and descriptive commit messages that follow best practices. Always use the imperative mood and focus on the intent and impact of the change. Do not include file names, code snippets, or unnecessary details. Never include explanations, commentary, or formatting outside the commit message itself.',
+        );
 }
 
 describe('AICommitMessageService', () => {
