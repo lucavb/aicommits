@@ -10,6 +10,15 @@ export default tseslint.config(
     {
         rules: {
             curly: ['error', 'all'],
+            '@typescript-eslint/no-unused-vars': [
+                'error',
+                {
+                    argsIgnorePattern: '^_',
+                    varsIgnorePattern: '^_',
+                    caughtErrorsIgnorePattern: '^_',
+                },
+            ],
+            'no-unused-vars': 'off', // Turn off the base rule as it can report incorrect errors
         },
     },
 );
