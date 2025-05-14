@@ -1,5 +1,5 @@
-import { bgCyan, black, green, red } from 'kolorist';
-import { intro, outro, spinner } from '@clack/prompts';
+import { bgCyan, black, green, red, yellow } from 'kolorist';
+import { intro, outro, spinner, note } from '@clack/prompts';
 import { handleCliError, KnownError } from '../utils/error';
 import { isError } from '../utils/typeguards';
 import { Container } from 'inversify';
@@ -16,9 +16,9 @@ export const aiCommits = async ({ container, stageAll = false }: { container: Co
         intro(bgCyan(black(' aicommits ')));
         const validResult = await configService.validConfig();
         if (!validResult.valid) {
-            outro(
-                `${red('✖')} Your configuration is invalid. Please update your .aicommits.yaml file or pass the required options as CLI parameters.\n` +
-                    (validResult.errors?.map((e) => `- ${e.path.join('.')}: ${e.message}`).join('\n') || ''),
+            note(
+                `It looks like you haven't set up aicommits yet. Let's get you started!\n\n` +
+                    `Run ${yellow('aicommits setup')} to configure your settings.`,
             );
             process.exit(1);
         }

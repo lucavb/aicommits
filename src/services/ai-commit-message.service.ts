@@ -17,8 +17,8 @@ const deduplicateMessages = (array: string[]) => Array.from(new Set(array));
 export class AICommitMessageService {
     constructor(
         @Optional() @Inject(OpenAI) private readonly openai: Pick<OpenAI, 'chat'> | undefined,
-        private readonly configService: ConfigService,
-        private readonly promptService: PromptService,
+        @Inject(ConfigService) private readonly configService: ConfigService,
+        @Inject(PromptService) private readonly promptService: PromptService,
     ) {}
 
     private async getOpenAi(): Promise<Pick<OpenAI, 'chat'>> {

@@ -27,6 +27,10 @@ export class ConfigService {
             configFilePath ?? join(process.env.HOME || process.env.USERPROFILE || '.', '.aicommits.yaml');
     }
 
+    public getConfigFilePath(): string {
+        return this.configFilePath;
+    }
+
     async readConfig(): Promise<Partial<Config>> {
         try {
             const fileContents = await this.fs.readFile(this.configFilePath, 'utf8');

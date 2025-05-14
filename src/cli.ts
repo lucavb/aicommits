@@ -3,11 +3,13 @@ import { Option, program } from '@commander-js/extra-typings';
 import { aiCommits } from './commands/aicommits';
 import { versionCommand } from './commands/version';
 import { configCommand } from './commands/config';
+import { setupCommand } from './commands/setup';
 import { prepareCommitMsgCommand } from './commands/prepare-commit-msg';
 import { container } from './utils/di';
 import { CLI_ARGUMENTS } from './services/config.service';
 
 program.addCommand(configCommand);
+program.addCommand(setupCommand);
 program.addCommand(prepareCommitMsgCommand);
 program.addCommand(versionCommand);
 
