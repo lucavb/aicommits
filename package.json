@@ -47,7 +47,7 @@
         "prettier": "prettier -c --ignore-unknown .",
         "prettier:fix": "prettier -w --ignore-unknown .",
         "test": "jest",
-        "type-check": "tsc"
+        "type-check": "tsc --noEmit --pretty --incremental --skipLibCheck"
     },
     "dependencies": {
         "@clack/prompts": "0.7.0",
