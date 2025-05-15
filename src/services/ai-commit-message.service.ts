@@ -1,9 +1,9 @@
 import { inject as Inject, injectable as Injectable } from 'inversify';
-import OpenAI from 'openai';
 import { isString } from '../utils/typeguards';
 import { ConfigService } from './config.service';
 import { PromptService } from './prompt.service';
-import { Optional } from '../utils/inversify';
+import type { AIProvider, AIProviderFactory } from './ai-provider.interface';
+import { AIProviderFactorySymbol } from './ai-provider.interface';
 
 const sanitizeMessage = (message: string) =>
     message
@@ -15,18 +15,21 @@ const deduplicateMessages = (array: string[]) => Array.from(new Set(array));
 
 @Injectable()
 export class AICommitMessageService {
+    private provider: AIProvider | undefined;
+
     constructor(
-        @Optional() @Inject(OpenAI) private readonly openai: Pick<OpenAI, 'chat'> | undefined,
+        @Inject(AIProviderFactorySymbol) private readonly providerFactory: AIProviderFactory,
         @Inject(ConfigService) private readonly configService: ConfigService,
         @Inject(PromptService) private readonly promptService: PromptService,
     ) {}
 
-    private async getOpenAi(): Promise<Pick<OpenAI, 'chat'>> {
-        if (this.openai) {
-            return this.openai;
+    private async getProvider(): Promise<AIProvider> {
+        if (this.provider) {
+            return this.provider;
         }
         const { baseUrl, apiKey } = await this.configService.getConfig();
-        return new OpenAI({ baseURL: baseUrl, apiKey });
+        this.provider = this.providerFactory.createProvider({ baseUrl, apiKey });
+        return this.provider;
     }
 
     async generateCommitMessage({
@@ -37,11 +40,10 @@ export class AICommitMessageService {
         generate?: number;
     }): Promise<{ commitMessages: string[]; bodies: string[] }> {
         const { locale, maxLength, type, model, generate } = await this.configService.getConfig();
-        const openAi = await this.getOpenAi();
+        const provider = await this.getProvider();
 
         const [commitMessageCompletion, commitBodyCompletion] = await Promise.all([
-            openAi.chat.completions.create({
-                frequency_penalty: 0,
+            provider.generateCompletion({
                 messages: [
                     {
                         role: 'system',
@@ -55,28 +57,21 @@ export class AICommitMessageService {
                 ],
                 model,
                 n: generateParam ?? generate,
-                presence_penalty: 0,
-                temperature: 0.7,
-                top_p: 1,
             }),
-            openAi.chat.completions.create({
-                frequency_penalty: 0,
+            provider.generateCompletion({
                 messages: [
                     { role: 'system', content: this.promptService.generateSummaryPrompt(locale) },
                     { role: 'user', content: diff },
                 ],
                 model,
                 n: generateParam ?? generate,
-                presence_penalty: 0,
-                temperature: 0.7,
-                top_p: 1,
             }),
         ]);
 
         return {
             commitMessages: deduplicateMessages(
                 commitMessageCompletion.choices
-                    .map((choice) => choice.message?.content)
+                    .map((choice) => choice.message.content)
                     .filter(isString)
                     .map((content) => sanitizeMessage(content)),
             ),
@@ -94,11 +89,10 @@ export class AICommitMessageService {
         generate?: number;
     }): Promise<{ commitMessages: string[]; bodies: string[] }> {
         const { locale, maxLength, type, model } = await this.configService.getConfig();
-        const openAi = await this.getOpenAi();
+        const provider = await this.getProvider();
 
         const [commitMessageCompletion, commitBodyCompletion] = await Promise.all([
-            openAi.chat.completions.create({
-                frequency_penalty: 0,
+            provider.generateCompletion({
                 messages: [
                     {
                         role: 'system',
@@ -115,12 +109,8 @@ export class AICommitMessageService {
                 ],
                 model,
                 n: generate,
-                presence_penalty: 0,
-                temperature: 0.7,
-                top_p: 1,
             }),
-            openAi.chat.completions.create({
-                frequency_penalty: 0,
+            provider.generateCompletion({
                 messages: [
                     {
                         role: 'system',
@@ -133,16 +123,13 @@ export class AICommitMessageService {
                 ],
                 model,
                 n: generate,
-                presence_penalty: 0,
-                temperature: 0.7,
-                top_p: 1,
             }),
         ]);
 
         return {
             commitMessages: deduplicateMessages(
                 commitMessageCompletion.choices
-                    .map((choice) => choice.message?.content)
+                    .map((choice) => choice.message.content)
                     .filter(isString)
                     .map((content) => sanitizeMessage(content)),
             ),

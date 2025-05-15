@@ -10,6 +10,7 @@ export const configKeys = [
     'locale',
     'maxLength',
     'model',
+    'provider',
     'type',
 ] as const;
 
@@ -26,6 +27,7 @@ export const configSchema = z.object({
         .refine((str: string): str is LanguageCode => iso6391.validate(str)),
     maxLength: z.coerce.number().int().positive().default(50),
     model: z.string().min(1),
+    provider: z.enum(['openai', 'ollama']).default('openai'),
     stageAll: z.boolean().or(
         z
             .string()

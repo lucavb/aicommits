@@ -7,6 +7,7 @@ import { green, yellow, red } from 'kolorist';
 import type { LanguageCode } from 'iso-639-1';
 import iso6391 from 'iso-639-1';
 import OpenAI from 'openai';
+import { OllamaProvider } from '../services/ollama-provider';
 
 const detectLocale = (): string => {
     // Try to get locale from environment variables in order of preference
@@ -30,11 +31,29 @@ export const setupCommand = new Command('setup').description('Interactive setup 
     const configService = container.get(ConfigService);
     const currentConfig = await configService.readConfig();
 
-    // 1. Prompt for Base URL
+    // 1. Prompt for Provider
+    const provider = await select({
+        message: 'Select your AI provider',
+        options: [
+            { value: 'openai', label: 'OpenAI' },
+            { value: 'ollama', label: 'Ollama' },
+        ],
+        initialValue: currentConfig.provider || 'openai',
+    });
+    if (provider === null) {
+        cancel('Setup cancelled');
+        process.exit(0);
+    }
+    if (typeof provider !== 'string' || (provider !== 'openai' && provider !== 'ollama')) {
+        throw new Error('Invalid provider');
+    }
+
+    // 2. Prompt for Base URL
     const baseUrl = await text({
-        message: 'Enter the OpenAI API base URL',
-        placeholder: 'https://api.openai.com/v1',
-        initialValue: currentConfig.baseUrl || 'https://api.openai.com/v1',
+        message: provider === 'openai' ? 'Enter the OpenAI API base URL' : 'Enter the Ollama API base URL',
+        placeholder: provider === 'openai' ? 'https://api.openai.com/v1' : 'http://localhost:11434',
+        initialValue:
+            currentConfig.baseUrl || (provider === 'openai' ? 'https://api.openai.com/v1' : 'http://localhost:11434'),
         validate: (value) => {
             if (!value) {
                 return 'Base URL is required';
@@ -55,79 +74,126 @@ export const setupCommand = new Command('setup').description('Interactive setup 
         throw new Error('Base URL is required');
     }
 
-    // 2. Prompt for API Key (no sk- check)
-    const apiKey = await text({
-        message: 'Enter your OpenAI API key',
-        placeholder: 'Your API key',
-        initialValue: currentConfig.apiKey,
-        validate: (value) => {
-            if (!value) {
-                return 'API key is required';
-            }
-            return undefined;
-        },
-    });
-    if (apiKey === null) {
-        cancel('Setup cancelled');
-        process.exit(0);
-    }
-    if (typeof apiKey !== 'string') {
-        throw new Error('API key is required');
-    }
-
-    // 3. Fetch available models from OpenAI
-    let modelChoices: { value: string; label: string }[] = [];
-    let model: string;
-    const s = spinner();
-    s.start('Fetching available models from OpenAI...');
-    try {
-        const openai = new OpenAI({ baseURL: baseUrl.trim(), apiKey });
-        const modelsResponse = await openai.models.list();
-        modelChoices = modelsResponse.data
-            .filter((m) => {
-                const id = m.id.toLowerCase();
-                return (
-                    id.includes('gpt') &&
-                    !id.includes('dall-e') &&
-                    !id.includes('audio') &&
-                    !id.includes('tts') &&
-                    !id.includes('transcribe') &&
-                    !id.includes('search') &&
-                    !id.includes('realtime') &&
-                    !id.includes('image') &&
-                    !id.includes('preview')
-                );
-            })
-            .map((m) => ({
-                value: m.id,
-                label: m.id,
-            }));
-        if (modelChoices.length === 0) {
-            s.stop(red('No GPT models found for your credentials.'));
-            cancel('Setup cancelled');
-            process.exit(1);
-        }
-        s.stop('Models fetched.');
-        const selectedModel = await select({
-            message: 'Select the OpenAI model to use',
-            options: modelChoices,
-            initialValue:
-                currentConfig.model && modelChoices.some((c) => c.value === currentConfig.model)
-                    ? currentConfig.model
-                    : modelChoices[0].value,
+    // 3. Prompt for API Key (only for OpenAI)
+    let apiKey: string | undefined;
+    if (provider === 'ollama') {
+        // Ollama doesn't require an API key
+        apiKey = undefined;
+    } else {
+        // OpenAI requires an API key
+        const apiKeyInput = await text({
+            message: 'Enter your OpenAI API key',
+            placeholder: 'Your API key',
+            initialValue: currentConfig.apiKey,
+            validate: (value) => {
+                if (!value) {
+                    return 'API key is required';
+                }
+                return undefined;
+            },
         });
-        if (typeof selectedModel !== 'string') {
+        if (apiKeyInput === null) {
             cancel('Setup cancelled');
             process.exit(0);
         }
-        model = selectedModel;
-    } catch (err) {
-        s.stop(red('Failed to fetch models. Please check your base URL and API key.'));
-        cancel('Setup cancelled');
-        process.exit(1);
+        if (typeof apiKeyInput !== 'string') {
+            throw new Error('API key is required');
+        }
+        apiKey = apiKeyInput;
     }
 
-    // 4. Get commit message type
+    // 4. Fetch available models
+    let modelChoices: { value: string; label: string }[] = [];
+    let model: string;
+    if (provider === 'ollama') {
+        // For Ollama, fetch available models
+        const s = spinner();
+        s.start('Fetching available models from Ollama...');
+        try {
+            const ollamaProvider = new OllamaProvider(configService);
+            await ollamaProvider.initialize();
+            const models = await ollamaProvider.listModels();
+            modelChoices = models.map((name: string) => ({
+                value: name,
+                label: name,
+            }));
+            if (modelChoices.length === 0) {
+                s.stop(red('No models found. Please pull a model first using `ollama pull <model>`'));
+                cancel('Setup cancelled');
+                process.exit(1);
+            }
+            s.stop('Models fetched.');
+            const selectedModel = await select({
+                message: 'Select the Ollama model to use',
+                options: modelChoices,
+                initialValue:
+                    currentConfig.model && modelChoices.some((c) => c.value === currentConfig.model)
+                        ? currentConfig.model
+                        : modelChoices[0].value,
+            });
+            if (typeof selectedModel !== 'string') {
+                cancel('Setup cancelled');
+                process.exit(0);
+            }
+            model = selectedModel;
+        } catch (err) {
+            s.stop(red('Failed to fetch models. Please make sure Ollama is running and accessible.'));
+            cancel('Setup cancelled');
+            process.exit(1);
+        }
+    } else {
+        // OpenAI: fetch available models
+        const s = spinner();
+        s.start('Fetching available models from OpenAI...');
+        try {
+            const openai = new OpenAI({ baseURL: baseUrl.trim(), apiKey });
+            const modelsResponse = await openai.models.list();
+            modelChoices = modelsResponse.data
+                .filter((m) => {
+                    const id = m.id.toLowerCase();
+                    return (
+                        id.includes('gpt') &&
+                        !id.includes('dall-e') &&
+                        !id.includes('audio') &&
+                        !id.includes('tts') &&
+                        !id.includes('transcribe') &&
+                        !id.includes('search') &&
+                        !id.includes('realtime') &&
+                        !id.includes('image') &&
+                        !id.includes('preview')
+                    );
+                })
+                .map((m) => ({
+                    value: m.id,
+                    label: m.id,
+                }));
+            if (modelChoices.length === 0) {
+                s.stop(red('No GPT models found for your credentials.'));
+                cancel('Setup cancelled');
+                process.exit(1);
+            }
+            s.stop('Models fetched.');
+            const selectedModel = await select({
+                message: 'Select the OpenAI model to use',
+                options: modelChoices,
+                initialValue:
+                    currentConfig.model && modelChoices.some((c) => c.value === currentConfig.model)
+                        ? currentConfig.model
+                        : modelChoices[0].value,
+            });
+            if (typeof selectedModel !== 'string') {
+                cancel('Setup cancelled');
+                process.exit(0);
+            }
+            model = selectedModel;
+        } catch (err) {
+            s.stop(red('Failed to fetch models. Please check your base URL and API key.'));
+            cancel('Setup cancelled');
+            process.exit(1);
+        }
+    }
+
+    // 5. Get commit message type
     const type = await select({
         message: 'Select commit message format',
         options: [
@@ -144,7 +210,7 @@ export const setupCommand = new Command('setup').description('Interactive setup 
         throw new Error('Invalid commit message type');
     }
 
-    // 5. Get language preference
+    // 6. Get language preference
     const detectedLocale = detectLocale();
     const locale = await text({
         message: 'Enter your preferred language code (e.g., en, es, fr)',
@@ -178,6 +244,7 @@ export const setupCommand = new Command('setup').description('Interactive setup 
         baseUrl,
         locale: locale as LanguageCode,
         model,
+        provider,
         type: type === 'simple' ? '' : 'conventional',
     };
 
