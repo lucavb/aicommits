@@ -1,7 +1,7 @@
 {
     "name": "@lucavb/aicommits",
     "version": "0.4.0",
-    "description": "Writes your git commit messages for you with AI",
+    "description": "✨ AI-powered git commit message generator that writes meaningful, consistent commit messages for you. Save time and maintain a clean git history effortlessly.",
     "keywords": [
         "ai",
         "git",
