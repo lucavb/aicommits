@@ -11,6 +11,12 @@ Install globally:
 npm install -g @lucavb/aicommits
 ```
 
+Run the setup command to configure your environment:
+
+```sh
+aicommits setup
+```
+
 Stage your changes and generate a commit message:
 
 ```sh
@@ -35,37 +41,26 @@ feat: Add user authentication and update login flow
     npm install -g @lucavb/aicommits
     ```
 
-2. Choose your provider:
-
-    For OpenAPI run:
-
-    ```shell
-    aic config set baseUrl "https://api.openai.com/v1"
-    ```
-
-    For any other provider replace the URL with yours. It needs to be compatible with the OpenAI API.
-
-3. Retrieve your API key from your provider (if necessary)
-   For OpenAI you can find your API Key [here](https://platform.openai.com/account/api-keys)
-
-    > Note: If you haven't already, you'll have to create an account and set up billing.
-
-4. Set the key so @lucavb/aicommits can use it:
+2. Run the interactive setup:
 
     ```sh
-    aicommits config set apiKey <your token>
+    aicommits setup
     ```
 
-    This will create a `.aicommits` file in your home directory.
+    This will guide you through:
 
-5. **Specify the model to use.**  
-   You must set the `model` property to a valid model name. This can be any model supported by your provider, such as `gpt-4o-mini`, `gpt-3.5-turbo`, or a custom model if you are using a custom OpenAI-compatible API.
+    - Selecting your AI provider (OpenAI, Ollama, or Anthropic)
+    - Configuring the API base URL
+    - Setting up your API key (if required)
+    - Choosing the model to use
+
+    You can also set up different profiles for different projects or environments:
 
     ```sh
-    aicommits config set model gpt-4o-mini
+    aicommits setup --profile development
     ```
 
-    > Note: The model property is required. If you are using a custom provider, specify the model name as required by your API.
+    > Note: For OpenAI, you'll need an API key from [OpenAI's platform](https://platform.openai.com/account/api-keys). Make sure you have an account and billing set up.
 
 ### Upgrading
 
@@ -94,7 +89,13 @@ For example, you can stage all changes in tracked files with as you commit:
 aicommits --stage-all # or -a
 ```
 
-> 👉 **Tip:** Use the `aic` alias if `aicommits` is too long for you.
+You can also use different profiles for different projects or environments:
+
+```sh
+aicommits --profile <profile-name>
+```
+
+> 👉 **Tip:** Use the `aic` alias if `aicommits` is too long for you.
 
 #### Generate multiple recommendations
 
@@ -141,8 +142,6 @@ To retrieve a configuration option, use the command:
 aicommits config get <key>
 ```
 
-For example, to retrieve the API key, you can use:
-
 ### Setting a configuration value
 
 To set a configuration option, use the command:
@@ -151,13 +150,11 @@ To set a configuration option, use the command:
 aicommits config set <key>=<value>
 ```
 
-For example, to set the API key, you can use:
-
 ### Options
 
 #### apiKey
 
-Required
+Required for OpenAI and Anthropic providers
 
 The API key needed for your provider.
 
@@ -165,7 +162,27 @@ The API key needed for your provider.
 
 Required
 
-The base URL for the OpenAI API. You can use this to point to a different API endpoint, such as a local development server.
+The base URL for your AI provider's API. Default values:
+
+-   OpenAI: `https://api.openai.com/v1`
+-   Ollama: `http://localhost:11434`
+-   Anthropic: `https://api.anthropic.com`
+
+#### profile
+
+Default: `default`
+
+The configuration profile to use. This allows you to maintain different configurations for different projects or environments. You can switch between profiles using the `--profile` flag:
+
+```sh
+aicommits --profile development
+```
+
+To set a configuration value for a specific profile:
+
+```sh
+aicommits config set apiKey <key> --profile development
+```
 
 #### locale
 
@@ -185,8 +202,11 @@ Note, this will use more tokens as it generates more results.
 
 **Required**
 
-The Chat Completions (`/v1/chat/completions`) model to use.  
-You must specify a model name, such as `gpt-4o-mini`, `gpt-3.5-turbo`, or a custom model if you are using a custom OpenAI-compatible API.
+The model to use for generating commit messages. The available models depend on your chosen provider:
+
+-   OpenAI: Various GPT models (e.g., `gpt-4.1`, `gpt-4o`)
+-   Ollama: Local models you have pulled (e.g., `llama4`, `mistral`)
+-   Anthropic: Claude models (e.g., `claude-3-7-sonnet-20250219`)
 
 #### max-length
 
