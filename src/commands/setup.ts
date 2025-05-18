@@ -35,7 +35,7 @@ export const setupCommand = new Command('setup').description('Interactive setup 
     const provider = await select({
         message: 'Select your AI provider',
         options: [
-            { value: 'openai', label: 'OpenAI' },
+            { value: 'openai', label: 'OpenAI (compatible)' },
             { value: 'ollama', label: 'Ollama' },
         ],
         initialValue: currentConfig.provider || 'openai',
@@ -151,17 +151,17 @@ export const setupCommand = new Command('setup').description('Interactive setup 
             modelChoices = modelsResponse.data
                 .filter((m) => {
                     const id = m.id.toLowerCase();
-                    return (
-                        id.includes('gpt') &&
-                        !id.includes('dall-e') &&
-                        !id.includes('audio') &&
-                        !id.includes('tts') &&
-                        !id.includes('transcribe') &&
-                        !id.includes('search') &&
-                        !id.includes('realtime') &&
-                        !id.includes('image') &&
-                        !id.includes('preview')
-                    );
+                    return baseUrl.trim() === 'https://api.openai.com/v1'
+                        ? id.includes('gpt') &&
+                              !id.includes('dall-e') &&
+                              !id.includes('audio') &&
+                              !id.includes('tts') &&
+                              !id.includes('transcribe') &&
+                              !id.includes('search') &&
+                              !id.includes('realtime') &&
+                              !id.includes('image') &&
+                              !id.includes('preview')
+                        : true;
                 })
                 .map((m) => ({
                     value: m.id,
