@@ -46,8 +46,8 @@ export class OllamaProvider implements AIProvider {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model: model,
-                options: { temperature: temperature },
+                model,
+                options: { temperature },
                 prompt,
                 stream: false,
             }),

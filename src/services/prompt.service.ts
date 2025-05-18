@@ -1,4 +1,4 @@
-import type { Config, ProfileConfig } from '../utils/config';
+import type { ProfileConfig } from '../utils/config';
 import { Injectable } from '../utils/inversify';
 
 type CommitType = NonNullable<ProfileConfig['type']>;

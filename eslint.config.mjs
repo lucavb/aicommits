@@ -15,6 +15,7 @@ export default tseslint.config(
             yoda: 'error',
 
             'no-nested-ternary': 'error',
+            'object-shorthand': 'error',
 
             '@typescript-eslint/array-type': ['error', { default: 'array' }],
             '@typescript-eslint/no-unused-vars': [
