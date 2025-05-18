@@ -1,5 +1,5 @@
 import iso6391, { LanguageCode } from 'iso-639-1';
-import { z, ZodType } from 'zod';
+import { z } from 'zod';
 
 export const configKeys = [
     'apiKey',
@@ -16,7 +16,7 @@ export const configKeys = [
 
 export const providerNameSchema = z.enum(['openai', 'ollama', 'anthropic']);
 
-export const configSchema = z.object({
+export const profileConfigSchema = z.object({
     apiKey: z.string().min(1).optional(),
     baseUrl: z.string().url(),
     contextLines: z.coerce.number().positive().default(10),
@@ -37,7 +37,13 @@ export const configSchema = z.object({
             .transform((str) => str === 'true'),
     ),
     type: z.enum(['conventional', ''] as const).optional(),
-} satisfies Record<(typeof configKeys)[number], ZodType> & Record<string, ZodType>);
+});
+
+export const configSchema = z.object({
+    currentProfile: z.string().default('default'),
+    profiles: z.record(z.string().min(1), profileConfigSchema),
+});
 
 export type Config = z.TypeOf<typeof configSchema>;
+export type ProfileConfig = z.TypeOf<typeof profileConfigSchema>;
 export type ProviderName = z.infer<typeof providerNameSchema>;

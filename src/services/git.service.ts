@@ -52,8 +52,8 @@ export class GitService {
         excludeFiles: string[] = [],
         contextLines: number,
     ): Promise<{ files: string[]; diff: string } | undefined> {
-        const diffCached = ['--cached', '--diff-algorithm=minimal'];
-        const excludeArgs = [...this.filesToExclude, ...excludeFiles.map(this.excludeFromDiff)];
+        const diffCached = ['--cached', '--diff-algorithm=minimal'] as const;
+        const excludeArgs = [...this.filesToExclude, ...excludeFiles.map(this.excludeFromDiff)] as const;
 
         try {
             const files = await this.git.diff([...diffCached, '--name-only', ...excludeArgs]);

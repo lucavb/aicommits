@@ -1,7 +1,7 @@
-import type { Config } from '../utils/config';
+import type { Config, ProfileConfig } from '../utils/config';
 import { Injectable } from '../utils/inversify';
 
-type CommitType = NonNullable<Config['type']>;
+type CommitType = NonNullable<ProfileConfig['type']>;
 
 const commitTypeFormats: Record<CommitType, string> = {
     '': '<commit message>',
