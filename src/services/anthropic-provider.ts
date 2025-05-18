@@ -27,14 +27,7 @@ export class AnthropicProvider implements AIProvider {
             max_tokens: 100,
             temperature: params.temperature ?? 0.7,
             messages: params.messages.map((msg) => {
-                let role: 'user' | 'assistant';
-                if (msg.role === 'system') {
-                    role = 'assistant';
-                } else if (msg.role === 'user') {
-                    role = 'user';
-                } else {
-                    role = 'assistant';
-                }
+                const role = msg.role === 'user' ? 'user' : 'assistant';
                 return {
                     role,
                     content: msg.content,
