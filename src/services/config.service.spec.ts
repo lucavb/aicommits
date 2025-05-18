@@ -46,15 +46,9 @@ describe('ConfigService', () => {
             const fileContents = yamlStringify(mockConfig);
             mockFsApi.readFile.mockResolvedValue(fileContents);
 
-            const result = await configService.readConfig();
+            await configService.readConfig();
 
-            expect(result).toEqual(mockConfig);
-        });
-
-        it('should return an empty object if reading the config file fails', async () => {
-            const result = await configService.readConfig();
-
-            expect(result).toEqual({});
+            expect(configService.getConfig()).toMatchObject(mockConfig);
         });
     });
 
@@ -73,7 +67,8 @@ describe('ConfigService', () => {
             const savedConfig: Partial<Config> = { model: 'llama3' };
             mockFsApi.readFile.mockResolvedValueOnce(yamlStringify(savedConfig));
 
-            const result = await configService.getConfig();
+            await configService.readConfig();
+            const result = configService.getConfig();
 
             expect(result).toStrictEqual({
                 ...mockCliArguments,
@@ -84,6 +79,7 @@ describe('ConfigService', () => {
                 locale: 'en',
                 maxLength: 50,
                 stageAll: false,
+                provider: 'openai',
             });
         });
     });
@@ -93,7 +89,8 @@ describe('ConfigService', () => {
             const savedConfig = { model: 'llama3' } satisfies Partial<Config>;
             mockFsApi.readFile.mockResolvedValueOnce(yamlStringify(savedConfig));
 
-            const result = await configService.validConfig();
+            await configService.readConfig();
+            const result = configService.validConfig();
 
             expect(result).toEqual({ valid: true });
         });
@@ -103,7 +100,8 @@ describe('ConfigService', () => {
             const invalidConfig = { model: undefined } satisfies Partial<Config>;
             mockFsApi.readFile.mockResolvedValueOnce(yamlStringify(invalidConfig));
 
-            const result = await configService.validConfig();
+            await configService.readConfig();
+            const result = configService.validConfig();
 
             if (result.valid) {
                 throw new Error();

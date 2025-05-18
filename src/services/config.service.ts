@@ -6,7 +6,6 @@ import { isString } from '../utils/typeguards';
 import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
 import { shake } from 'radash';
 import { Inject, Injectable, Optional } from '../utils/inversify';
-import type { ZodIssue } from 'zod';
 
 export const CLI_ARGUMENTS = Symbol.for('CLI_ARGUMENTS');
 export const CONFIG_FILE_PATH = Symbol.for('CONFIG_FILE_PATH');

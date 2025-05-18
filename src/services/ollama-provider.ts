@@ -1,4 +1,3 @@
-import { ConfigService } from './config.service';
 import { AIProvider } from './ai-provider.interface';
 
 export interface OllamaModel {
@@ -15,24 +14,16 @@ export interface OllamaModel {
     };
 }
 
+type Fetch = typeof fetch;
+
 export class OllamaProvider implements AIProvider {
-    private baseUrl: string;
-
-    constructor(private readonly configService: ConfigService) {
-        // Initialize with default URL, will be updated in initialize()
-        this.baseUrl = 'http://localhost:11434';
-    }
-
-    async initialize(): Promise<void> {
-        const config = await this.configService.getConfig();
-        if (!config.baseUrl) {
-            throw new Error('Base URL is required in configuration');
-        }
-        this.baseUrl = config.baseUrl;
-    }
+    constructor(
+        private readonly fetch: Fetch,
+        private readonly baseUrl: string,
+    ) {}
 
     async listModels(): Promise<string[]> {
-        const response = await fetch(`${this.baseUrl}/api/tags`);
+        const response = await this.fetch(`${this.baseUrl}/api/tags`);
         if (!response.ok) {
             throw new Error(`Failed to fetch models: ${response.statusText}`);
         }
@@ -40,27 +31,25 @@ export class OllamaProvider implements AIProvider {
         return data.models.map((m: OllamaModel) => m.name);
     }
 
-    async generateCompletion(params: {
+    async generateCompletion({
+        messages,
+        model,
+        temperature = 0.7,
+    }: {
         messages: { role: string; content: string }[];
         model: string;
         temperature?: number;
-        n?: number;
     }): Promise<{ choices: { message: { content: string } }[] }> {
-        // Convert messages to a single prompt
-        const prompt = params.messages.map((m) => `${m.role}: ${m.content}`).join('\n');
+        const prompt = messages.map((m) => `${m.role}: ${m.content}`).join('\n');
 
-        const response = await fetch(`${this.baseUrl}/api/generate`, {
+        const response = await this.fetch(`${this.baseUrl}/api/generate`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model: params.model,
+                model: model,
+                options: { temperature: temperature },
                 prompt,
                 stream: false,
-                options: {
-                    temperature: params.temperature,
-                },
             }),
         });
 

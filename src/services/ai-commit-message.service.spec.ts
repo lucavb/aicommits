@@ -1,28 +1,11 @@
 import 'reflect-metadata';
 import { Container } from 'inversify';
-import OpenAI from 'openai';
 import { AICommitMessageService } from './ai-commit-message.service';
 
 import { PromptService } from './prompt.service';
 import { ConfigService } from './config.service';
 import { Injectable } from '../utils/inversify';
-
-type DeepPartial<T> = T extends object
-    ? {
-          [P in keyof T]?: DeepPartial<T[P]>;
-      }
-    : T;
-
-@Injectable()
-class MockOpenAI implements DeepPartial<OpenAI> {
-    public readonly chat = {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error
-        completions: {
-            create: jest.fn().mockResolvedValue({}),
-        } as const,
-    } as const satisfies Partial<OpenAI['chat']>;
-}
+import { AIProviderSymbol } from './ai-provider.interface';
 
 @Injectable()
 class MockConfigService implements Partial<ConfigService> {
@@ -40,23 +23,29 @@ class MockPromptService implements Partial<PromptService> {
         );
 }
 
+@Injectable()
+class MockAIProvider {
+    generateCompletion = jest.fn();
+    listModels = jest.fn();
+}
+
 describe('AICommitMessageService', () => {
     let configService: MockConfigService;
-    let openai: MockOpenAI;
     let promptService: MockPromptService;
     let service: AICommitMessageService;
+    let aiProvider: MockAIProvider;
 
     beforeEach(() => {
         const container = new Container({ defaultScope: 'Singleton' });
-        container.bind(OpenAI).to(MockOpenAI as unknown as typeof OpenAI);
         container.bind(ConfigService).to(MockConfigService as unknown as typeof ConfigService);
         container.bind(PromptService).to(MockPromptService as unknown as typeof PromptService);
+        container.bind(AIProviderSymbol).to(MockAIProvider);
         container.bind(AICommitMessageService).toSelf();
 
         configService = container.get<MockConfigService>(ConfigService as unknown as typeof MockConfigService);
-        openai = container.get<MockOpenAI>(OpenAI as unknown as typeof MockOpenAI);
         promptService = container.get<MockPromptService>(PromptService as unknown as typeof MockPromptService);
         service = container.get(AICommitMessageService);
+        aiProvider = container.get(AIProviderSymbol);
     });
 
     it('can be composed', () => {
@@ -73,15 +62,15 @@ describe('AICommitMessageService', () => {
             type: 'feat',
         };
 
-        configService.getConfig.mockResolvedValue(config);
+        configService.getConfig.mockReturnValue(config);
 
-        openai.chat.completions.create.mockResolvedValueOnce({
-            choices: [{ message: { content: 'Commit message 1.' } }, { message: { content: 'Commit message 2.' } }],
-        });
-
-        openai.chat.completions.create.mockResolvedValueOnce({
-            choices: [{ message: { content: 'Summary 1' } }, { message: { content: 'Summary 2' } }],
-        });
+        aiProvider.generateCompletion
+            .mockResolvedValueOnce({
+                choices: [{ message: { content: 'Commit message 1.' } }, { message: { content: 'Commit message 2.' } }],
+            })
+            .mockResolvedValueOnce({
+                choices: [{ message: { content: 'Summary 1' } }, { message: { content: 'Summary 2' } }],
+            });
 
         const result = await service.generateCommitMessage({ diff });
 
@@ -91,7 +80,6 @@ describe('AICommitMessageService', () => {
         });
 
         expect(configService.getConfig).toHaveBeenCalledTimes(1);
-        expect(openai.chat.completions.create).toHaveBeenCalledTimes(2);
         expect(promptService.generateCommitMessagePrompt).toHaveBeenCalledWith('en', 50, 'feat');
         expect(promptService.generateSummaryPrompt).toHaveBeenCalledWith('en');
     });

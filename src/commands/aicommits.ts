@@ -10,11 +10,12 @@ import { chooseOption, reviewAndRevise } from './aicommits-utils';
 
 export const aiCommits = async ({ container, stageAll = false }: { container: Container; stageAll?: boolean }) => {
     try {
+        const configService = container.get(ConfigService);
+        await configService.readConfig();
+
         const gitService = container.get(GitService);
         const aiCommitMessageService = container.get(AICommitMessageService);
-        const configService = container.get(ConfigService);
         intro(bgCyan(black(' aicommits ')));
-        await configService.readConfig();
         const validResult = configService.validConfig();
         if (!validResult.valid) {
             note(

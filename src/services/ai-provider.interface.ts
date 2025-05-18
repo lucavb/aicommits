@@ -8,8 +8,4 @@ export interface AIProvider {
     }): Promise<{ choices: { message: { content: string } }[] }>;
 }
 
-export interface AIProviderFactory {
-    createProvider(config: { baseUrl: string; apiKey?: string }): AIProvider;
-}
-
-export const AIProviderFactorySymbol = Symbol.for('AIProviderFactory');
+export const AIProviderSymbol = Symbol.for('AIProvider');
