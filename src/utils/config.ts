@@ -14,6 +14,8 @@ export const configKeys = [
     'type',
 ] as const;
 
+export const providerNameSchema = z.enum(['openai', 'ollama', 'anthropic']);
+
 export const configSchema = z.object({
     apiKey: z.string().min(1).optional(),
     baseUrl: z.string().url(),
@@ -27,7 +29,7 @@ export const configSchema = z.object({
         .refine((str: string): str is LanguageCode => iso6391.validate(str)),
     maxLength: z.coerce.number().int().positive().default(50),
     model: z.string().min(1),
-    provider: z.enum(['openai', 'ollama']).default('openai'),
+    provider: providerNameSchema.default('openai'),
     stageAll: z.boolean().or(
         z
             .string()
@@ -38,3 +40,4 @@ export const configSchema = z.object({
 } satisfies Record<(typeof configKeys)[number], ZodType> & Record<string, ZodType>);
 
 export type Config = z.TypeOf<typeof configSchema>;
+export type ProviderName = z.infer<typeof providerNameSchema>;

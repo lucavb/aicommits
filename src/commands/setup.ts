@@ -2,12 +2,13 @@ import { Command } from '@commander-js/extra-typings';
 import { cancel, intro, note, outro, select, spinner, text } from '@clack/prompts';
 import { container } from '../utils/di';
 import { ConfigService } from '../services/config.service';
-import { type Config } from '../utils/config';
+import { ProviderName, type Config } from '../utils/config';
 import { green, red, yellow } from 'kolorist';
 import type { LanguageCode } from 'iso-639-1';
 import iso6391 from 'iso-639-1';
 import OpenAI from 'openai';
 import { OllamaProvider } from '../services/ollama-provider';
+import Anthropic from '@anthropic-ai/sdk';
 
 const isLanguageCode = (value: string): value is LanguageCode => {
     return value.length === 2 && iso6391.validate(value);
@@ -42,6 +43,7 @@ export const setupCommand = new Command('setup').description('Interactive setup 
         options: [
             { value: 'openai', label: 'OpenAI (compatible)' },
             { value: 'ollama', label: 'Ollama' },
+            { value: 'anthropic', label: 'Anthropic' },
         ],
         initialValue: currentConfig.provider || 'openai',
     });
@@ -56,11 +58,37 @@ export const setupCommand = new Command('setup').description('Interactive setup 
     configService.updateConfigInMemory({ provider });
 
     // 2. Prompt for Base URL
+    const getBaseUrlMessage = (provider: ProviderName) => {
+        if (provider === 'openai') {
+            return 'Enter the OpenAI API base URL';
+        }
+        if (provider === 'ollama') {
+            return 'Enter the Ollama API base URL';
+        }
+        return 'Enter the Anthropic API base URL';
+    };
+
+    const getBaseUrlPlaceholder = (provider: ProviderName) => {
+        if (provider === 'openai') {
+            return 'https://api.openai.com/v1';
+        }
+        if (provider === 'ollama') {
+            return 'http://localhost:11434';
+        }
+        return 'https://api.anthropic.com';
+    };
+
+    const getBaseUrlInitialValue = (provider: ProviderName, currentConfig: Config) => {
+        if (currentConfig.baseUrl) {
+            return currentConfig.baseUrl;
+        }
+        return getBaseUrlPlaceholder(provider);
+    };
+
     const baseUrl = await text({
-        message: provider === 'openai' ? 'Enter the OpenAI API base URL' : 'Enter the Ollama API base URL',
-        placeholder: provider === 'openai' ? 'https://api.openai.com/v1' : 'http://localhost:11434',
-        initialValue:
-            currentConfig.baseUrl || (provider === 'openai' ? 'https://api.openai.com/v1' : 'http://localhost:11434'),
+        message: getBaseUrlMessage(provider),
+        placeholder: getBaseUrlPlaceholder(provider),
+        initialValue: getBaseUrlInitialValue(provider, currentConfig),
         validate: (value) => {
             if (!value) {
                 return 'Base URL is required';
@@ -83,15 +111,15 @@ export const setupCommand = new Command('setup').description('Interactive setup 
 
     configService.updateConfigInMemory({ baseUrl: baseUrl.trim() });
 
-    // 3. Prompt for API Key (only for OpenAI)
+    // 3. Prompt for API Key (only for OpenAI and Anthropic)
     let apiKey: string | undefined;
     if (provider === 'ollama') {
         // Ollama doesn't require an API key
         apiKey = undefined;
     } else {
-        // OpenAI requires an API key
+        // OpenAI and Anthropic require an API key
         const apiKeyInput = await text({
-            message: 'Enter your OpenAI API key',
+            message: `Enter your ${provider === 'openai' ? 'OpenAI' : 'Anthropic'} API key`,
             placeholder: 'Your API key',
             initialValue: currentConfig.apiKey,
             validate: (value) => {
@@ -113,7 +141,6 @@ export const setupCommand = new Command('setup').description('Interactive setup 
     configService.updateConfigInMemory({ apiKey: apiKey?.trim() });
 
     // 4. Fetch available models
-    let modelChoices: { value: string; label: string }[] = [];
     let model: string;
     if (provider === 'ollama') {
         // For Ollama, fetch available models
@@ -122,7 +149,7 @@ export const setupCommand = new Command('setup').description('Interactive setup 
         try {
             const ollamaProvider = new OllamaProvider(fetch, configService.getConfig().baseUrl);
             const models = await ollamaProvider.listModels();
-            modelChoices = models.map((name: string) => ({
+            const modelChoices = models.map((name: string) => ({
                 value: name,
                 label: name,
             }));
@@ -150,6 +177,27 @@ export const setupCommand = new Command('setup').description('Interactive setup 
             cancel('Setup cancelled');
             process.exit(1);
         }
+    } else if (provider === 'anthropic') {
+        // For Anthropic, use static model list
+        const anthropic = new Anthropic({ baseURL: baseUrl.trim(), apiKey });
+        const modelsResponse = await anthropic.models.list();
+        const modelChoices = modelsResponse.data.map((m) => ({
+            value: m.id,
+            label: m.id,
+        }));
+        const selectedModel = await select({
+            message: 'Select the Anthropic model to use',
+            options: modelChoices,
+            initialValue:
+                currentConfig.model && modelChoices.some((c) => c.value === currentConfig.model)
+                    ? currentConfig.model
+                    : modelChoices[0].value,
+        });
+        if (typeof selectedModel !== 'string') {
+            cancel('Setup cancelled');
+            process.exit(0);
+        }
+        model = selectedModel;
     } else {
         // OpenAI: fetch available models
         const s = spinner();
@@ -157,7 +205,7 @@ export const setupCommand = new Command('setup').description('Interactive setup 
         try {
             const openai = new OpenAI({ baseURL: baseUrl.trim(), apiKey });
             const modelsResponse = await openai.models.list();
-            modelChoices = modelsResponse.data
+            const modelChoices = modelsResponse.data
                 .filter((m) => {
                     const id = m.id.toLowerCase();
                     return baseUrl.trim() === 'https://api.openai.com/v1'

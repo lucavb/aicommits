@@ -51,6 +51,7 @@
         "type-check": "tsc --noEmit --pretty --incremental --skipLibCheck"
     },
     "dependencies": {
+        "@anthropic-ai/sdk": "0.51.0",
         "@clack/prompts": "0.7.0",
         "@commander-js/extra-typings": "12.1.0",
         "commander": "12.1.0",
