@@ -17,6 +17,7 @@ type FileSystemApi = Pick<typeof fs, 'writeFile' | 'readFile'>;
 @Injectable()
 export class ConfigService {
     private readonly configFilePath: string;
+    private inMemoryConfig: Partial<Config> = {};
 
     constructor(
         @Optional() @Inject(CLI_ARGUMENTS) private readonly cliArguments: Partial<Config> = {},
@@ -31,40 +32,46 @@ export class ConfigService {
         return this.configFilePath;
     }
 
-    async readConfig(): Promise<Partial<Config>> {
+    async readConfig(): Promise<void> {
         try {
             const fileContents = await this.fs.readFile(this.configFilePath, 'utf8');
-            return yamlParse(fileContents) ?? {};
+            this.inMemoryConfig = yamlParse(fileContents) ?? {};
         } catch (error) {
-            return {};
+            this.inMemoryConfig = {};
         }
     }
 
-    async writeConfig(config: Partial<Config>): Promise<void> {
-        const yamlStr = yamlStringify(config);
+    updateConfigInMemory(config: Partial<Config>): void {
+        this.inMemoryConfig = {
+            ...this.inMemoryConfig,
+            ...config,
+        };
+    }
+
+    async flush(): Promise<void> {
+        const yamlStr = yamlStringify(this.inMemoryConfig);
         await this.fs.writeFile(this.configFilePath, yamlStr, 'utf8');
     }
 
-    private async getRawConfig() {
-        const savedConfig = await this.readConfig();
+    private getRawConfig() {
         return {
-            ...savedConfig,
+            ...this.inMemoryConfig,
             ...shake(this.cliArguments),
-            exclude: [...(savedConfig.exclude ?? []), this.cliArguments.exclude].filter(isString),
+            exclude: [...(this.inMemoryConfig.exclude ?? []), this.cliArguments.exclude].filter(isString),
         } as const;
     }
 
-    async getConfig(): Promise<Readonly<Config>> {
-        const rawConfig = await this.getRawConfig();
+    getConfig(): Readonly<Config> {
+        const rawConfig = this.getRawConfig();
         return configSchema.parse(rawConfig);
     }
 
-    async validConfig(): Promise<{ valid: true } | { valid: false; errors: ZodIssue[] }> {
-        const rawConfig = await this.getRawConfig();
+    validConfig() {
+        const rawConfig = this.getRawConfig();
         const parsedResult = configSchema.safeParse(rawConfig);
         if (parsedResult.success) {
-            return { valid: true };
+            return { valid: true } as const;
         }
-        return { valid: false, errors: parsedResult.error.issues };
+        return { valid: false, errors: parsedResult.error.issues } as const;
     }
 }

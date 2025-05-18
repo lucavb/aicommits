@@ -14,7 +14,8 @@ export const aiCommits = async ({ container, stageAll = false }: { container: Co
         const aiCommitMessageService = container.get(AICommitMessageService);
         const configService = container.get(ConfigService);
         intro(bgCyan(black(' aicommits ')));
-        const validResult = await configService.validConfig();
+        await configService.readConfig();
+        const validResult = configService.validConfig();
         if (!validResult.valid) {
             note(
                 `It looks like you haven't set up aicommits yet. Let's get you started!\n\n` +
@@ -22,7 +23,7 @@ export const aiCommits = async ({ container, stageAll = false }: { container: Co
             );
             process.exit(1);
         }
-        const config = await configService.getConfig();
+        const config = configService.getConfig();
         await gitService.assertGitRepo();
 
         if (stageAll) {

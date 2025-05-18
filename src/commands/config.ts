@@ -9,9 +9,9 @@ const configSetCommand = new Command('set')
     .argument('<value>', 'Value of the configuration property')
     .action(async (name, value) => {
         const configService = container.get(ConfigService);
-
-        const config = { ...(await configService.readConfig()), [name]: value };
-        await configService.writeConfig(config);
+        await configService.readConfig();
+        configService.updateConfigInMemory({ [name]: value });
+        await configService.flush();
         console.log(`Configuration property "${name}" set to "${value}".`);
     });
 

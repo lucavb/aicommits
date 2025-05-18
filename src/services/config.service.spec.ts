@@ -60,7 +60,8 @@ describe('ConfigService', () => {
 
     describe('writeConfig', () => {
         it('should write the config to the file', async () => {
-            await configService.writeConfig(mockConfig);
+            configService.updateConfigInMemory(mockConfig);
+            await configService.flush();
 
             expect(mockFsApi.writeFile).toHaveBeenCalledWith(tempFilePath, yamlStringify(mockConfig), 'utf8');
             expect(mockFsApi.writeFile).toHaveBeenCalledTimes(1);
