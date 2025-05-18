@@ -39,6 +39,7 @@
     "scripts": {
         "build": "rollup --config rollup.config.ts --configPlugin typescript",
         "dev": "tsx src/cli.ts",
+        "dev:setup": "tsx src/cli.ts setup",
         "dev:5": "tsx src/cli.ts --generate 5",
         "dev:stage-all": "tsx src/cli.ts --stage-all",
         "eslint": "eslint .",
