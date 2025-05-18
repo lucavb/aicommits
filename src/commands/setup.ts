@@ -265,7 +265,7 @@ export const setupCommand = new Command('setup').description('Interactive setup 
 
     note(
         `Configuration saved to ${yellow(configService.getConfigFilePath())}\n\n` +
-            `You can now use aicommits! Try it with:\n` +
+            'You can now use aicommits! Try it with:\n' +
             `${green('git add .')}\n` +
             `${green('aicommits')}\n\n` +
             `To modify your settings later, run ${yellow('aicommits config set <key> <value>')}`,
