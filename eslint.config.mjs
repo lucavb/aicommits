@@ -14,6 +14,8 @@ export default tseslint.config(
             quotes: ['error', 'single', { avoidEscape: true, allowTemplateLiterals: false }],
             yoda: 'error',
 
+            'no-nested-ternary': 'error',
+
             '@typescript-eslint/array-type': ['error', { default: 'array' }],
             '@typescript-eslint/no-unused-vars': [
                 'error',
