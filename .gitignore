@@ -22,6 +22,9 @@ lerna-debug.log*
 # Distribution
 dist
 
+# Test coverage
+coverage
+
 # Eslint cache
 .eslintcache
 .idea

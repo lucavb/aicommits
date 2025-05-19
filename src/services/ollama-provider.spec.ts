@@ -1,7 +1,8 @@
 import { OllamaProvider } from './ollama-provider';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 describe('OllamaProvider', () => {
-    const mockFetch = jest.fn();
+    const mockFetch = vi.fn();
     const baseUrl = 'http://localhost:11434';
     let provider: OllamaProvider;
 

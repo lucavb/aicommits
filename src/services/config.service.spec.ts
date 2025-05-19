@@ -4,11 +4,12 @@ import { stringify as yamlStringify } from 'yaml';
 import { CLI_ARGUMENTS, CONFIG_FILE_PATH, ConfigService, FILE_SYSTEM_PROMISE_API } from './config.service';
 import { Injectable } from '../utils/inversify';
 import { Config, ProfileConfig } from '../utils/config';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 @Injectable()
 class MockFsApi implements Partial<typeof fs> {
-    readFile = jest.fn();
-    writeFile = jest.fn();
+    readFile = vi.fn();
+    writeFile = vi.fn();
 }
 
 describe('ConfigService', () => {
