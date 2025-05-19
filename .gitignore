@@ -26,3 +26,5 @@ dist
 .eslintcache
 .idea
 .aider*
+
+tsconfig.tsbuildinfo
