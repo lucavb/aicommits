@@ -45,7 +45,7 @@ export async function setupLanguage(currentConfig?: ProfileConfig): Promise<Lang
             if (value.length !== 2) {
                 return 'Language code must be 2 characters';
             }
-            if (!iso6391.validate(value)) {
+            if (!isLanguageCode(value)) {
                 return 'Invalid language code. Please use a valid ISO 639-1 code (e.g., en, es, fr)';
             }
             return undefined;
