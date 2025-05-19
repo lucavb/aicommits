@@ -46,7 +46,13 @@ describe('AnthropicProvider', () => {
                 content: [{ type: 'text' as const, text: 'This is a test response.', citations: [] }],
                 stop_reason: 'end_turn' as const,
                 stop_sequence: null,
-                usage: { input_tokens: 10, output_tokens: 20, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, server_tool_use: { web_search_requests: 0 } },
+                usage: {
+                    input_tokens: 10,
+                    output_tokens: 20,
+                    cache_creation_input_tokens: 0,
+                    cache_read_input_tokens: 0,
+                    server_tool_use: { web_search_requests: 0 },
+                },
             };
             jest.spyOn(mockAnthropic.messages, 'create').mockResolvedValue(mockResponse);
 
@@ -68,9 +74,7 @@ describe('AnthropicProvider', () => {
         });
 
         it('should throw an error if generating completion fails', async () => {
-            jest.spyOn(mockAnthropic.messages, 'create').mockRejectedValue(
-                new Error('Failed to generate completion'),
-            );
+            jest.spyOn(mockAnthropic.messages, 'create').mockRejectedValue(new Error('Failed to generate completion'));
 
             await expect(
                 provider.generateCompletion({
@@ -80,4 +84,4 @@ describe('AnthropicProvider', () => {
             ).rejects.toThrow('Failed to generate completion');
         });
     });
-}); 
+});
