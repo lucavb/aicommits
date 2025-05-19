@@ -38,12 +38,12 @@ export class OpenAIProvider implements AIProvider {
         n?: number;
     }) {
         const completion = await this.openai.chat.completions.create({
+            frequency_penalty: 0,
             messages: params.messages,
             model: params.model,
-            temperature: params.temperature ?? 0.7,
             n: params.n ?? 1,
-            frequency_penalty: 0,
             presence_penalty: 0,
+            temperature: params.temperature ?? 0.7,
             top_p: 1,
         });
 
