@@ -1,15 +1,19 @@
 import { Command } from '@commander-js/extra-typings';
-import { intro, note, outro, select, text, cancel, spinner } from '@clack/prompts';
+import { cancel, intro, note, outro, select, spinner, text } from '@clack/prompts';
 import { container } from '../utils/di';
 import { ConfigService } from '../services/config.service';
 import { type Config } from '../utils/config';
-import { green, yellow, red } from 'kolorist';
+import { green, red, yellow } from 'kolorist';
 import type { LanguageCode } from 'iso-639-1';
 import iso6391 from 'iso-639-1';
 import OpenAI from 'openai';
 import { OllamaProvider } from '../services/ollama-provider';
 
-const detectLocale = (): string => {
+const isLanguageCode = (value: string): value is LanguageCode => {
+    return value.length === 2 && iso6391.validate(value);
+};
+
+const detectLocale = (): LanguageCode => {
     // Try to get locale from environment variables in order of preference
     const localeVars = ['LC_ALL', 'LANG', 'LANGUAGE'];
     for (const varName of localeVars) {
@@ -17,7 +21,7 @@ const detectLocale = (): string => {
         if (value) {
             // Extract the language code (e.g., "en_US.UTF-8" -> "en")
             const langCode = value.split('_')[0].toLowerCase();
-            if (langCode.length === 2 && iso6391.validate(langCode)) {
+            if (isLanguageCode(langCode)) {
                 return langCode;
             }
         }
@@ -45,9 +49,11 @@ export const setupCommand = new Command('setup').description('Interactive setup 
         cancel('Setup cancelled');
         process.exit(0);
     }
-    if (typeof provider !== 'string' || (provider !== 'openai' && provider !== 'ollama')) {
+    if (typeof provider !== 'string') {
         throw new Error('Invalid provider');
     }
+
+    configService.updateConfigInMemory({ provider });
 
     // 2. Prompt for Base URL
     const baseUrl = await text({
@@ -74,6 +80,8 @@ export const setupCommand = new Command('setup').description('Interactive setup 
     if (typeof baseUrl !== 'string') {
         throw new Error('Base URL is required');
     }
+
+    configService.updateConfigInMemory({ baseUrl: baseUrl.trim() });
 
     // 3. Prompt for API Key (only for OpenAI)
     let apiKey: string | undefined;
@@ -102,6 +110,7 @@ export const setupCommand = new Command('setup').description('Interactive setup 
         }
         apiKey = apiKeyInput;
     }
+    configService.updateConfigInMemory({ apiKey: apiKey?.trim() });
 
     // 4. Fetch available models
     let modelChoices: { value: string; label: string }[] = [];
@@ -111,8 +120,7 @@ export const setupCommand = new Command('setup').description('Interactive setup 
         const s = spinner();
         s.start('Fetching available models from Ollama...');
         try {
-            const ollamaProvider = new OllamaProvider(configService);
-            await ollamaProvider.initialize();
+            const ollamaProvider = new OllamaProvider(fetch, configService.getConfig().baseUrl);
             const models = await ollamaProvider.listModels();
             modelChoices = models.map((name: string) => ({
                 value: name,

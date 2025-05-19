@@ -1,20 +1,18 @@
 import OpenAI from 'openai';
-import { Injectable } from '../utils/inversify';
-import { AIProvider, AIProviderFactory } from './ai-provider.interface';
+import { Inject, Injectable } from '../utils/inversify';
+import { AIProvider } from './ai-provider.interface';
+
+type OpenAIWithSpecificFunctions = {
+    chat: { completions: { create: InstanceType<typeof OpenAI>['chat']['completions']['create'] } };
+    models: { list: InstanceType<typeof OpenAI>['models']['list'] };
+};
 
 @Injectable()
 export class OpenAIProvider implements AIProvider {
-    private client: OpenAI;
-
-    constructor(config: { baseUrl: string; apiKey?: string }) {
-        this.client = new OpenAI({
-            baseURL: config.baseUrl,
-            apiKey: config.apiKey,
-        });
-    }
+    constructor(@Inject(OpenAI) private readonly openai: OpenAIWithSpecificFunctions) {}
 
     async listModels(): Promise<string[]> {
-        const models = await this.client.models.list();
+        const models = await this.openai.models.list();
         return models.data
             .filter((m) => {
                 const id = m.id.toLowerCase();
@@ -39,7 +37,7 @@ export class OpenAIProvider implements AIProvider {
         temperature?: number;
         n?: number;
     }) {
-        const completion = await this.client.chat.completions.create({
+        const completion = await this.openai.chat.completions.create({
             messages: params.messages,
             model: params.model,
             temperature: params.temperature ?? 0.7,
@@ -50,16 +48,7 @@ export class OpenAIProvider implements AIProvider {
         });
 
         return {
-            choices: completion.choices.map((choice) => ({
-                message: { content: choice.message.content ?? '' },
-            })),
+            choices: completion.choices.map((choice) => ({ message: { content: choice.message.content ?? '' } })),
         };
-    }
-}
-
-@Injectable()
-export class OpenAIProviderFactory implements AIProviderFactory {
-    createProvider(config: { baseUrl: string; apiKey?: string }): AIProvider {
-        return new OpenAIProvider(config);
     }
 }
