@@ -10,6 +10,10 @@ export default tseslint.config(
     {
         rules: {
             curly: ['error', 'all'],
+            eqeqeq: 'error',
+            quotes: ['error', 'single', { avoidEscape: true, allowTemplateLiterals: false }],
+            yoda: 'error',
+
             '@typescript-eslint/no-unused-vars': [
                 'error',
                 {

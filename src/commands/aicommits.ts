@@ -19,7 +19,7 @@ export const aiCommits = async ({ container, stageAll = false }: { container: Co
         const validResult = configService.validConfig();
         if (!validResult.valid) {
             note(
-                `It looks like you haven't set up aicommits yet. Let's get you started!\n\n` +
+                "It looks like you haven't set up aicommits yet. Let's get you started!\n\n" +
                     `Run ${yellow('aicommits setup')} to configure your settings.`,
             );
             process.exit(1);
