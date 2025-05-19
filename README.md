@@ -164,9 +164,9 @@ Required
 
 The base URL for your AI provider's API. Default values:
 
--   OpenAI: `https://api.openai.com/v1`
--   Ollama: `http://localhost:11434`
--   Anthropic: `https://api.anthropic.com`
+- OpenAI: `https://api.openai.com/v1`
+- Ollama: `http://localhost:11434`
+- Anthropic: `https://api.anthropic.com`
 
 #### profile
 
@@ -204,9 +204,9 @@ Note, this will use more tokens as it generates more results.
 
 The model to use for generating commit messages. The available models depend on your chosen provider:
 
--   OpenAI: Various GPT models (e.g., `gpt-4.1`, `gpt-4o`)
--   Ollama: Local models you have pulled (e.g., `llama4`, `mistral`)
--   Anthropic: Claude models (e.g., `claude-3-7-sonnet-20250219`)
+- OpenAI: Various GPT models (e.g., `gpt-4.1`, `gpt-4o`)
+- Ollama: Local models you have pulled (e.g., `llama4`, `mistral`)
+- Anthropic: Claude models (e.g., `claude-3-7-sonnet-20250219`)
 
 #### max-length
 
@@ -242,9 +242,9 @@ Video coming soon where I rebuild it from scratch to show you how to easily buil
 
 ## Maintainers
 
--   **Luca Becker**: [@lucavb](https://github.com/lucavb)
--   **Hassan El Mghari**: [@Nutlope](https://github.com/Nutlope) [<img src="https://img.shields.io/twitter/follow/nutlope?style=flat&label=nutlope&logo=twitter&color=0bf&logoColor=fff" align="center">](https://twitter.com/nutlope)
--   **Hiroki Osame**: [@privatenumber](https://github.com/privatenumber) [<img src="https://img.shields.io/twitter/follow/privatenumbr?style=flat&label=privatenumbr&logo=twitter&color=0bf&logoColor=fff" align="center">](https://twitter.com/privatenumbr)
+- **Luca Becker**: [@lucavb](https://github.com/lucavb)
+- **Hassan El Mghari**: [@Nutlope](https://github.com/Nutlope) [<img src="https://img.shields.io/twitter/follow/nutlope?style=flat&label=nutlope&logo=twitter&color=0bf&logoColor=fff" align="center">](https://twitter.com/nutlope)
+- **Hiroki Osame**: [@privatenumber](https://github.com/privatenumber) [<img src="https://img.shields.io/twitter/follow/privatenumbr?style=flat&label=privatenumbr&logo=twitter&color=0bf&logoColor=fff" align="center">](https://twitter.com/privatenumbr)
 
 ## Contributing
 
@@ -252,7 +252,7 @@ If you want to help fix a bug or implement a feature in [Issues](https://github.
 
 ## Support & Links
 
--   [Documentation](https://github.com/lucavb/aicommits#readme)
--   [Report Issues](https://github.com/lucavb/aicommits/issues)
--   [NPM Package](https://www.npmjs.com/package/@lucavb/aicommits)
--   [License](./LICENSE)
+- [Documentation](https://github.com/lucavb/aicommits#readme)
+- [Report Issues](https://github.com/lucavb/aicommits/issues)
+- [NPM Package](https://www.npmjs.com/package/@lucavb/aicommits)
+- [License](./LICENSE)
