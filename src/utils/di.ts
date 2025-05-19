@@ -8,7 +8,9 @@ import { promises as fs } from 'fs';
 import { AIProvider, AIProviderSymbol } from '../services/ai-provider.interface';
 import { OpenAIProvider } from '../services/openai-provider';
 import { OllamaProvider } from '../services/ollama-provider';
+import { AnthropicProvider } from '../services/anthropic-provider';
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 
 const container = new Container({ defaultScope: 'Singleton' });
 
@@ -31,6 +33,9 @@ container
                 }
                 case 'ollama': {
                     return new OllamaProvider(fetch, config.baseUrl);
+                }
+                case 'anthropic': {
+                    return new AnthropicProvider(new Anthropic({ baseURL: config.baseUrl, apiKey: config.apiKey }));
                 }
             }
         },
