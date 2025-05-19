@@ -1,5 +1,5 @@
 import { bgCyan, black, green, red, yellow } from 'kolorist';
-import { intro, outro, spinner, note } from '@clack/prompts';
+import { intro, note, outro, spinner } from '@clack/prompts';
 import { handleCliError, KnownError } from '../utils/error';
 import { isError } from '../utils/typeguards';
 import { Container } from 'inversify';
@@ -7,7 +7,6 @@ import { AICommitMessageService } from '../services/ai-commit-message.service';
 import { GitService } from '../services/git.service';
 import { ConfigService } from '../services/config.service';
 import { chooseOption, reviewAndRevise } from './aicommits-utils';
-import { Config } from '../utils/config';
 
 export const aiCommits = async ({
     container,

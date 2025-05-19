@@ -59,7 +59,7 @@ export const setupCommand = new Command('setup')
             throw new Error('Invalid provider');
         }
 
-        configService.updateProfileInMemory(profile, { provider: provider });
+        configService.updateProfileInMemory(profile, { provider });
 
         // 2. Prompt for Base URL
         const getBaseUrlMessage = (provider: ProviderName) => {
