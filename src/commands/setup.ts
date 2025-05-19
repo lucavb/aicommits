@@ -176,7 +176,7 @@ export const setupCommand = new Command('setup')
                     process.exit(0);
                 }
                 model = selectedModel;
-            } catch (err) {
+            } catch {
                 s.stop(red('Failed to fetch models. Please make sure Ollama is running and accessible.'));
                 cancel('Setup cancelled');
                 process.exit(1);
@@ -247,7 +247,7 @@ export const setupCommand = new Command('setup')
                     process.exit(0);
                 }
                 model = selectedModel;
-            } catch (err) {
+            } catch {
                 s.stop(red('Failed to fetch models. Please check your base URL and API key.'));
                 cancel('Setup cancelled');
                 process.exit(1);

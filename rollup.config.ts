@@ -4,7 +4,9 @@ import typescript from '@rollup/plugin-typescript';
 import terser from '@rollup/plugin-terser';
 import json from '@rollup/plugin-json';
 import type { RollupOptions } from 'rollup';
-import packageJson from './package.json';
+import { readFileSync } from 'fs';
+
+const packageJson = JSON.parse(readFileSync('./package.json', 'utf-8'));
 
 export default {
     input: 'src/cli.ts',
