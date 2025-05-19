@@ -1,6 +1,6 @@
 import { join } from 'path';
 
-import { Config, ProfileConfig, profileConfigSchema } from '../utils/config';
+import { Config, configSchema, ProfileConfig, profileConfigSchema } from '../utils/config';
 import type { promises as fs } from 'fs';
 import { isString } from '../utils/typeguards';
 import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
@@ -12,6 +12,12 @@ export const CONFIG_FILE_PATH = Symbol.for('CONFIG_FILE_PATH');
 export const FILE_SYSTEM_PROMISE_API = Symbol.for('FILE_SYSTEM_PROMISE_API');
 
 type FileSystemApi = Pick<typeof fs, 'writeFile' | 'readFile'>;
+type ConfigValidationResult = { valid: true } | { valid: false; errors: unknown[] };
+
+interface ConfigState {
+    profiles: Record<string, ProfileConfig>;
+    currentProfile: string;
+}
 
 @Injectable()
 export class ConfigService {
@@ -35,20 +41,26 @@ export class ConfigService {
         try {
             const fileContents = await this.fs.readFile(this.configFilePath, 'utf8');
             const parsed = yamlParse(fileContents);
-            // Handle migration from old config format
-            if (parsed && !parsed.profiles) {
-                this.inMemoryConfig = {
-                    profiles: {
-                        default: parsed,
-                    },
-                    currentProfile: 'default',
-                };
-            } else {
-                this.inMemoryConfig = parsed ?? { profiles: {}, currentProfile: 'default' };
-            }
-        } catch (error) {
-            this.inMemoryConfig = { profiles: {}, currentProfile: 'default' };
+            this.inMemoryConfig = this.migrateLegacyConfig(parsed);
+        } catch {
+            this.inMemoryConfig = this.getDefaultConfig();
         }
+    }
+
+    private migrateLegacyConfig(parsed: unknown) {
+        const potentialProfileConfig = profileConfigSchema.safeParse(parsed);
+        if (potentialProfileConfig.success) {
+            return {
+                profiles: { default: potentialProfileConfig.data },
+                currentProfile: 'default',
+            };
+        }
+
+        return configSchema.parse(parsed);
+    }
+
+    private getDefaultConfig(): ConfigState {
+        return { profiles: {}, currentProfile: 'default' };
     }
 
     updateConfigInMemory(config: Partial<Config>): void {
@@ -76,7 +88,7 @@ export class ConfigService {
         return this.cliArguments.profile || this.inMemoryConfig.currentProfile || 'default';
     }
 
-    getProfile(profileName: string) {
+    getProfile(profileName: string): ProfileConfig | undefined {
         const profile = this.inMemoryConfig.profiles?.[profileName];
         return profile ? profileConfigSchema.parse(profile) : undefined;
     }
@@ -91,33 +103,31 @@ export class ConfigService {
         const profileConfig = this.inMemoryConfig.profiles?.[currentProfile] || {};
         const cliArgs = shake(this.cliArguments);
 
-        const exclude = [
-            ...((profileConfig as Partial<ProfileConfig>).exclude || []),
-            ...((cliArgs as Partial<ProfileConfig>).exclude || []),
-        ].filter(isString);
+        const exclude = this.mergeExcludePatterns(profileConfig, cliArgs);
 
         return {
             ...profileConfig,
             ...cliArgs,
             exclude: exclude.length > 0 ? exclude : undefined,
-        } as ProfileConfig;
+        } as const satisfies Partial<ProfileConfig>;
+    }
+
+    private mergeExcludePatterns(profileConfig: Partial<ProfileConfig>, cliArgs: Partial<ProfileConfig>): string[] {
+        return [...(profileConfig.exclude || []), ...(cliArgs.exclude || [])].filter(isString);
     }
 
     getConfig(): Readonly<ProfileConfig> {
-        const rawConfig = this.getRawConfig();
-        return profileConfigSchema.parse(rawConfig);
+        return profileConfigSchema.parse(this.getRawConfig());
     }
 
-    getProfileNames() {
+    getProfileNames(): string[] {
         return Object.keys(this.inMemoryConfig.profiles || {});
     }
 
-    validConfig() {
+    validConfig(): ConfigValidationResult {
         const rawConfig = this.getRawConfig();
         const parsedResult = profileConfigSchema.safeParse(rawConfig);
-        if (parsedResult.success) {
-            return { valid: true } as const;
-        }
-        return { valid: false, errors: parsedResult.error.issues } as const;
+
+        return parsedResult.success ? { valid: true } : { valid: false, errors: parsedResult.error.issues };
     }
 }
