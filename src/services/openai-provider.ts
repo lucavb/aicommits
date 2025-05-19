@@ -32,7 +32,7 @@ export class OpenAIProvider implements AIProvider {
     }
 
     async generateCompletion(params: {
-        messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+        messages: { role: 'system' | 'user' | 'assistant'; content: string }[];
         model: string;
         temperature?: number;
         n?: number;
