@@ -22,11 +22,12 @@ program
     .addOption(new Option('--locale <locale>'))
     .addOption(new Option('--max-length <maxLength>'))
     .addOption(new Option('--model <model>'))
+    .addOption(new Option('--profile <profile>', 'Configuration profile to use').default('default'))
     .addOption(new Option('--stage-all'))
     .addOption(new Option('--type <type>'))
     .action(async (options) => {
         container.bind(CLI_ARGUMENTS).toConstantValue(options);
-        await aiCommits({ container, stageAll: options.stageAll });
+        await aiCommits({ container, stageAll: options.stageAll, profile: options.profile });
     });
 
 program.parse(process.argv);

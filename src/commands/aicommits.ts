@@ -7,8 +7,17 @@ import { AICommitMessageService } from '../services/ai-commit-message.service';
 import { GitService } from '../services/git.service';
 import { ConfigService } from '../services/config.service';
 import { chooseOption, reviewAndRevise } from './aicommits-utils';
+import { Config } from '../utils/config';
 
-export const aiCommits = async ({ container, stageAll = false }: { container: Container; stageAll?: boolean }) => {
+export const aiCommits = async ({
+    container,
+    stageAll = false,
+    profile = 'default',
+}: {
+    container: Container;
+    stageAll?: boolean;
+    profile?: string;
+}) => {
     try {
         const configService = container.get(ConfigService);
         await configService.readConfig();
@@ -24,7 +33,18 @@ export const aiCommits = async ({ container, stageAll = false }: { container: Co
             );
             process.exit(1);
         }
-        const config = configService.getConfig();
+
+        const currentProfile = configService.getProfile(profile);
+        if (!currentProfile) {
+            const config = configService.getProfileNames();
+            note(
+                `Profile "${profile}" not found. Available profiles: ${config.join(', ')}\n\n` +
+                    `Run ${yellow('aicommits setup --profile ' + profile)} to create this profile.`,
+            );
+            process.exit(1);
+        }
+
+        const config = currentProfile;
         await gitService.assertGitRepo();
 
         if (stageAll) {

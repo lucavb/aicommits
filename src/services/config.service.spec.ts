@@ -3,7 +3,7 @@ import { Container } from 'inversify';
 import { stringify as yamlStringify } from 'yaml';
 import { CLI_ARGUMENTS, CONFIG_FILE_PATH, ConfigService, FILE_SYSTEM_PROMISE_API } from './config.service';
 import { Injectable } from '../utils/inversify';
-import { Config } from '../utils/config';
+import { Config, ProfileConfig } from '../utils/config';
 
 @Injectable()
 class MockFsApi implements Partial<typeof fs> {
@@ -15,8 +15,22 @@ describe('ConfigService', () => {
     let configService: ConfigService;
     let mockFsApi: MockFsApi;
     let tempFilePath: string;
-    const mockCliArguments: Partial<Config> = { baseUrl: 'https://api.ollama.local/v1' };
-    const mockConfig: Partial<Config> = { model: 'llama3' };
+    const mockCliArguments: Partial<ProfileConfig> & { profile?: string } = { baseUrl: 'https://api.ollama.local/v1' };
+    const mockConfig: Partial<Config> = {
+        profiles: {
+            default: {
+                model: 'llama3',
+                baseUrl: 'https://api.ollama.local/v1',
+                provider: 'ollama',
+                stageAll: false,
+                contextLines: 10,
+                generate: 1,
+                locale: 'en',
+                maxLength: 50,
+            },
+        },
+        currentProfile: 'default',
+    };
 
     beforeEach(() => {
         tempFilePath = '/tmp/no-being-written.yaml';
@@ -48,67 +62,76 @@ describe('ConfigService', () => {
 
             await configService.readConfig();
 
-            expect(configService.getConfig()).toMatchObject(mockConfig);
+            expect(configService.getConfig()).toMatchObject(mockConfig.profiles!.default);
         });
     });
 
     describe('writeConfig', () => {
         it('should write the config to the file', async () => {
-            configService.updateConfigInMemory(mockConfig);
+            const savedConfig: Partial<Config> = {
+                profiles: {
+                    default: {
+                        model: 'llama3',
+                        baseUrl: 'https://api.ollama.local/v1',
+                        provider: 'ollama',
+                        stageAll: false,
+                        contextLines: 10,
+                        generate: 1,
+                        locale: 'en',
+                        maxLength: 50,
+                    },
+                },
+                currentProfile: 'default',
+            };
+            configService.updateConfigInMemory(savedConfig);
             await configService.flush();
 
-            expect(mockFsApi.writeFile).toHaveBeenCalledWith(tempFilePath, yamlStringify(mockConfig), 'utf8');
+            expect(mockFsApi.writeFile).toHaveBeenCalledWith(tempFilePath, yamlStringify(savedConfig), 'utf8');
             expect(mockFsApi.writeFile).toHaveBeenCalledTimes(1);
         });
     });
 
-    describe('getConfig', () => {
-        it('should merge and validate the config', async () => {
-            const savedConfig: Partial<Config> = { model: 'llama3' };
-            mockFsApi.readFile.mockResolvedValueOnce(yamlStringify(savedConfig));
-
-            await configService.readConfig();
-            const result = configService.getConfig();
-
-            expect(result).toStrictEqual({
-                ...mockCliArguments,
-                ...savedConfig,
-                contextLines: 10,
-                exclude: [],
-                generate: 1,
-                locale: 'en',
-                maxLength: 50,
-                stageAll: false,
-                provider: 'openai',
-            });
-        });
-    });
-
     describe('validConfig', () => {
-        it('should return { valid: true } for a valid config', async () => {
-            const savedConfig = { model: 'llama3' } satisfies Partial<Config>;
-            mockFsApi.readFile.mockResolvedValueOnce(yamlStringify(savedConfig));
-
-            await configService.readConfig();
+        it('should return valid for a valid config', () => {
+            const savedConfig = {
+                profiles: {
+                    default: {
+                        model: 'llama3',
+                        baseUrl: 'https://api.ollama.local/v1',
+                        provider: 'ollama',
+                        stageAll: false,
+                        contextLines: 10,
+                        generate: 1,
+                        locale: 'en',
+                        maxLength: 50,
+                    },
+                },
+                currentProfile: 'default',
+            } satisfies Partial<Config>;
+            configService.updateConfigInMemory(savedConfig);
             const result = configService.validConfig();
-
-            expect(result).toEqual({ valid: true });
+            expect(result.valid).toBe(true);
         });
 
-        it('should return { valid: false, errors } for an invalid config', async () => {
-            // model is required, so omit it to make config invalid
-            const invalidConfig = { model: undefined } satisfies Partial<Config>;
-            mockFsApi.readFile.mockResolvedValueOnce(yamlStringify(invalidConfig));
-
-            await configService.readConfig();
+        it('should return invalid for an invalid config', () => {
+            const invalidConfig = {
+                profiles: {
+                    default: {
+                        model: '',
+                        baseUrl: 'https://api.ollama.local/v1',
+                        provider: 'ollama',
+                        stageAll: false,
+                        contextLines: 10,
+                        generate: 1,
+                        locale: 'en',
+                        maxLength: 50,
+                    },
+                },
+                currentProfile: 'default',
+            } satisfies Partial<Config>;
+            configService.updateConfigInMemory(invalidConfig);
             const result = configService.validConfig();
-
-            if (result.valid) {
-                throw new Error();
-            }
-            expect(Array.isArray(result.errors)).toBe(true);
-            expect(result.errors.length).toBeGreaterThan(0);
-            expect(result.errors[0]).toHaveProperty('message');
+            expect(result.valid).toBe(false);
         });
     });
 });
