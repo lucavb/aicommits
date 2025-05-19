@@ -29,7 +29,8 @@ export const setupCommand = new Command('setup').description('Interactive setup 
     intro('Welcome to aicommits setup! 🚀');
 
     const configService = container.get(ConfigService);
-    const currentConfig = await configService.readConfig();
+    await configService.readConfig();
+    const currentConfig = configService.getConfig();
 
     // 1. Prompt for Provider
     const provider = await select({
@@ -248,7 +249,11 @@ export const setupCommand = new Command('setup').description('Interactive setup 
         type: type === 'simple' ? '' : 'conventional',
     };
 
-    await configService.writeConfig(newConfig);
+    // Update config in memory first
+    configService.updateConfigInMemory(newConfig);
+
+    // Flush the config to disk
+    await configService.flush();
 
     note(
         `Configuration saved to ${yellow(configService.getConfigFilePath())}\n\n` +

@@ -24,7 +24,7 @@ export class OllamaProvider implements AIProvider {
     }
 
     async initialize(): Promise<void> {
-        const config = await this.configService.readConfig();
+        const config = await this.configService.getConfig();
         if (!config.baseUrl) {
             throw new Error('Base URL is required in configuration');
         }
