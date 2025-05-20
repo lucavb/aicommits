@@ -1,0 +1,16 @@
+{
+    $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+    extends: [
+        'github>whitesource/merge-confidence:beta',
+        'config:base',
+        ':semanticCommits',
+        ':automergeLinters',
+        ':automergeTesters',
+        ':automergeTypes',
+    ],
+
+    addLabels: ['dependencies'],
+    automergeType: 'branch',
+    prConcurrentLimit: 5,
+    rebaseWhen: 'behind-base-branch',
+}
