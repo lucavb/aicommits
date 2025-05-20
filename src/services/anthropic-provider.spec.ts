@@ -1,5 +1,5 @@
 import { AnthropicProvider } from './anthropic-provider';
-import Anthropic from '@anthropic-ai/sdk';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('AnthropicProvider', () => {
     let mockAnthropic: ConstructorParameters<typeof AnthropicProvider>[0];
@@ -7,8 +7,8 @@ describe('AnthropicProvider', () => {
 
     beforeEach(() => {
         mockAnthropic = {
-            messages: { create: jest.fn() },
-            models: { list: jest.fn() },
+            messages: { create: vi.fn() },
+            models: { list: vi.fn() },
         } satisfies ConstructorParameters<typeof AnthropicProvider>[0];
         provider = new AnthropicProvider(mockAnthropic);
     });
@@ -19,9 +19,9 @@ describe('AnthropicProvider', () => {
                 { id: 'claude-3-opus-20240229', created: 0, object: 'model' as const },
                 { id: 'claude-3-sonnet-20240229', created: 0, object: 'model' as const },
             ];
-            jest.spyOn(mockAnthropic.models, 'list').mockResolvedValue({
+            vi.spyOn(mockAnthropic.models, 'list').mockResolvedValue({
                 data: mockModels,
-            } as unknown as ReturnType<InstanceType<typeof Anthropic>['models']['list']>);
+            } as unknown as Awaited<ReturnType<typeof mockAnthropic.models.list>>);
 
             const result = await provider.listModels();
 
@@ -30,7 +30,7 @@ describe('AnthropicProvider', () => {
         });
 
         it('should throw an error if listing models fails', async () => {
-            jest.spyOn(mockAnthropic.models, 'list').mockRejectedValue(new Error('Failed to list models'));
+            vi.spyOn(mockAnthropic.models, 'list').mockRejectedValue(new Error('Failed to list models'));
 
             await expect(provider.listModels()).rejects.toThrow('Failed to list models');
         });
@@ -54,7 +54,7 @@ describe('AnthropicProvider', () => {
                     server_tool_use: { web_search_requests: 0 },
                 },
             };
-            jest.spyOn(mockAnthropic.messages, 'create').mockResolvedValue(mockResponse);
+            vi.spyOn(mockAnthropic.messages, 'create').mockResolvedValue(mockResponse);
 
             const result = await provider.generateCompletion({
                 messages: [{ role: 'user', content: 'Hello' }],
@@ -74,7 +74,7 @@ describe('AnthropicProvider', () => {
         });
 
         it('should throw an error if generating completion fails', async () => {
-            jest.spyOn(mockAnthropic.messages, 'create').mockRejectedValue(new Error('Failed to generate completion'));
+            vi.spyOn(mockAnthropic.messages, 'create').mockRejectedValue(new Error('Failed to generate completion'));
 
             await expect(
                 provider.generateCompletion({

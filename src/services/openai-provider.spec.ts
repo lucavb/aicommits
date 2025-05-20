@@ -2,6 +2,7 @@ import { OpenAIProvider } from './openai-provider';
 import { Model } from 'openai/resources/models';
 import { ChatCompletion } from 'openai/resources/chat/completions';
 import OpenAI from 'openai';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 describe('OpenAIProvider', () => {
     let mockOpenAI: ConstructorParameters<typeof OpenAIProvider>[0];
@@ -9,8 +10,8 @@ describe('OpenAIProvider', () => {
 
     beforeEach(() => {
         mockOpenAI = {
-            chat: { completions: { create: jest.fn() } },
-            models: { list: jest.fn() },
+            chat: { completions: { create: vi.fn() } },
+            models: { list: vi.fn() },
         } satisfies ConstructorParameters<typeof OpenAIProvider>[0];
         provider = new OpenAIProvider(mockOpenAI);
     });
@@ -23,9 +24,9 @@ describe('OpenAIProvider', () => {
                 { id: 'dall-e', created: 0, object: 'model' as const, owned_by: 'openai' },
                 { id: 'gpt-3.5-turbo-instruct', created: 0, object: 'model' as const, owned_by: 'openai' },
             ];
-            jest.spyOn(mockOpenAI.models, 'list').mockResolvedValue({
+            vi.spyOn(mockOpenAI.models, 'list').mockResolvedValue({
                 data: mockModels,
-            } as unknown as ReturnType<InstanceType<typeof OpenAI>['models']['list']>);
+            } as unknown as Awaited<ReturnType<InstanceType<typeof OpenAI>['models']['list']>>);
 
             const result = await provider.listModels();
 
@@ -34,7 +35,7 @@ describe('OpenAIProvider', () => {
         });
 
         it('should throw an error if listing models fails', async () => {
-            jest.spyOn(mockOpenAI.models, 'list').mockRejectedValue(new Error('Failed to list models'));
+            vi.spyOn(mockOpenAI.models, 'list').mockRejectedValue(new Error('Failed to list models'));
 
             await expect(provider.listModels()).rejects.toThrow('Failed to list models');
         });
@@ -56,7 +57,7 @@ describe('OpenAIProvider', () => {
                     },
                 ],
             };
-            jest.spyOn(mockOpenAI.chat.completions, 'create').mockResolvedValue(mockCompletion);
+            vi.spyOn(mockOpenAI.chat.completions, 'create').mockResolvedValue(mockCompletion);
 
             const result = await provider.generateCompletion({
                 messages: [{ role: 'user', content: 'Hello' }],
@@ -79,7 +80,7 @@ describe('OpenAIProvider', () => {
         });
 
         it('should throw an error if generating completion fails', async () => {
-            jest.spyOn(mockOpenAI.chat.completions, 'create').mockRejectedValue(
+            vi.spyOn(mockOpenAI.chat.completions, 'create').mockRejectedValue(
                 new Error('Failed to generate completion'),
             );
 

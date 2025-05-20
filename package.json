@@ -39,15 +39,17 @@
     "scripts": {
         "build": "rollup --config rollup.config.ts --configPlugin typescript",
         "dev": "tsx src/cli.ts",
-        "dev:setup": "tsx src/cli.ts setup",
         "dev:5": "tsx src/cli.ts --generate 5",
+        "dev:setup": "tsx src/cli.ts setup",
         "dev:stage-all": "tsx src/cli.ts --stage-all",
         "eslint": "eslint .",
         "eslint:fix": "eslint . --fix",
         "prepack": "npm run build",
         "prettier": "prettier -c --ignore-unknown .",
         "prettier:fix": "prettier -w --ignore-unknown .",
-        "test": "jest",
+        "test": "vitest run",
+        "test:coverage": "vitest run --coverage",
+        "test:watch": "vitest",
         "type-check": "tsc --noEmit --pretty --incremental --skipLibCheck"
     },
     "dependencies": {
@@ -72,17 +74,16 @@
         "@rollup/plugin-node-resolve": "16.0.1",
         "@rollup/plugin-terser": "0.4.4",
         "@rollup/plugin-typescript": "12.1.2",
-        "@types/jest": "29.5.14",
         "@types/node": "22.15.19",
+        "@vitest/coverage-v8": "3.1.4",
         "eslint": "9.27.0",
-        "jest": "29.7.0",
         "prettier": "3.5.3",
         "rollup": "4.41.0",
-        "ts-jest": "29.3.4",
         "ts-node": "10.9.2",
         "tslib": "2.8.1",
         "tsx": "4.19.4",
         "typescript": "5.8.3",
-        "typescript-eslint": "8.32.1"
+        "typescript-eslint": "8.32.1",
+        "vitest": "3.1.4"
     }
 }

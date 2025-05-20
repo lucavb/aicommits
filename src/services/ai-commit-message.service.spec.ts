@@ -6,17 +6,18 @@ import { PromptService } from './prompt.service';
 import { ConfigService } from './config.service';
 import { Injectable } from '../utils/inversify';
 import { AIProviderSymbol } from './ai-provider.interface';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 @Injectable()
 class MockConfigService implements Partial<ConfigService> {
-    getConfig = jest.fn();
+    getConfig = vi.fn();
 }
 
 @Injectable()
 class MockPromptService implements Partial<PromptService> {
-    generateCommitMessagePrompt = jest.fn().mockReturnValue('generateCommitMessagePrompt');
-    generateSummaryPrompt = jest.fn().mockReturnValue('generateSummaryPrompt');
-    getCommitMessageSystemPrompt = jest
+    generateCommitMessagePrompt = vi.fn().mockReturnValue('generateCommitMessagePrompt');
+    generateSummaryPrompt = vi.fn().mockReturnValue('generateSummaryPrompt');
+    getCommitMessageSystemPrompt = vi
         .fn()
         .mockReturnValue(
             'You are a git commit message generator. Your task is to write clear, concise, and descriptive commit messages that follow best practices. Always use the imperative mood and focus on the intent and impact of the change. Do not include file names, code snippets, or unnecessary details. Never include explanations, commentary, or formatting outside the commit message itself.',
@@ -25,8 +26,8 @@ class MockPromptService implements Partial<PromptService> {
 
 @Injectable()
 class MockAIProvider {
-    generateCompletion = jest.fn();
-    listModels = jest.fn();
+    generateCompletion = vi.fn();
+    listModels = vi.fn();
 }
 
 describe('AICommitMessageService', () => {
