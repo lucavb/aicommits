@@ -7,6 +7,7 @@ import { AICommitMessageService } from '../services/ai-commit-message.service';
 import { GitService } from '../services/git.service';
 import { ConfigService } from '../services/config.service';
 import { chooseOption, reviewAndRevise } from './aicommits-utils';
+import { trimLines } from '../utils/string';
 
 export const aiCommits = async ({
     container,
@@ -27,8 +28,11 @@ export const aiCommits = async ({
         const validResult = configService.validConfig();
         if (!validResult.valid) {
             note(
-                "It looks like you haven't set up aicommits yet. Let's get you started!\n\n" +
-                    `Run ${yellow('aicommits setup')} to configure your settings.`,
+                trimLines(`
+                It looks like you haven't set up aicommits yet. Let's get you started!
+                
+                Run ${yellow('aicommits setup')} to configure your settings.
+            `),
             );
             process.exit(1);
         }
@@ -37,13 +41,27 @@ export const aiCommits = async ({
         if (!currentProfile) {
             const config = configService.getProfileNames();
             note(
-                `Profile "${profile}" not found. Available profiles: ${config.join(', ')}\n\n` +
-                    `Run ${yellow('aicommits setup --profile ' + profile)} to create this profile.`,
+                trimLines(`
+                Profile "${profile}" not found. Available profiles: ${config.join(', ')}
+                
+                Run ${yellow('aicommits setup --profile ' + profile)} to create this profile.
+            `),
             );
             process.exit(1);
         }
 
         const config = currentProfile;
+
+        // Display provider and model information
+        note(
+            trimLines(`
+             Profile: ${yellow(profile)}
+             Provider: ${yellow(config.provider)}
+             Model: ${yellow(config.model)}
+             Endpoint: ${yellow(config.baseUrl)}
+            `),
+        );
+
         await gitService.assertGitRepo();
 
         if (stageAll) {
@@ -60,7 +78,9 @@ export const aiCommits = async ({
         if (!staged) {
             detectingFiles.stop('Detecting staged files');
             throw new KnownError(
-                'No staged changes found. Stage your changes manually, or automatically stage all changes with the `--stage-all` flag.',
+                trimLines(`
+                    No staged changes found. Stage your changes manually, or automatically stage all changes with the \`--stage-all\` flag.
+                `),
             );
         }
 
