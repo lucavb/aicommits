@@ -42,7 +42,7 @@ const openInEditor = (initialContent: string): string | null => {
         const edited = readFileSync(tmpFile, { encoding: 'utf8' });
         unlinkSync(tmpFile);
         return edited;
-    } catch (e) {
+    } catch {
         unlinkSync(tmpFile);
         outro('Could not read edited commit message.');
         return null;

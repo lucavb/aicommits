@@ -50,7 +50,7 @@ describe('ConfigService', () => {
         // Clean up the temporary file
         try {
             await fs.unlink(tempFilePath);
-        } catch (err) {
+        } catch {
             // File might not exist, ignore the error
         }
     });

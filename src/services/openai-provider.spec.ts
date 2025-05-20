@@ -52,7 +52,7 @@ describe('OpenAIProvider', () => {
                         finish_reason: 'stop',
                         index: 0,
                         logprobs: null,
-                        message: { content: 'This is a test response.', role: 'assistant' },
+                        message: { content: 'This is a test response.', role: 'assistant', refusal: null },
                     },
                 ],
             };

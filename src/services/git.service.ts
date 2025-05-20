@@ -16,7 +16,7 @@ export class GitService {
     async stageAllFiles(): Promise<void> {
         try {
             await this.git.add('.');
-        } catch (error) {
+        } catch {
             throw new Error('Failed to stage all files');
         }
     }
@@ -24,7 +24,7 @@ export class GitService {
     async commitChanges(message: string): Promise<void> {
         try {
             await this.git.commit(message);
-        } catch (error) {
+        } catch {
             throw new KnownError('Failed to commit changes');
         }
     }
@@ -33,7 +33,7 @@ export class GitService {
         try {
             const topLevel = await this.git.revparse(['--show-toplevel']);
             return topLevel.trim();
-        } catch (error) {
+        } catch {
             throw new KnownError('The current directory must be a Git repository!');
         }
     }
@@ -67,7 +67,7 @@ export class GitService {
                 files: files.split('\n').filter(Boolean),
                 diff,
             };
-        } catch (error) {
+        } catch {
             throw new KnownError('Failed to get staged diff');
         }
     }
