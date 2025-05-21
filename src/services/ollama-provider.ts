@@ -6,6 +6,11 @@ import { Inject, Injectable } from '../utils/inversify';
 export class OllamaProvider implements AIProvider {
     constructor(@Inject(Ollama) private readonly ollama: Pick<Ollama, 'list' | 'chat'>) {}
 
+    static create(config: { baseUrl?: string }): OllamaProvider {
+        const ollama = new Ollama({ host: config.baseUrl || 'http://localhost:11434' });
+        return new OllamaProvider(ollama);
+    }
+
     async listModels(): Promise<string[]> {
         const response = await this.ollama.list();
         return response.models.map((model) => model.name);

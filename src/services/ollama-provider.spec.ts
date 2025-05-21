@@ -141,7 +141,9 @@ describe('OllamaProvider', () => {
                 },
             };
 
-            vi.spyOn(mockOllama, 'chat').mockResolvedValue(mockStream as unknown as Awaited<ReturnType<Ollama['chat']>>);
+            vi.spyOn(mockOllama, 'chat').mockResolvedValue(
+                mockStream as unknown as Awaited<ReturnType<Ollama['chat']>>,
+            );
 
             const onMessageDelta = vi.fn();
             const onComplete = vi.fn();
@@ -192,7 +194,9 @@ describe('OllamaProvider', () => {
                 },
             };
 
-            vi.spyOn(mockOllama, 'chat').mockResolvedValue(mockStream as unknown as Awaited<ReturnType<Ollama['chat']>>);
+            vi.spyOn(mockOllama, 'chat').mockResolvedValue(
+                mockStream as unknown as Awaited<ReturnType<Ollama['chat']>>,
+            );
 
             const onMessageDelta = vi.fn();
             const onComplete = vi.fn();
@@ -220,7 +224,9 @@ describe('OllamaProvider', () => {
                 },
             };
 
-            vi.spyOn(mockOllama, 'chat').mockResolvedValue(mockStream as unknown as Awaited<ReturnType<Ollama['chat']>>);
+            vi.spyOn(mockOllama, 'chat').mockResolvedValue(
+                mockStream as unknown as Awaited<ReturnType<Ollama['chat']>>,
+            );
 
             await provider.streamCompletion({
                 messages: [{ role: 'user', content: 'Hello' }],

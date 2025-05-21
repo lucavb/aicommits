@@ -2,13 +2,13 @@ import { AnthropicProvider } from './anthropic-provider';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Define types for mock streams
-type MockAnthropicChunk = 
-  | { type: 'content_block_delta'; delta: { type: 'text_delta'; text: string } }
-  | { type: 'message_start' }
-  | { type: 'message_stop' };
+type MockAnthropicChunk =
+    | { type: 'content_block_delta'; delta: { type: 'text_delta'; text: string } }
+    | { type: 'message_start' }
+    | { type: 'message_stop' };
 
 type MockAnthropicStream = {
-  [Symbol.asyncIterator](): AsyncGenerator<MockAnthropicChunk, void, unknown>;
+    [Symbol.asyncIterator](): AsyncGenerator<MockAnthropicChunk, void, unknown>;
 };
 
 describe('AnthropicProvider', () => {
@@ -115,7 +115,9 @@ describe('AnthropicProvider', () => {
             };
 
             // Type-safe mock for Anthropic's stream
-            vi.spyOn(mockAnthropic.messages, 'create').mockResolvedValue(mockStream as unknown as Awaited<ReturnType<typeof mockAnthropic.messages.create>>);
+            vi.spyOn(mockAnthropic.messages, 'create').mockResolvedValue(
+                mockStream as unknown as Awaited<ReturnType<typeof mockAnthropic.messages.create>>,
+            );
 
             const onMessageDelta = vi.fn();
             const onComplete = vi.fn();
@@ -165,7 +167,9 @@ describe('AnthropicProvider', () => {
             };
 
             // Type-safe mock for Anthropic's stream
-            vi.spyOn(mockAnthropic.messages, 'create').mockResolvedValue(mockStream as unknown as Awaited<ReturnType<typeof mockAnthropic.messages.create>>);
+            vi.spyOn(mockAnthropic.messages, 'create').mockResolvedValue(
+                mockStream as unknown as Awaited<ReturnType<typeof mockAnthropic.messages.create>>,
+            );
 
             const onMessageDelta = vi.fn();
             const onComplete = vi.fn();

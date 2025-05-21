@@ -9,9 +9,6 @@ import { AIProvider, AIProviderSymbol } from '../services/ai-provider.interface'
 import { OpenAIProvider } from '../services/openai-provider';
 import { OllamaProvider } from '../services/ollama-provider';
 import { AnthropicProvider } from '../services/anthropic-provider';
-import OpenAI from 'openai';
-import Anthropic from '@anthropic-ai/sdk';
-import { Ollama } from 'ollama';
 
 const container = new Container({ defaultScope: 'Singleton' });
 
@@ -30,13 +27,13 @@ container
 
             switch (provider) {
                 case 'openai': {
-                    return new OpenAIProvider(new OpenAI({ baseURL: config.baseUrl, apiKey: config.apiKey }));
+                    return OpenAIProvider.create({ baseUrl: config.baseUrl, apiKey: config.apiKey });
                 }
                 case 'ollama': {
-                    return new OllamaProvider(new Ollama({ host: config.baseUrl }));
+                    return OllamaProvider.create({ baseUrl: config.baseUrl });
                 }
                 case 'anthropic': {
-                    return new AnthropicProvider(new Anthropic({ baseURL: config.baseUrl, apiKey: config.apiKey }));
+                    return AnthropicProvider.create({ baseUrl: config.baseUrl, apiKey: config.apiKey });
                 }
             }
         },

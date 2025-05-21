@@ -11,6 +11,14 @@ type AnthropicWithSpecificFunctions = {
 export class AnthropicProvider implements AIProvider {
     constructor(@Inject(Anthropic) private readonly anthropic: AnthropicWithSpecificFunctions) {}
 
+    static create(config: { baseUrl?: string; apiKey?: string }): AnthropicProvider {
+        if (!config.apiKey) {
+            throw new Error('Anthropic API key is required');
+        }
+        const anthropic = new Anthropic({ baseURL: config.baseUrl, apiKey: config.apiKey });
+        return new AnthropicProvider(anthropic);
+    }
+
     async listModels(): Promise<string[]> {
         const models = await this.anthropic.models.list();
         return models.data.map((model) => model.id);
