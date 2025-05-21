@@ -1,99 +1,65 @@
 import { OllamaProvider } from './ollama-provider';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Ollama } from 'ollama';
 
 describe('OllamaProvider', () => {
-    const mockFetch = vi.fn();
-    const baseUrl = 'http://localhost:11434';
+    let mockOllama: ConstructorParameters<typeof OllamaProvider>[0];
     let provider: OllamaProvider;
 
     beforeEach(() => {
-        mockFetch.mockClear();
-        provider = new OllamaProvider(mockFetch, baseUrl);
+        mockOllama = {
+            list: vi.fn(),
+            chat: vi.fn(),
+        };
+
+        provider = new OllamaProvider(mockOllama);
     });
 
     describe('listModels', () => {
         it('should return list of model names', async () => {
-            const mockResponse = {
-                models: [
-                    {
-                        name: 'llama2',
-                        modified_at: '2024-01-01',
-                        size: 1000,
-                        digest: 'abc123',
-                        details: {
-                            format: 'gguf',
-                            family: 'llama',
-                            families: ['llama'],
-                            parameter_size: '7B',
-                            quantization_level: 'Q4_0',
-                        },
-                    },
-                    {
-                        name: 'mistral',
-                        modified_at: '2024-01-02',
-                        size: 2000,
-                        digest: 'def456',
-                        details: {
-                            format: 'gguf',
-                            family: 'mistral',
-                            families: ['mistral'],
-                            parameter_size: '7B',
-                            quantization_level: 'Q4_0',
-                        },
-                    },
-                ],
-            };
+            const mockModels = [{ name: 'llama2' }, { name: 'mistral' }];
 
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve(mockResponse),
-            });
+            vi.spyOn(mockOllama, 'list').mockResolvedValue({
+                models: mockModels,
+            } as unknown as Awaited<ReturnType<Ollama['list']>>);
 
             const result = await provider.listModels();
 
-            expect(mockFetch).toHaveBeenCalledWith(`${baseUrl}/api/tags`);
+            expect(mockOllama.list).toHaveBeenCalled();
             expect(result).toEqual(['llama2', 'mistral']);
         });
 
         it('should throw error when API call fails', async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: false,
-                statusText: 'Internal Server Error',
-            });
+            vi.spyOn(mockOllama, 'list').mockRejectedValue(new Error('Failed to list models'));
 
-            await expect(provider.listModels()).rejects.toThrow('Failed to fetch models: Internal Server Error');
+            await expect(provider.listModels()).rejects.toThrow();
         });
     });
 
     describe('generateCompletion', () => {
         it('should return completion response', async () => {
-            const mockResponse = {
-                response: 'This is a test response',
-            };
+            const messages = [
+                { role: 'user', content: 'Hello' },
+                { role: 'assistant', content: 'Hi there!' },
+            ];
 
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve(mockResponse),
-            });
+            vi.spyOn(mockOllama, 'chat').mockResolvedValue({
+                message: {
+                    role: 'assistant',
+                    content: 'This is a test response',
+                },
+            } as unknown as Awaited<ReturnType<Ollama['chat']>>);
 
             const result = await provider.generateCompletion({
-                messages: [
-                    { role: 'user', content: 'Hello' },
-                    { role: 'assistant', content: 'Hi there!' },
-                ],
+                messages,
                 model: 'llama2',
                 temperature: 0.8,
             });
 
-            expect(mockFetch).toHaveBeenCalledWith(`${baseUrl}/api/generate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    model: 'llama2',
-                    options: { temperature: 0.8 },
-                    prompt: 'user: Hello\nassistant: Hi there!',
-                    stream: false,
-                }),
+            expect(mockOllama.chat).toHaveBeenCalledWith({
+                model: 'llama2',
+                messages,
+                options: { temperature: 0.8 },
             });
 
             expect(result).toEqual({
@@ -108,40 +74,36 @@ describe('OllamaProvider', () => {
         });
 
         it('should use default temperature when not provided', async () => {
-            const mockResponse = {
-                response: 'This is a test response',
-            };
+            const messages = [{ role: 'user', content: 'Hello' }];
 
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: () => Promise.resolve(mockResponse),
-            });
+            vi.spyOn(mockOllama, 'chat').mockResolvedValue({
+                message: {
+                    role: 'assistant',
+                    content: 'This is a test response',
+                },
+            } as unknown as Awaited<ReturnType<Ollama['chat']>>);
 
             await provider.generateCompletion({
-                messages: [{ role: 'user', content: 'Hello' }],
+                messages,
                 model: 'llama2',
             });
 
-            expect(mockFetch).toHaveBeenCalledWith(
-                expect.any(String),
-                expect.objectContaining({
-                    body: expect.stringContaining('"temperature":0.7'),
-                }),
-            );
+            expect(mockOllama.chat).toHaveBeenCalledWith({
+                model: 'llama2',
+                messages,
+                options: { temperature: 0.7 },
+            });
         });
 
         it('should throw error when API call fails', async () => {
-            mockFetch.mockResolvedValueOnce({
-                ok: false,
-                statusText: 'Internal Server Error',
-            });
+            vi.spyOn(mockOllama, 'chat').mockRejectedValue(new Error('Failed to generate completion'));
 
             await expect(
                 provider.generateCompletion({
                     messages: [{ role: 'user', content: 'Hello' }],
                     model: 'llama2',
                 }),
-            ).rejects.toThrow('Failed to generate completion: Internal Server Error');
+            ).rejects.toThrow();
         });
     });
 });

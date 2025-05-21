@@ -11,6 +11,7 @@ import { OllamaProvider } from '../services/ollama-provider';
 import { AnthropicProvider } from '../services/anthropic-provider';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
+import { Ollama } from 'ollama';
 
 const container = new Container({ defaultScope: 'Singleton' });
 
@@ -32,7 +33,7 @@ container
                     return new OpenAIProvider(new OpenAI({ baseURL: config.baseUrl, apiKey: config.apiKey }));
                 }
                 case 'ollama': {
-                    return new OllamaProvider(fetch, config.baseUrl);
+                    return new OllamaProvider(new Ollama({ host: config.baseUrl }));
                 }
                 case 'anthropic': {
                     return new AnthropicProvider(new Anthropic({ baseURL: config.baseUrl, apiKey: config.apiKey }));

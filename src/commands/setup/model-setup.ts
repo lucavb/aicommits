@@ -4,6 +4,7 @@ import { red } from 'kolorist';
 import OpenAI from 'openai';
 import { OllamaProvider } from '../../services/ollama-provider';
 import Anthropic from '@anthropic-ai/sdk';
+import { Ollama } from 'ollama';
 
 /**
  * Get the base URL placeholder based on the provider
@@ -108,7 +109,8 @@ export async function setupModel(provider: ProviderName, currentConfig?: Profile
         const s = spinner();
         s.start('Fetching available models from Ollama...');
         try {
-            const ollamaProvider = new OllamaProvider(fetch, baseUrl.trim());
+            const ollama = new Ollama({ host: baseUrl.trim() });
+            const ollamaProvider = new OllamaProvider(ollama);
             const models = await ollamaProvider.listModels();
             const modelChoices = models.map((name: string) => ({
                 value: name,
