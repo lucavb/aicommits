@@ -51,4 +51,34 @@ export class OpenAIProvider implements AIProvider {
             choices: completion.choices.map((choice) => ({ message: { content: choice.message.content ?? '' } })),
         };
     }
+
+    async streamCompletion(params: {
+        messages: { role: string; content: string }[];
+        model: string;
+        temperature?: number;
+        onMessageDelta: (content: string) => void;
+        onComplete: (finalContent: string) => void;
+    }): Promise<void> {
+        const stream = await this.openai.chat.completions.create({
+            frequency_penalty: 0,
+            messages: params.messages as { role: 'system' | 'user' | 'assistant'; content: string }[],
+            model: params.model,
+            presence_penalty: 0,
+            stream: true,
+            temperature: params.temperature ?? 0.7,
+            top_p: 1,
+        });
+
+        let fullContent = '';
+
+        for await (const chunk of stream) {
+            const content = chunk.choices[0]?.delta?.content || '';
+            if (content) {
+                fullContent += content;
+                params.onMessageDelta(content);
+            }
+        }
+
+        params.onComplete(fullContent);
+    }
 }

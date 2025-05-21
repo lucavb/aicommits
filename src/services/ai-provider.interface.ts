@@ -6,6 +6,14 @@ export interface AIProvider {
         temperature?: number;
         n?: number;
     }): Promise<{ choices: { message: { content: string } }[] }>;
+
+    streamCompletion(params: {
+        messages: { role: string; content: string }[];
+        model: string;
+        onComplete: (finalContent: string) => void;
+        onMessageDelta: (content: string) => void;
+        temperature?: number;
+    }): Promise<void>;
 }
 
 export const AIProviderSymbol = Symbol.for('AIProvider');

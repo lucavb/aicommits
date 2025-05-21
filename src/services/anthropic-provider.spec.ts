@@ -1,6 +1,16 @@
 import { AnthropicProvider } from './anthropic-provider';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Define types for mock streams
+type MockAnthropicChunk = 
+  | { type: 'content_block_delta'; delta: { type: 'text_delta'; text: string } }
+  | { type: 'message_start' }
+  | { type: 'message_stop' };
+
+type MockAnthropicStream = {
+  [Symbol.asyncIterator](): AsyncGenerator<MockAnthropicChunk, void, unknown>;
+};
+
 describe('AnthropicProvider', () => {
     let mockAnthropic: ConstructorParameters<typeof AnthropicProvider>[0];
     let provider: AnthropicProvider;
@@ -82,6 +92,119 @@ describe('AnthropicProvider', () => {
                     model: 'claude-3-opus-20240229',
                 }),
             ).rejects.toThrow('Failed to generate completion');
+        });
+    });
+
+    describe('streamCompletion', () => {
+        it('should stream completion chunks and call callbacks correctly', async () => {
+            // Mock chunks for streaming
+            const mockChunks: MockAnthropicChunk[] = [
+                { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Hello' } },
+                { type: 'content_block_delta', delta: { type: 'text_delta', text: ' world' } },
+                { type: 'content_block_delta', delta: { type: 'text_delta', text: '!' } },
+                { type: 'message_stop' }, // End of stream marker
+            ];
+
+            // Create mock async iterator
+            const mockStream: MockAnthropicStream = {
+                async *[Symbol.asyncIterator]() {
+                    for (const chunk of mockChunks) {
+                        yield chunk;
+                    }
+                },
+            };
+
+            // Type-safe mock for Anthropic's stream
+            vi.spyOn(mockAnthropic.messages, 'create').mockResolvedValue(mockStream as unknown as Awaited<ReturnType<typeof mockAnthropic.messages.create>>);
+
+            const onMessageDelta = vi.fn();
+            const onComplete = vi.fn();
+
+            await provider.streamCompletion({
+                messages: [{ role: 'user', content: 'Hello' }],
+                model: 'claude-3-opus-20240229',
+                temperature: 0.7,
+                onMessageDelta,
+                onComplete,
+            });
+
+            // Verify the messages.create was called with stream: true
+            expect(mockAnthropic.messages.create).toHaveBeenCalledWith({
+                model: 'claude-3-opus-20240229',
+                max_tokens: 100,
+                temperature: 0.7,
+                messages: [{ role: 'user', content: 'Hello' }],
+                stream: true,
+            });
+
+            // Verify onMessageDelta was called for each content chunk
+            expect(onMessageDelta).toHaveBeenCalledTimes(3);
+            expect(onMessageDelta).toHaveBeenNthCalledWith(1, 'Hello');
+            expect(onMessageDelta).toHaveBeenNthCalledWith(2, ' world');
+            expect(onMessageDelta).toHaveBeenNthCalledWith(3, '!');
+
+            // Verify onComplete was called once with the full content
+            expect(onComplete).toHaveBeenCalledTimes(1);
+            expect(onComplete).toHaveBeenCalledWith('Hello world!');
+        });
+
+        it('should handle non-text chunks', async () => {
+            const mockChunks: MockAnthropicChunk[] = [
+                { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Hello' } },
+                { type: 'message_start' }, // Not a text chunk
+                { type: 'content_block_delta', delta: { type: 'text_delta', text: '!' } },
+                { type: 'message_stop' },
+            ];
+
+            const mockStream: MockAnthropicStream = {
+                async *[Symbol.asyncIterator]() {
+                    for (const chunk of mockChunks) {
+                        yield chunk;
+                    }
+                },
+            };
+
+            // Type-safe mock for Anthropic's stream
+            vi.spyOn(mockAnthropic.messages, 'create').mockResolvedValue(mockStream as unknown as Awaited<ReturnType<typeof mockAnthropic.messages.create>>);
+
+            const onMessageDelta = vi.fn();
+            const onComplete = vi.fn();
+
+            await provider.streamCompletion({
+                messages: [{ role: 'user', content: 'Hello' }],
+                model: 'claude-3-opus-20240229',
+                onMessageDelta,
+                onComplete,
+            });
+
+            // Verify onMessageDelta was called only for text chunks
+            expect(onMessageDelta).toHaveBeenCalledTimes(2);
+            expect(onMessageDelta).toHaveBeenNthCalledWith(1, 'Hello');
+            expect(onMessageDelta).toHaveBeenNthCalledWith(2, '!');
+
+            // Verify onComplete was called with the full content
+            expect(onComplete).toHaveBeenCalledTimes(1);
+            expect(onComplete).toHaveBeenCalledWith('Hello!');
+        });
+
+        it('should throw an error if streaming fails', async () => {
+            vi.spyOn(mockAnthropic.messages, 'create').mockRejectedValue(new Error('Failed to stream completion'));
+
+            const onMessageDelta = vi.fn();
+            const onComplete = vi.fn();
+
+            await expect(
+                provider.streamCompletion({
+                    messages: [{ role: 'user', content: 'Hello' }],
+                    model: 'claude-3-opus-20240229',
+                    onMessageDelta,
+                    onComplete,
+                }),
+            ).rejects.toThrow('Failed to stream completion');
+
+            // Callbacks should not have been called
+            expect(onMessageDelta).not.toHaveBeenCalled();
+            expect(onComplete).not.toHaveBeenCalled();
         });
     });
 });

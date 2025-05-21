@@ -36,4 +36,31 @@ export class OllamaProvider implements AIProvider {
             ],
         };
     }
+
+    async streamCompletion(params: {
+        messages: { role: string; content: string }[];
+        model: string;
+        temperature?: number;
+        onMessageDelta: (content: string) => void;
+        onComplete: (finalContent: string) => void;
+    }): Promise<void> {
+        let fullContent = '';
+
+        const stream = await this.ollama.chat({
+            messages: params.messages,
+            model: params.model,
+            options: { temperature: params.temperature ?? 0.7 },
+            stream: true,
+        });
+
+        for await (const chunk of stream) {
+            const content = chunk.message.content;
+            // Extract just the new content by removing what we've already seen
+            const newContent = content.substring(fullContent.length);
+            fullContent = content;
+            params.onMessageDelta(newContent);
+        }
+
+        params.onComplete(fullContent);
+    }
 }
