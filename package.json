@@ -61,7 +61,7 @@
         "iso-639-1": "3.1.5",
         "kolorist": "1.8.0",
         "ollama": "0.5.15",
-        "openai": "4.100.0",
+        "openai": "4.102.0",
         "radash": "12.1.0",
         "reflect-metadata": "0.2.2",
         "simple-git": "3.27.0",
