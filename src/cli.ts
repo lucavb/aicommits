@@ -14,6 +14,7 @@ program.addCommand(prepareCommitMsgCommand);
 program.addCommand(versionCommand);
 
 program
+    .passThroughOptions(true)
     .addOption(new Option('--api-key <apiKey>'))
     .addOption(new Option('--base-url <baseUrl>'))
     .addOption(new Option('--context-lines <contextLines>'))
