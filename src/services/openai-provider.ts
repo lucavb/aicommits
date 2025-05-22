@@ -11,6 +11,14 @@ type OpenAIWithSpecificFunctions = {
 export class OpenAIProvider implements AIProvider {
     constructor(@Inject(OpenAI) private readonly openai: OpenAIWithSpecificFunctions) {}
 
+    static create(config: { baseUrl?: string; apiKey?: string }): OpenAIProvider {
+        if (!config.apiKey) {
+            throw new Error('OpenAI API key is required');
+        }
+        const openai = new OpenAI({ baseURL: config.baseUrl, apiKey: config.apiKey });
+        return new OpenAIProvider(openai);
+    }
+
     async listModels(): Promise<string[]> {
         const models = await this.openai.models.list();
         return models.data
