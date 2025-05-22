@@ -1,29 +1,10 @@
-import { cyan, dim } from 'kolorist';
-import { isCancel, outro, select, spinner, text } from '@clack/prompts';
+import { cyan, green } from 'kolorist';
+import { isCancel, log, outro, select, spinner, text } from '@clack/prompts';
 import { readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { spawnSync } from 'child_process';
 import { AICommitMessageService } from '../services/ai-commit-message.service';
-
-export const chooseOption = async (message: string, options: string[]): Promise<string | null> => {
-    const selected = await select({
-        message: `${message} ${dim('(Ctrl+c to exit)')}`,
-        options: options.map((value, index) => ({ label: value, value: index })),
-    });
-
-    if (typeof selected !== 'number') {
-        outro('Unable to understand the selected option');
-        return null;
-    }
-
-    if (isCancel(selected)) {
-        outro('Commit cancelled');
-        return null;
-    }
-
-    return options[selected];
-};
 
 const openInEditor = (initialContent: string): string | null => {
     const editor = process.env.EDITOR || (process.platform === 'win32' ? 'notepad' : 'vi');
@@ -49,7 +30,7 @@ const openInEditor = (initialContent: string): string | null => {
     }
 };
 
-export const reviewAndRevise = async (
+export const streamingReviewAndRevise = async (
     aiCommitMessageService: AICommitMessageService,
     message: string,
     body: string,
@@ -86,13 +67,40 @@ export const reviewAndRevise = async (
                 outro('Commit cancelled');
                 return { accepted: false };
             }
-            const s = spinner();
-            s.start('The AI is revising your commit message');
-            const { commitMessages: revisedMessages, bodies: revisedBodies } =
-                await aiCommitMessageService.reviseCommitMessage({ diff, userPrompt });
-            s.stop('Revision complete');
-            currentMessage = revisedMessages[0] ?? currentMessage;
-            currentBody = revisedBodies[0] ?? currentBody;
+
+            const reviseSpinner = spinner();
+            reviseSpinner.start('The AI is revising your commit message');
+
+            let messageBuffer = '';
+
+            // Use streaming to show revision in real-time
+            await aiCommitMessageService.reviseStreamingCommitMessage({
+                diff,
+                userPrompt,
+                onMessageUpdate: (content) => {
+                    messageBuffer += content;
+                    const previewContent =
+                        messageBuffer.length > 50 ? messageBuffer.substring(0, 47) + '...' : messageBuffer;
+                    reviseSpinner.message(`Revising: ${previewContent}`);
+                },
+                onBodyUpdate: () => {
+                    // Don't show body updates in real-time
+                },
+                onComplete: (updatedMessage, updatedBody) => {
+                    currentMessage = updatedMessage;
+                    currentBody = updatedBody;
+                    reviseSpinner.stop('Revision complete');
+
+                    // Display the updated message and body
+                    log.step('Updated commit message:');
+                    log.message(green(updatedMessage));
+
+                    if (updatedBody) {
+                        log.step('Updated commit body:');
+                        log.message(updatedBody);
+                    }
+                },
+            });
         } else if (confirmed === 'edit') {
             const initial = `${currentMessage}\n\n${currentBody}`.trim();
             const edited = openInEditor(initial);

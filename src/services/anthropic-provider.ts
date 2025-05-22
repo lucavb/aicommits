@@ -45,4 +45,38 @@ export class AnthropicProvider implements AIProvider {
             ],
         };
     }
+
+    async streamCompletion(params: {
+        messages: { role: string; content: string }[];
+        model: string;
+        temperature?: number;
+        onMessageDelta: (content: string) => void;
+        onComplete: (finalContent: string) => void;
+    }): Promise<void> {
+        const stream = await this.anthropic.messages.create({
+            model: params.model,
+            max_tokens: 100,
+            temperature: params.temperature ?? 0.7,
+            messages: params.messages.map((msg) => {
+                const role = msg.role === 'user' ? 'user' : 'assistant';
+                return {
+                    role,
+                    content: msg.content,
+                };
+            }),
+            stream: true,
+        });
+
+        let fullContent = '';
+
+        for await (const chunk of stream) {
+            if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+                const content = chunk.delta.text || '';
+                fullContent += content;
+                params.onMessageDelta(content);
+            }
+        }
+
+        params.onComplete(fullContent);
+    }
 }

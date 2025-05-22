@@ -1,12 +1,12 @@
 import { bgCyan, black, green, red, yellow } from 'kolorist';
-import { intro, note, outro, spinner } from '@clack/prompts';
+import { intro, log, note, outro, spinner } from '@clack/prompts';
 import { handleCliError, KnownError } from '../utils/error';
 import { isError } from '../utils/typeguards';
 import { Container } from 'inversify';
 import { AICommitMessageService } from '../services/ai-commit-message.service';
 import { GitService } from '../services/git.service';
 import { ConfigService } from '../services/config.service';
-import { chooseOption, reviewAndRevise } from './aicommits-utils';
+import { streamingReviewAndRevise } from './aicommits-utils';
 import { trimLines } from '../utils/string';
 
 export const aiCommits = async ({
@@ -88,51 +88,54 @@ export const aiCommits = async ({
             `${gitService.getDetectedMessage(staged.files)}:\n${staged.files.map((file) => `     ${file}`).join('\n')}`,
         );
 
-        const s = spinner();
-        s.start('The AI is analyzing your changes');
-        const { commitMessages: messages, bodies: commitBodies } = await aiCommitMessageService.generateCommitMessage({
+        const analyzeSpinner = spinner();
+        analyzeSpinner.start('The AI is analyzing your changes');
+
+        let commitMessage = '';
+        let commitBody = '';
+        let messageBuffer = '';
+
+        // Use streaming API to generate and display commit message in real-time
+        await aiCommitMessageService.generateStreamingCommitMessage({
             diff: staged.diff,
+            onMessageUpdate: (content) => {
+                // Update spinner message with the growing message content
+                messageBuffer += content;
+                const previewContent =
+                    messageBuffer.length > 50 ? messageBuffer.substring(0, 47) + '...' : messageBuffer;
+                analyzeSpinner.message(`Generating commit message: ${previewContent}`);
+            },
+            onBodyUpdate: () => {
+                // Don't show body updates in real-time
+            },
+            onComplete: (message, body) => {
+                commitMessage = message;
+                commitBody = body;
+            },
         });
 
-        s.stop('Changes analyzed');
+        analyzeSpinner.stop('Commit message generated');
 
-        if (messages.length === 0) {
-            throw new KnownError('No commit messages were generated. Try again.');
+        // Display the full message after generation
+        log.step('Generated commit message:');
+        log.message(green(commitMessage));
+
+        if (commitBody) {
+            log.step('Commit body:');
+            log.message(commitBody);
         }
 
-        let message: string;
-        let body: string;
-
-        if (messages.length === 1 && commitBodies.length === 1) {
-            [message] = messages;
-            [body] = commitBodies;
-            const result = await reviewAndRevise(aiCommitMessageService, message, body, staged.diff);
-            if (!result?.accepted) {
-                return;
-            }
-            message = result.message ?? '';
-            body = result.body ?? '';
-        } else {
-            message = (await chooseOption('Pick a commit message to use:', messages)) ?? '';
-            if (!message) {
-                return;
-            }
-
-            if (commitBodies.length > 0) {
-                body = (await chooseOption('Pick a commit body to use:', commitBodies)) ?? '';
-                if (!body) {
-                    return;
-                }
-            } else {
-                body = '';
-            }
-            const result = await reviewAndRevise(aiCommitMessageService, message, body, staged.diff);
-            if (!result?.accepted) {
-                return;
-            }
-            message = result.message ?? '';
-            body = result.body ?? '';
+        if (!commitMessage) {
+            throw new KnownError('No commit message was generated. Try again.');
         }
+
+        const result = await streamingReviewAndRevise(aiCommitMessageService, commitMessage, commitBody, staged.diff);
+        if (!result?.accepted) {
+            return;
+        }
+
+        const message = result.message ?? '';
+        const body = result.body ?? '';
 
         const fullMessage = `${message}\n\n${body}`.trim();
         await gitService.commitChanges(fullMessage);
