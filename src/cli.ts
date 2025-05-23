@@ -19,7 +19,6 @@ program
     .addOption(new Option('--base-url <baseUrl>'))
     .addOption(new Option('--context-lines <contextLines>'))
     .addOption(new Option('--exclude <exclude>'))
-    .addOption(new Option('--generate <generate>'))
     .addOption(new Option('--locale <locale>'))
     .addOption(new Option('--max-length <maxLength>'))
     .addOption(new Option('--model <model>'))

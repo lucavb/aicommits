@@ -57,7 +57,6 @@ describe('AICommitMessageService', () => {
     it('should generate commit messages and bodies', async () => {
         const diff = 'some diff';
         const config = {
-            generate: 2,
             locale: 'en',
             maxLength: 50,
             model: 'gpt-3.5-turbo',

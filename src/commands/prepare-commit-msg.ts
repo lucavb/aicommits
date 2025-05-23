@@ -20,7 +20,7 @@ export const prepareCommitMsgCommand = new Command('prepare-commit-msg')
         const {
             commitMessages: [firstCommitMessage],
             bodies: [firstBody],
-        } = await aiCommitMessageService.generateCommitMessage({ diff: staged.diff, generate: 1 });
+        } = await aiCommitMessageService.generateCommitMessage({ diff: staged.diff });
 
         if (firstCommitMessage && firstBody) {
             const fullMessage = `${firstCommitMessage}\n\n${firstBody}`.trim();

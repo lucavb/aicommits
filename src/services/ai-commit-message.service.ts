@@ -20,14 +20,8 @@ export class AICommitMessageService {
         @Inject(PromptService) private readonly promptService: PromptService,
     ) {}
 
-    async generateCommitMessage({
-        diff,
-        generate: generateParam,
-    }: {
-        diff: string;
-        generate?: number;
-    }): Promise<{ commitMessages: string[]; bodies: string[] }> {
-        const { locale, maxLength, type, model, generate } = this.configService.getConfig();
+    async generateCommitMessage({ diff }: { diff: string }): Promise<{ commitMessages: string[]; bodies: string[] }> {
+        const { locale, maxLength, type, model } = this.configService.getConfig();
 
         const [commitMessageCompletion, commitBodyCompletion] = await Promise.all([
             this.aiProvider.generateCompletion({
@@ -43,7 +37,7 @@ export class AICommitMessageService {
                     { role: 'user', content: diff },
                 ],
                 model,
-                n: generateParam ?? generate,
+                n: 1,
             }),
             this.aiProvider.generateCompletion({
                 messages: [
@@ -51,7 +45,7 @@ export class AICommitMessageService {
                     { role: 'user', content: diff },
                 ],
                 model,
-                n: generateParam ?? generate,
+                n: 1,
             }),
         ]);
 
@@ -142,11 +136,9 @@ export class AICommitMessageService {
     async reviseCommitMessage({
         diff,
         userPrompt,
-        generate,
     }: {
         diff: string;
         userPrompt: string;
-        generate?: number;
     }): Promise<{ commitMessages: string[]; bodies: string[] }> {
         const { locale, maxLength, type, model } = this.configService.getConfig();
 
@@ -167,7 +159,7 @@ export class AICommitMessageService {
                     },
                 ],
                 model,
-                n: generate,
+                n: 1,
             }),
             this.aiProvider.generateCompletion({
                 messages: [
@@ -181,7 +173,7 @@ export class AICommitMessageService {
                     },
                 ],
                 model,
-                n: generate,
+                n: 1,
             }),
         ]);
 

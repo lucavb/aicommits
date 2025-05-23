@@ -97,16 +97,6 @@ aicommits --profile <profile-name>
 
 > 👉 **Tip:** Use the `aic` alias if `aicommits` is too long for you.
 
-#### Generate multiple recommendations
-
-Sometimes the recommended commit message isn't the best so you want it to generate a few to pick from. You can generate multiple commit messages at once by passing in the `--generate <i>` flag, where 'i' is the number of generated messages:
-
-```sh
-aicommits --generate <i> # or -g <i>
-```
-
-> Warning: this uses more tokens, meaning it costs more.
-
 #### Generating Conventional Commits
 
 If you'd like to generate [Conventional Commits](https://conventionalcommits.org/), you can use the `--type` flag followed by `conventional`. This will prompt `aicommits` to format the commit message according to the Conventional Commits specification:
@@ -189,14 +179,6 @@ aicommits config set apiKey <key> --profile development
 Default: `en`
 
 The locale to use for the generated commit messages. Consult the list of codes in: https://wikipedia.org/wiki/List_of_ISO_639-1_codes.
-
-#### generate
-
-Default: `1`
-
-The number of commit messages to generate to pick from.
-
-Note, this will use more tokens as it generates more results.
 
 #### model
 

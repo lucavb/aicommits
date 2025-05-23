@@ -6,7 +6,6 @@ export const configKeys = [
     'baseUrl',
     'contextLines',
     'exclude',
-    'generate',
     'locale',
     'maxLength',
     'model',
@@ -21,7 +20,6 @@ export const profileConfigSchema = z.object({
     baseUrl: z.string().url(),
     contextLines: z.coerce.number().positive().default(10),
     exclude: z.array(z.string().min(1)).optional(),
-    generate: z.coerce.number().int().min(1).default(1),
     locale: z
         .string()
         .length(2)
