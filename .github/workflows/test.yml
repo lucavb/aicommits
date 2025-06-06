@@ -2,8 +2,9 @@ name: Test
 
 on:
     push:
-        branches: [main, develop]
+        branches: [main, develop, 'renovate/**']
     pull_request:
+        branches: [main, develop]
     workflow_dispatch:
 
 jobs:
@@ -11,6 +12,9 @@ jobs:
         name: Test
         runs-on: ubuntu-latest
         timeout-minutes: 10
+        concurrency:
+            group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+            cancel-in-progress: true
 
         steps:
             - name: Checkout
