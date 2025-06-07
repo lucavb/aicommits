@@ -12,8 +12,8 @@ const Configuration: UserConfig = {
      * Any rules defined here will override rules from @commitlint/config-conventional
      */
     rules: {
-        // Ensure the subject case is lower case
-        'subject-case': [RuleConfigSeverity.Error, 'always', 'lower-case'],
+        // Disable subject case rule to allow flexibility with acronyms and proper nouns
+        'subject-case': [RuleConfigSeverity.Disabled],
         // Ensure the subject is not empty
         'subject-empty': [RuleConfigSeverity.Error, 'never'],
         // Ensure the type is not empty
