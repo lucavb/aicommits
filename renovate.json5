@@ -39,7 +39,7 @@
             matchUpdateTypes: ['major'],
             automerge: false,
             addLabels: ['manual-review:major'],
-            addReviewers: ['lucavb'],
+            reviewers: ['lucavb'],
         },
         {
             matchDatasources: ['npm'],
