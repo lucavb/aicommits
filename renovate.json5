@@ -1,12 +1,10 @@
 {
     $schema: 'https://docs.renovatebot.com/renovate-schema.json',
     extends: ['config:recommended', ':semanticCommits', ':automergeLinters', ':automergeTesters', ':automergeTypes'],
-
     addLabels: ['dependencies'],
     automergeType: 'branch',
     prConcurrentLimit: 5,
     rebaseWhen: 'behind-base-branch',
-
     packageRules: [
         {
             matchUpdateTypes: ['patch'],
@@ -35,18 +33,16 @@
         },
         {
             matchDatasources: ['npm'],
-            vulnerabilityAlerts: true,
+            vulnerabilityAlerts: {
+                enabled: true,
+            },
             matchCurrentAge: '0 days',
             automerge: true,
             addLabels: ['security-update'],
         },
     ],
-
     timezone: 'Europe/Berlin',
-
-    stabilityDays: 1,
     minimumReleaseAge: '2 days',
-
     semanticCommits: 'enabled',
     semanticCommitType: 'chore',
     semanticCommitScope: 'deps',
