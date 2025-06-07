@@ -39,6 +39,7 @@
     },
     "scripts": {
         "build": "rollup --config rollup.config.ts --configPlugin typescript",
+        "commitlint": "commitlint --edit --last",
         "dev": "tsx src/cli.ts",
         "dev:setup": "tsx src/cli.ts setup",
         "dev:stage-all": "tsx src/cli.ts --stage-all",
@@ -52,7 +53,8 @@
         "test": "vitest run",
         "test:coverage": "vitest run --coverage",
         "test:watch": "vitest",
-        "type-check": "tsc --noEmit --pretty --incremental --skipLibCheck"
+        "type-check": "tsc --noEmit --pretty --incremental --skipLibCheck",
+        "prepare": "husky"
     },
     "dependencies": {
         "@anthropic-ai/sdk": "0.53.0",
@@ -71,6 +73,9 @@
         "zod": "3.25.53"
     },
     "devDependencies": {
+        "@commitlint/cli": "19.8.1",
+        "@commitlint/config-conventional": "19.8.1",
+        "@commitlint/types": "19.8.1",
         "@eslint/js": "9.28.0",
         "@rollup/plugin-commonjs": "28.0.3",
         "@rollup/plugin-json": "6.1.0",
@@ -84,6 +89,7 @@
         "@types/node": "22.15.30",
         "@vitest/coverage-v8": "3.2.2",
         "eslint": "9.28.0",
+        "husky": "9.1.7",
         "prettier": "3.5.3",
         "rollup": "4.41.1",
         "semantic-release": "24.2.5",

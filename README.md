@@ -122,6 +122,52 @@ This feature can be useful if your project follows the Conventional Commits stan
 
 3. Save and close the editor to commit!
 
+## Commit Message Standards
+
+This project uses [commitlint](https://commitlint.js.org/) with [Conventional Commits](https://conventionalcommits.org/) to ensure consistent commit message formatting. The configuration is automatically enforced via Git hooks powered by [husky](https://typicode.github.io/husky/).
+
+### Conventional Commit Format
+
+Commit messages must follow this format:
+
+```
+<type>[(optional scope)]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+**Types:**
+
+- `feat`: A new feature
+- `fix`: A bug fix
+- `docs`: Documentation only changes
+- `style`: Changes that do not affect the meaning of the code
+- `refactor`: A code change that neither fixes a bug nor adds a feature
+- `perf`: A code change that improves performance
+- `test`: Adding missing tests or correcting existing tests
+- `chore`: Changes to the build process or auxiliary tools
+
+**Examples:**
+
+```bash
+feat: add user authentication
+fix: resolve memory leak in data processing
+docs: update installation instructions
+chore: bump dependencies to latest versions
+```
+
+### Manual Validation
+
+You can manually check your commit messages using:
+
+```bash
+npm run commitlint
+```
+
+The commit message validation runs automatically when you commit, so invalid messages will be rejected before they're added to the repository.
+
 ## Configuration
 
 ### Reading a configuration value

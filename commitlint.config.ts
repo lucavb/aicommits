@@ -1,0 +1,50 @@
+import type { UserConfig } from '@commitlint/types';
+import { RuleConfigSeverity } from '@commitlint/types';
+
+const Configuration: UserConfig = {
+    /*
+     * Resolve and load @commitlint/config-conventional from node_modules.
+     * Referenced packages must be installed
+     */
+    extends: ['@commitlint/config-conventional'],
+
+    /*
+     * Any rules defined here will override rules from @commitlint/config-conventional
+     */
+    rules: {
+        // Ensure the subject case is lower case
+        'subject-case': [RuleConfigSeverity.Error, 'always', 'lower-case'],
+        // Ensure the subject is not empty
+        'subject-empty': [RuleConfigSeverity.Error, 'never'],
+        // Ensure the type is not empty
+        'type-empty': [RuleConfigSeverity.Error, 'never'],
+        // Ensure the subject is not longer than 100 characters
+        'subject-max-length': [RuleConfigSeverity.Error, 'always', 100],
+        // Ensure the entire header is not longer than 100 characters
+        'header-max-length': [RuleConfigSeverity.Error, 'always', 100],
+    },
+
+    /*
+     * Array of functions that return true if commitlint should ignore the given message.
+     */
+    ignores: [
+        // Ignore merge commits
+        (commit) => commit.includes('Merge'),
+        // Ignore revert commits
+        (commit) => commit.includes('Revert'),
+        // Ignore release commits
+        (commit) => /^v\d+\.\d+\.\d+/.test(commit),
+    ],
+
+    /*
+     * Whether commitlint uses the default ignore rules
+     */
+    defaultIgnores: true,
+
+    /*
+     * Custom URL to show upon failure
+     */
+    helpUrl: 'https://github.com/conventional-changelog/commitlint/#what-is-commitlint',
+};
+
+export default Configuration;
