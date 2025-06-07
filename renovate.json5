@@ -1,10 +1,13 @@
 {
     $schema: 'https://docs.renovatebot.com/renovate-schema.json',
-    extends: ['config:recommended', ':semanticCommits', ':automergeLinters', ':automergeTesters', ':automergeTypes'],
+    extends: ['config:recommended', ':automergeLinters', ':automergeTesters', ':automergeTypes'],
     addLabels: ['dependencies'],
     automergeType: 'branch',
     prConcurrentLimit: 5,
     rebaseWhen: 'behind-base-branch',
+    semanticCommits: 'enabled',
+    semanticCommitType: 'chore',
+    semanticCommitScope: 'deps',
     packageRules: [
         {
             matchUpdateTypes: ['patch'],
@@ -43,7 +46,4 @@
     ],
     timezone: 'Europe/Berlin',
     minimumReleaseAge: '2 days',
-    semanticCommits: 'enabled',
-    semanticCommitType: 'chore',
-    semanticCommitScope: 'deps',
 }
