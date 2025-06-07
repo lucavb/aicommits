@@ -1,13 +1,6 @@
 {
     $schema: 'https://docs.renovatebot.com/renovate-schema.json',
-    extends: [
-        'mergeConfidence:all-badges',
-        'config:recommended',
-        ':semanticCommits',
-        ':automergeLinters',
-        ':automergeTesters',
-        ':automergeTypes',
-    ],
+    extends: ['config:recommended', ':semanticCommits', ':automergeLinters', ':automergeTesters', ':automergeTypes'],
 
     addLabels: ['dependencies'],
     automergeType: 'branch',
@@ -24,7 +17,6 @@
         {
             matchUpdateTypes: ['minor'],
             matchCurrentAge: '5 days',
-            matchConfidence: ['high', 'very-high'],
             automerge: true,
             addLabels: ['automerge:minor'],
         },
