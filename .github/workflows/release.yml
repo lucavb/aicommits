@@ -1,0 +1,53 @@
+name: Release
+
+on:
+    push:
+        branches:
+            - develop
+    workflow_dispatch:
+
+permissions:
+    contents: write # to be able to publish a GitHub release
+    issues: write # to be able to comment on released issues
+    pull-requests: write # to be able to comment on released pull requests
+    id-token: write # to enable use of OIDC for npm provenance
+
+jobs:
+    release:
+        name: Release
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        if: "!contains(github.event.head_commit.message, 'skip ci')"
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0 # Fetch all history for all tags and branches
+
+            - name: Use Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version-file: '.nvmrc'
+                  registry-url: 'https://registry.npmjs.org'
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Code Quality
+              run: |
+                  npm run prettier
+                  npm run eslint
+                  npm run type-check
+
+            - name: Tests
+              run: npm run test
+
+            - name: Build
+              run: npm run build
+
+            - name: Release
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+              run: npx semantic-release
