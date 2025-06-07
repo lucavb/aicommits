@@ -18,10 +18,6 @@ const Configuration: UserConfig = {
         'subject-empty': [RuleConfigSeverity.Error, 'never'],
         // Ensure the type is not empty
         'type-empty': [RuleConfigSeverity.Error, 'never'],
-        // Ensure the subject is not longer than 100 characters
-        'subject-max-length': [RuleConfigSeverity.Error, 'always', 100],
-        // Ensure the entire header is not longer than 100 characters
-        'header-max-length': [RuleConfigSeverity.Error, 'always', 100],
     },
 
     /*
