@@ -45,7 +45,7 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/). 
 
 ## Branches
 
-- **develop**: Production releases (e.g., `1.0.0`, `1.1.0`, `1.1.1`)
+- **main**: Production releases (e.g., `1.0.0`, `1.1.0`, `1.1.1`)
 
 ## Manual Release
 

@@ -2,9 +2,9 @@ name: Test
 
 on:
     push:
-        branches: [main, develop, 'renovate/**']
+        branches: [main, 'renovate/**']
     pull_request:
-        branches: [main, develop]
+        branches: [main]
     workflow_dispatch:
 
 jobs:
