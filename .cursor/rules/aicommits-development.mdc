@@ -1,0 +1,65 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# aicommits Development Guidelines
+
+This is an AI-powered git commit message generator. Follow these guidelines when contributing:
+
+## Code Style & Quality
+- Use TypeScript for all new code
+- Follow the existing ESLint configuration (`npm run eslint`)
+- Use Prettier for code formatting (`npm run prettier:fix`)
+- Maintain type safety - **NEVER** use `any` types to avoid type errors
+- Use dependency injection with Inversify for service management
+- Avoid needless comments - only add comments when they provide helpful context for the next developer
+- Write self-documenting code with clear variable and function names
+
+## Testing
+- Write tests for new features using Vitest
+- Run tests with `npm test` or `npm run test:watch`
+- Maintain test coverage with `npm run test:coverage`
+- Test files should be co-located with source files or in `__tests__` directories
+
+## Development Workflow
+- Use `npm run dev` to run the CLI in development mode
+- Use `npm run dev:setup` to test the setup flow
+- Use `npm run dev:stage-all` to test staging all files
+- Run `npm run type-check` before committing
+
+## Architecture
+- Services are in `src/services/` and follow dependency injection patterns
+- Commands are in `src/commands/` and handle CLI interactions
+- Providers are in `src/providers/` for different AI service integrations
+- Use the existing service interfaces and patterns
+
+## AI Providers
+- Support multiple AI providers (OpenAI, Anthropic, Ollama)
+- Each provider should implement the `ai-provider.interface.ts`
+- Handle API errors gracefully with proper user feedback
+- Respect rate limits and provide meaningful error messages
+
+## Configuration
+- Use the existing config service for user settings
+- Store config in user's home directory
+- Validate configuration with Zod schemas
+- Provide helpful setup wizards for new users
+
+## Git Integration
+- Use `simple-git` for git operations
+- Handle git errors gracefully
+- Support different git workflows and edge cases
+- Respect `.gitignore` and other git configurations
+
+## CLI Experience
+- Use `@clack/prompts` for interactive prompts
+- Provide clear, helpful error messages
+- Support both interactive and non-interactive modes
+- Follow conventional CLI patterns and help text
+
+## Commit Message Generation
+- Generate meaningful, conventional commit messages
+- Support different commit message formats
+- Allow user customization of commit styles
+- Respect conventional commit standards when configured

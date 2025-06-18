@@ -1,0 +1,30 @@
+---
+description: 
+globs: package.json
+alwaysApply: false
+---
+# Package Management Rules
+
+When working with dependencies in this project:
+
+## Adding Packages
+- **ALWAYS** use `npm install <package-name>` to add runtime dependencies
+- **ALWAYS** use `npm install --save-dev <package-name>` to add development dependencies
+- **NEVER** manually edit the "dependencies" or "devDependencies" keys in package.json directly
+
+## Removing Packages
+- **ALWAYS** use `npm uninstall <package-name>` to remove packages
+- **NEVER** manually delete entries from package.json dependencies
+
+## Updating Packages
+- Use `npm update <package-name>` for specific updates
+- Use `npm update` for updating all packages
+- Use `npm audit fix` to fix security vulnerabilities
+
+## Why This Matters
+- Ensures package-lock.json stays in sync
+- Prevents version conflicts and dependency resolution issues
+- Maintains consistent dependency management across the team
+- Automatically handles peer dependencies and version ranges
+
+Always let npm handle the package.json modifications to maintain consistency and prevent errors.
