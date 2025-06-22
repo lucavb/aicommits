@@ -47,6 +47,8 @@ export class PromptService {
             'You are a git commit message generator.',
             'Your task is to write clear, concise, and descriptive commit messages that follow best practices.',
             'Always use the imperative mood and focus on the intent and impact of the change.',
+            'CRITICAL: When analyzing a git diff, only consider the actual changes made (lines starting with "+" for additions or "-" for deletions).',
+            'Ignore context lines and existing code that appears in the diff without "+" or "-" prefixes.',
             'Do not include file names, code snippets, or unnecessary details.',
             'Never include explanations, commentary, or formatting outside the commit message itself.',
         ].join(' ');
@@ -56,6 +58,9 @@ export class PromptService {
         return [
             'Generate a concise git commit body written in present tense for the following code diff with the given specifications below:',
             `Message language: ${locale}`,
+            'IMPORTANT: Only describe the changes that were ADDED in this diff. Focus only on lines that start with "+" (plus sign).',
+            'Do not describe existing code, context lines, or unchanged code that appears in the diff.',
+            'If a line does not start with "+", it was already there and should not be mentioned in the commit body.',
             'Use bullet points for the items.',
             'Return only the bullet points using the ascii character "*". Your entire response will be passed directly into git commit.',
         ]
@@ -69,6 +74,8 @@ export class PromptService {
             `Commit message must be a maximum of ${maxLength} characters.`,
             'Write a clear, concise, and descriptive commit message in the imperative mood (e.g., "Add feature", "Fix bug").',
             'Focus on the main intent and impact of the change. If possible, briefly mention the reason or motivation.',
+            'IMPORTANT: Base the commit message only on the actual changes made (lines starting with "+" for additions or "-" for deletions).',
+            'Do not describe existing code, context lines, or unchanged code that appears in the diff.',
             'Do not include file names, code snippets, or restate the diff. Do not include unnecessary words or phrases.',
             'Avoid generic messages like "update code" or "fix issue".',
             'Return only the commit message, with no extra commentary or formatting.',
