@@ -13,8 +13,9 @@ This is an AI-powered git commit message generator. Follow these guidelines when
 - Use Prettier for code formatting (`npm run prettier:fix`)
 - Maintain type safety - **NEVER** use `any` types to avoid type errors
 - Use dependency injection with Inversify for service management
-- Avoid needless comments - only add comments when they provide helpful context for the next developer
-- Write self-documenting code with clear variable and function names
+- **DO NOT add comments by default** - code should be self-explanatory through clear naming and structure
+- Only add comments when they provide essential context that cannot be conveyed through the code itself (e.g., explaining complex business logic, architectural decisions, or non-obvious workarounds)
+- Write self-documenting code with descriptive variable names, function names, and clear logic flow
 
 ## Testing
 - Write tests for new features using Vitest
