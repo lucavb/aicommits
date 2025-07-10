@@ -48,7 +48,6 @@ feat: Add user authentication and update login flow
     ```
 
     This will guide you through:
-
     - Selecting your AI provider (OpenAI, Ollama, or Anthropic)
     - Configuring the API base URL
     - Setting up your API key (if required)
