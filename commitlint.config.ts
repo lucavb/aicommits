@@ -18,6 +18,7 @@ const Configuration: UserConfig = {
         'subject-empty': [RuleConfigSeverity.Error, 'never'],
         // Ensure the type is not empty
         'type-empty': [RuleConfigSeverity.Error, 'never'],
+        'body-max-line-length': [RuleConfigSeverity.Disabled],
     },
 
     /*
