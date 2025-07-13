@@ -1,10 +1,8 @@
 import { select, spinner, text } from '@clack/prompts';
 import { type ProfileConfig, ProviderName } from '../../utils/config';
 import { red } from 'kolorist';
-import OpenAI from 'openai';
-import { OllamaProvider } from '../../services/ollama-provider';
-import Anthropic from '@anthropic-ai/sdk';
-import { Ollama } from 'ollama';
+import { ModelDiscoveryService } from '../../services/model-discovery.service';
+import { container } from '../../utils/di';
 
 /**
  * Get the base URL placeholder based on the provider
@@ -102,133 +100,79 @@ export async function setupModel(provider: ProviderName, currentConfig?: Profile
         apiKey = apiKeyInput.trim();
     }
 
-    // 3. Get model
-    let model: string;
-    if (provider === 'ollama') {
-        // For Ollama, fetch available models
-        const s = spinner();
-        s.start('Fetching available models from Ollama...');
-        try {
-            const ollama = new Ollama({ host: baseUrl.trim() });
-            const ollamaProvider = new OllamaProvider(ollama);
-            const models = await ollamaProvider.listModels();
-            const modelChoices = models.map((name: string) => ({
-                value: name,
-                label: name,
-            }));
+    // 3. Get model using the new model discovery service
+    const modelDiscoveryService = container.get(ModelDiscoveryService);
+    const s = spinner();
+    s.start(`Fetching available models from ${provider}...`);
 
-            if (modelChoices.length === 0) {
-                s.stop(red('No models found. Please pull a model first using `ollama pull <model>`'));
-                return { baseUrl, apiKey, model: null };
-            }
+    try {
+        const discoveryResult = await modelDiscoveryService.discoverModels({
+            provider,
+            apiKey,
+            baseUrl: baseUrl.trim(),
+        });
 
-            s.stop('Models fetched.');
-
-            const selectedModel = await select({
-                message: 'Select the Ollama model to use',
-                options: modelChoices,
-                initialValue:
-                    currentConfig?.model && modelChoices.some((c) => c.value === currentConfig?.model)
-                        ? currentConfig.model
-                        : modelChoices[0].value,
-            });
-
-            if (typeof selectedModel !== 'string') {
-                return { baseUrl, apiKey, model: null };
-            }
-
-            model = selectedModel;
-        } catch {
-            s.stop(red('Failed to fetch models. Please make sure Ollama is running and accessible.'));
+        if (!discoveryResult.success) {
+            s.stop(red(`Failed to fetch models: ${discoveryResult.error}`));
             return { baseUrl, apiKey, model: null };
         }
-    } else if (provider === 'anthropic') {
-        // For Anthropic, use static model list
-        const anthropic = new Anthropic({ baseURL: baseUrl.trim(), apiKey });
-        const s = spinner();
-        s.start('Fetching available models from Anthropic...');
 
-        try {
-            const modelsResponse = await anthropic.models.list();
-            const modelChoices = modelsResponse.data.map((m) => ({
-                value: m.id,
-                label: m.id,
-            }));
-
-            s.stop('Models fetched.');
-
-            const selectedModel = await select({
-                message: 'Select the Anthropic model to use',
-                options: modelChoices,
-                initialValue:
-                    currentConfig?.model && modelChoices.some((c) => c.value === currentConfig?.model)
-                        ? currentConfig.model
-                        : modelChoices[0].value,
-            });
-
-            if (typeof selectedModel !== 'string') {
-                return { baseUrl, apiKey, model: null };
-            }
-
-            model = selectedModel;
-        } catch {
-            s.stop(red('Failed to fetch models. Please check your base URL and API key.'));
+        if (discoveryResult.models.length === 0) {
+            const noModelsMessage =
+                provider === 'ollama'
+                    ? 'No models found. Please pull a model first using `ollama pull <model>`'
+                    : 'No models found for your credentials.';
+            s.stop(red(noModelsMessage));
             return { baseUrl, apiKey, model: null };
         }
-    } else {
-        // OpenAI: fetch available models
-        const s = spinner();
-        s.start('Fetching available models from OpenAI...');
 
-        try {
-            const openai = new OpenAI({ baseURL: baseUrl.trim(), apiKey });
-            const modelsResponse = await openai.models.list();
-            const modelChoices = modelsResponse.data
-                .filter((m) => {
-                    const id = m.id.toLowerCase();
-                    return baseUrl.trim() === 'https://api.openai.com/v1'
-                        ? id.includes('gpt') &&
-                              !id.includes('dall-e') &&
-                              !id.includes('audio') &&
-                              !id.includes('tts') &&
-                              !id.includes('transcribe') &&
-                              !id.includes('search') &&
-                              !id.includes('realtime') &&
-                              !id.includes('image') &&
-                              !id.includes('preview')
-                        : true;
-                })
-                .map((m) => ({
-                    value: m.id,
-                    label: m.id,
-                }));
+        // Filter OpenAI models to exclude non-GPT models for OpenAI's main API
+        let filteredModels = discoveryResult.models;
+        if (provider === 'openai' && baseUrl.trim() === 'https://api.openai.com/v1') {
+            filteredModels = discoveryResult.models.filter((model) => {
+                const id = model.id.toLowerCase();
+                return (
+                    id.includes('gpt') &&
+                    !id.includes('dall-e') &&
+                    !id.includes('audio') &&
+                    !id.includes('tts') &&
+                    !id.includes('transcribe') &&
+                    !id.includes('search') &&
+                    !id.includes('realtime') &&
+                    !id.includes('image') &&
+                    !id.includes('preview')
+                );
+            });
 
-            if (modelChoices.length === 0) {
+            if (filteredModels.length === 0) {
                 s.stop(red('No GPT models found for your credentials.'));
                 return { baseUrl, apiKey, model: null };
             }
+        }
 
-            s.stop('Models fetched.');
+        const modelChoices = filteredModels.map((model) => ({
+            value: model.id,
+            label: model.name,
+        }));
 
-            const selectedModel = await select({
-                message: 'Select the OpenAI model to use',
-                options: modelChoices,
-                initialValue:
-                    currentConfig?.model && modelChoices.some((c) => c.value === currentConfig?.model)
-                        ? currentConfig.model
-                        : modelChoices[0].value,
-            });
+        s.stop('Models fetched.');
 
-            if (typeof selectedModel !== 'string') {
-                return { baseUrl, apiKey, model: null };
-            }
+        const selectedModel = await select({
+            message: `Select the ${provider} model to use`,
+            options: modelChoices,
+            initialValue:
+                currentConfig?.model && modelChoices.some((c) => c.value === currentConfig?.model)
+                    ? currentConfig.model
+                    : modelChoices[0].value,
+        });
 
-            model = selectedModel;
-        } catch {
-            s.stop(red('Failed to fetch models. Please check your base URL and API key.'));
+        if (typeof selectedModel !== 'string') {
             return { baseUrl, apiKey, model: null };
         }
-    }
 
-    return { baseUrl: baseUrl.trim(), apiKey, model };
+        return { baseUrl: baseUrl.trim(), apiKey, model: selectedModel };
+    } catch (error) {
+        s.stop(red(`Failed to fetch models: ${error instanceof Error ? error.message : 'Unknown error'}`));
+        return { baseUrl, apiKey, model: null };
+    }
 }

@@ -1,88 +1,86 @@
-import type { ProfileConfig } from '../utils/config';
 import { Injectable } from '../utils/inversify';
-
-type CommitType = NonNullable<ProfileConfig['type']>;
-
-const commitTypeFormats: Record<CommitType, string> = {
-    '': '<commit message>',
-    conventional: '<type>(<optional scope>): <commit message>',
-};
-const specifyCommitFormat = (type: CommitType): string =>
-    `The output response must be in format:\n${commitTypeFormats[type]}`;
-
-const commitTypes: Record<CommitType, string> = {
-    '': '',
-
-    /**
-     * References:
-     * Commitlint:
-     * https://github.com/conventional-changelog/commitlint/blob/18fbed7ea86ac0ec9d5449b4979b762ec4305a92/%40commitlint/config-conventional/index.js#L40-L100
-     *
-     * Conventional Changelog:
-     * https://github.com/conventional-changelog/conventional-changelog/blob/d0e5d5926c8addba74bc962553dd8bcfba90e228/packages/conventional-changelog-conventionalcommits/writer-opts.js#L182-L193
-     */
-    conventional: `Choose a type from the type-to-description JSON below that best describes the git diff:\n${JSON.stringify(
-        {
-            build: 'Changes that affect the build system or external dependencies',
-            chore: "Other changes that don't modify src or test files",
-            ci: 'Changes to our CI configuration files and scripts',
-            docs: 'Documentation only changes',
-            feat: 'A new feature',
-            fix: 'A bug fix',
-            perf: 'A code change that improves performance',
-            refactor: 'A code change that neither fixes a bug nor adds a feature',
-            revert: 'Reverts a previous commit',
-            style: 'Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc)',
-            test: 'Adding missing tests or correcting existing tests',
-        },
-        null,
-        2,
-    )}`,
-};
 
 @Injectable()
 export class PromptService {
-    getCommitMessageSystemPrompt() {
-        return [
-            'You are a git commit message generator.',
-            'Your task is to write clear, concise, and descriptive commit messages that follow best practices.',
-            'Always use the imperative mood and focus on the intent and impact of the change.',
-            'CRITICAL: When analyzing a git diff, only consider the actual changes made (lines starting with "+" for additions or "-" for deletions).',
-            'Ignore context lines and existing code that appears in the diff without "+" or "-" prefixes.',
-            'Do not include file names, code snippets, or unnecessary details.',
-            'Never include explanations, commentary, or formatting outside the commit message itself.',
-        ].join(' ');
+    getAgentCommitMessageSystemPrompt() {
+        return `# Agent Profile
+You are a Git Commit Message Specialist Agent. Your role is to analyze staged git changes and generate professional, descriptive commit messages that follow repository conventions.
+
+# Agent Coordination
+As the main coordinator, you must orchestrate a systematic analysis of staged changes using your available tools. You will not terminate until you successfully complete the task by calling finishCommitMessage().
+
+# Planning Module
+Your task requires breaking down the commit message generation into these subtasks:
+1. Inventory Analysis: Identify all staged files 
+2. Change Analysis: Examine what specific changes were made
+3. Style Analysis: Understand the repository's commit message patterns
+4. Message Generation: Create a commit message that matches the repository style
+
+# Available Tools
+You have access to these specialized tools:
+- listStagedFiles() - Returns array of staged file paths
+- readStagedFileDiffs() - Returns diff content showing + and - changes
+- getRecentCommitMessageExamples() - Returns recent commit messages for style reference
+- finishCommitMessage() - Completes task with generated commit message and body
+
+# Execution Protocol
+1. **Inventory**: Call listStagedFiles() to understand scope
+2. **Analysis**: Call readStagedFileDiffs() to see actual changes (focus on + and - lines)
+3. **Style Study**: Call getRecentCommitMessageExamples() to learn repository patterns
+4. **Generation**: Call finishCommitMessage() with your crafted message
+
+# CRITICAL: Example Matching Requirements
+🚨 MANDATORY: Your commit message MUST be indistinguishable from the repository's existing commit messages.
+- Study the getRecentCommitMessageExamples() output carefully
+- If examples use "feat:", "fix:", "docs:", etc. - YOU MUST use the same prefixes
+- If examples use sentence case - YOU MUST use sentence case
+- If examples use present tense - YOU MUST use present tense
+- If examples have specific punctuation patterns - YOU MUST follow them exactly
+- If examples have specific formatting - YOU MUST replicate it precisely
+- Your message must look like it was written by the same person who wrote the examples
+
+# Commit Message Generation Rules
+- Use imperative mood (e.g., "Add feature", "Fix bug", "Update config")
+- CRITICAL: Match the EXACT style and format of recent repository commits - NO DEVIATION ALLOWED
+- Be specific and detailed about what changed, avoid generic phrases
+- Create comprehensive, descriptive commit messages that thoroughly explain the changes
+- Include extensive bullet points in commit body listing ALL changes with detailed descriptions
+- Focus only on actual changes (+ additions, - deletions), ignore context lines
+- The commit message format must be IDENTICAL to the examples provided
+- Generate detailed, informative commit messages that provide comprehensive context
+- Make commit messages as descriptive and thorough as possible while maintaining the repository's style
+- Include all relevant technical details, file changes, and functional modifications
+- Provide complete context about what was changed, why it was changed, and how it affects the codebase
+
+# Success Criteria
+Task completion requires calling finishCommitMessage() with both:
+- A detailed, comprehensive commit message that is INDISTINGUISHABLE from the provided examples but more thorough and descriptive
+- An extensive commit body with detailed bullet points covering all changes made with comprehensive explanations
+- ZERO deviation from the example format and style patterns
+- Maximum detail and verbosity in the commit message content while maintaining the repository's established format
+
+🚨 FAILURE TO MATCH EXAMPLES EXACTLY = TASK FAILURE
+
+Begin execution now by calling listStagedFiles().`;
     }
 
-    generateSummaryPrompt(locale: string) {
+    getAgentCommitMessageUserPrompt(maxLength: number) {
         return [
-            'Generate a concise git commit body written in present tense for the following code diff with the given specifications below:',
-            `Message language: ${locale}`,
-            'IMPORTANT: Only describe the changes that were ADDED in this diff. Focus only on lines that start with "+" (plus sign).',
-            'Do not describe existing code, context lines, or unchanged code that appears in the diff.',
-            'If a line does not start with "+", it was already there and should not be mentioned in the commit body.',
-            'Use bullet points for the items.',
-            'Return only the bullet points using the ascii character "*". Your entire response will be passed directly into git commit.',
-        ]
-            .filter((entry) => !!entry)
-            .join('\n');
-    }
-
-    generateCommitMessagePrompt(locale: string, maxLength: number, type: CommitType) {
-        return [
-            `Message language: ${locale}`,
-            `Commit message must be a maximum of ${maxLength} characters.`,
-            'Write a clear, concise, and descriptive commit message in the imperative mood (e.g., "Add feature", "Fix bug").',
-            'Focus on the main intent and impact of the change. If possible, briefly mention the reason or motivation.',
-            'IMPORTANT: Base the commit message only on the actual changes made (lines starting with "+" for additions or "-" for deletions).',
-            'Do not describe existing code, context lines, or unchanged code that appears in the diff.',
-            'Do not include file names, code snippets, or restate the diff. Do not include unnecessary words or phrases.',
-            'Avoid generic messages like "update code" or "fix issue".',
-            'Return only the commit message, with no extra commentary or formatting.',
-            commitTypes[type],
-            specifyCommitFormat(type),
-        ]
-            .filter((entry) => !!entry)
-            .join('\n');
+            'Execute the commit message generation workflow for my staged changes.',
+            '',
+            `Constraints: Maximum ${maxLength} characters total, imperative mood required.`,
+            '',
+            'Follow your execution protocol: listStagedFiles() → readStagedFileDiffs() → getRecentCommitMessageExamples() → finishCommitMessage()',
+            '',
+            '🚨 CRITICAL REQUIREMENTS:',
+            '• Your commit message MUST match the examples exactly - same format, same style, same patterns.',
+            '• Study the getRecentCommitMessageExamples() output and replicate the format precisely.',
+            '• Generate DETAILED and COMPREHENSIVE commit messages with thorough descriptions.',
+            '• Make the commit message as informative and descriptive as possible within the style constraints.',
+            '• Include extensive technical details about what was changed and why.',
+            '• Provide complete context about the modifications and their impact.',
+            '',
+            'Generate comprehensive, detailed bullet points in the commit body documenting ALL changes made with thorough explanations.',
+        ].join('\n');
     }
 }

@@ -1,29 +1,44 @@
-import { Command } from '@commander-js/extra-typings';
-import { container } from '../utils/di';
-import { ConfigService } from '../services/config.service';
-import { GitService } from '../services/git.service';
+import { Container } from 'inversify';
+import { writeFileSync } from 'fs';
 import { AICommitMessageService } from '../services/ai-commit-message.service';
+import { GitService } from '../services/git.service';
+import { ConfigService } from '../services/config.service';
 
-export const prepareCommitMsgCommand = new Command('prepare-commit-msg')
-    .description('Runs aicommits silently and returns the first proposed text')
-    .action(async () => {
+export const prepareCommitMessage = async ({ container, file }: { container: Container; file: string }) => {
+    try {
         const configService = container.get(ConfigService);
+        await configService.readConfig();
+
         const gitService = container.get(GitService);
         const aiCommitMessageService = container.get(AICommitMessageService);
-        const config = await configService.getConfig();
-        const staged = await gitService.getStagedDiff(config.exclude, config.contextLines);
 
+        const config = configService.getConfig();
+        const staged = await gitService.getStagedDiff(config.exclude, config.contextLines);
         if (!staged) {
             return;
         }
 
-        const {
-            commitMessages: [firstCommitMessage],
-            bodies: [firstBody],
-        } = await aiCommitMessageService.generateCommitMessage({ diff: staged.diff });
+        let commitMessage = '';
+        let commitBody = '';
 
-        if (firstCommitMessage && firstBody) {
-            const fullMessage = `${firstCommitMessage}\n\n${firstBody}`.trim();
-            console.log(fullMessage);
+        // Use the agent pattern to generate commit message
+        await aiCommitMessageService.generateAgentCommitMessage({
+            stagedFiles: staged.files,
+            onStepUpdate: () => {
+                // Silent operation for prepare-commit-msg
+            },
+            onComplete: (message, body) => {
+                commitMessage = message;
+                commitBody = body;
+            },
+        });
+
+        if (commitMessage) {
+            const fullMessage = `${commitMessage}\n\n${commitBody}`.trim();
+            writeFileSync(file, fullMessage);
         }
-    });
+    } catch (error) {
+        // Silent fail for prepare-commit-msg hook
+        console.error('aicommits prepare-commit-msg failed:', error);
+    }
+};

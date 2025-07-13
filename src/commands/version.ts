@@ -66,7 +66,6 @@ Options:
   --base-url <baseUrl>       Set the OpenAI API base URL
   --context-lines <n>        Number of context lines for diffs
   --exclude <pattern>        Exclude files from commit analysis
-  --locale <locale>          Language for commit messages
   --max-length <n>           Maximum commit message length
   --model <model>            OpenAI model to use
   --stage-all                Stage all files before committing

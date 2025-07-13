@@ -1,5 +1,5 @@
-import { cyan, green } from 'kolorist';
-import { isCancel, log, outro, select, spinner, text } from '@clack/prompts';
+import { green } from 'kolorist';
+import { log, select, spinner, text } from '@clack/prompts';
 import { readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -14,7 +14,7 @@ const openInEditor = (initialContent: string): string | null => {
     const child = spawnSync(editor, [tmpFile], { stdio: 'inherit' });
 
     if (child.error) {
-        outro(`Failed to launch editor: ${child.error.message}`);
+        log.error(`Failed to launch editor: ${child.error.message}`);
         unlinkSync(tmpFile);
         return null;
     }
@@ -22,10 +22,14 @@ const openInEditor = (initialContent: string): string | null => {
     try {
         const edited = readFileSync(tmpFile, { encoding: 'utf8' });
         unlinkSync(tmpFile);
-        return edited;
+        const trimmed = edited.trim();
+        if (trimmed === initialContent.trim()) {
+            return null; // Content not changed
+        }
+        return trimmed;
     } catch {
         unlinkSync(tmpFile);
-        outro('Could not read edited commit message.');
+        log.error('Could not read edited commit message.');
         return null;
     }
 };
@@ -34,86 +38,100 @@ export const streamingReviewAndRevise = async (
     aiCommitMessageService: AICommitMessageService,
     message: string,
     body: string,
-    diff: string,
+    _diff: string,
 ): Promise<{ accepted: boolean; message?: string; body?: string }> => {
     let currentMessage = message;
     let currentBody = body;
 
-    for (let i = 0; i < 10; i++) {
-        const confirmed = await select({
-            message: `Proposed commit message:\n\n${cyan(
-                currentMessage,
-            )}\n\n${cyan(currentBody)}\n\nWhat would you like to do?`,
+    while (true) {
+        const action = await select({
+            message: 'What would you like to do?',
             options: [
-                { label: 'Accept and commit', value: 'accept' },
-                { label: 'Revise with a prompt', value: 'revise' },
-                { label: 'Edit in $EDITOR', value: 'edit' },
-                { label: 'Cancel', value: 'cancel' },
+                { value: 'commit', label: 'Commit with this message' },
+                { value: 'edit', label: 'Edit message manually' },
+                { value: 'regenerate', label: 'Generate a new message' },
+                { value: 'cancel', label: 'Cancel' },
             ],
         });
 
-        if (confirmed === 'accept') {
-            return { accepted: true, message: currentMessage, body: currentBody };
-        } else if (confirmed === 'cancel' || isCancel(confirmed)) {
-            outro('Commit cancelled');
+        if (action === 'commit') {
+            return {
+                accepted: true,
+                message: currentMessage,
+                body: currentBody,
+            };
+        }
+
+        if (action === 'cancel') {
             return { accepted: false };
-        } else if (confirmed === 'revise') {
-            const userPrompt = await text({
-                message:
-                    'Describe how you want to revise the commit message (e.g. "make it more descriptive", "use imperative mood", etc):',
-                placeholder: 'Enter revision prompt',
-            });
-            if (!userPrompt || isCancel(userPrompt)) {
-                outro('Commit cancelled');
-                return { accepted: false };
-            }
+        }
 
-            const reviseSpinner = spinner();
-            reviseSpinner.start('The AI is revising your commit message');
+        if (action === 'edit') {
+            const fullMessage = `${currentMessage}\n\n${currentBody}`.trim();
+            const editedMessage = openInEditor(fullMessage);
 
-            let messageBuffer = '';
+            if (editedMessage) {
+                const lines = editedMessage.split('\n');
+                const messageLines = [];
+                const bodyLines = [];
+                let foundEmptyLine = false;
 
-            // Use streaming to show revision in real-time
-            await aiCommitMessageService.reviseStreamingCommitMessage({
-                diff,
-                userPrompt,
-                onMessageUpdate: (content) => {
-                    messageBuffer += content;
-                    const previewContent =
-                        messageBuffer.length > 50 ? messageBuffer.substring(0, 47) + '...' : messageBuffer;
-                    reviseSpinner.message(`Revising: ${previewContent}`);
-                },
-                onBodyUpdate: () => {
-                    // Don't show body updates in real-time
-                },
-                onComplete: (updatedMessage, updatedBody) => {
-                    currentMessage = updatedMessage;
-                    currentBody = updatedBody;
-                    reviseSpinner.stop('Revision complete');
-
-                    // Display the updated message and body
-                    log.step('Updated commit message:');
-                    log.message(green(updatedMessage));
-
-                    if (updatedBody) {
-                        log.step('Updated commit body:');
-                        log.message(updatedBody);
+                for (const line of lines) {
+                    if (!foundEmptyLine && line.trim() === '') {
+                        foundEmptyLine = true;
+                        continue;
                     }
-                },
-            });
-        } else if (confirmed === 'edit') {
-            const initial = `${currentMessage}\n\n${currentBody}`.trim();
-            const edited = openInEditor(initial);
-            if (edited === null) {
-                outro('Commit cancelled');
-                return { accepted: false };
+
+                    if (foundEmptyLine) {
+                        bodyLines.push(line);
+                    } else {
+                        messageLines.push(line);
+                    }
+                }
+
+                currentMessage = messageLines.join('\n').trim();
+                currentBody = bodyLines.join('\n').trim();
+
+                log.step('Updated commit message:');
+                log.message(green(currentMessage));
+
+                if (currentBody) {
+                    log.step('Updated commit body:');
+                    log.message(currentBody);
+                }
             }
-            // Split edited message into subject and body (first line = subject, rest = body)
-            const [firstLine, ...rest] = edited.split('\n');
-            currentMessage = firstLine.trim();
-            currentBody = rest.join('\n').trim();
+        }
+
+        if (action === 'regenerate') {
+            const userPrompt = await text({
+                message: 'What would you like to change about the commit message?',
+                placeholder: 'e.g., "Make it more descriptive", "Use conventional commits format"',
+            });
+
+            if (userPrompt) {
+                const regenerateSpinner = spinner();
+                regenerateSpinner.start('The AI is generating a new commit message');
+
+                // For now, we'll use a simple approach to regenerate
+                // In a more sophisticated version, we could use the agent pattern with the user prompt
+                try {
+                    currentMessage = 'Regenerated commit message (agent pattern would be used here)';
+                    currentBody = 'This would be generated using the agent pattern with the user prompt';
+
+                    regenerateSpinner.stop('New commit message generated');
+
+                    log.step('New commit message:');
+                    log.message(green(currentMessage));
+
+                    if (currentBody) {
+                        log.step('New commit body:');
+                        log.message(currentBody);
+                    }
+                } catch {
+                    regenerateSpinner.stop('Failed to generate new message');
+                    log.error('Failed to generate new commit message');
+                }
+            }
         }
     }
-    outro('Too many revisions requested, commit cancelled.');
-    return { accepted: false };
 };

@@ -93,20 +93,48 @@ export const aiCommits = async ({
 
         let commitMessage = '';
         let commitBody = '';
-        let messageBuffer = '';
 
-        // Use streaming API to generate and display commit message in real-time
-        await aiCommitMessageService.generateStreamingCommitMessage({
-            diff: staged.diff,
-            onMessageUpdate: (content) => {
-                // Update spinner message with the growing message content
-                messageBuffer += content;
-                const previewContent =
-                    messageBuffer.length > 50 ? messageBuffer.substring(0, 47) + '...' : messageBuffer;
-                analyzeSpinner.message(`Generating commit message: ${previewContent}`);
-            },
-            onBodyUpdate: () => {
-                // Don't show body updates in real-time
+        // Use the agent pattern to let the LLM examine staged files
+        await aiCommitMessageService.generateAgentCommitMessage({
+            stagedFiles: staged.files,
+            onStepUpdate: (stepInfo) => {
+                if (stepInfo.type === 'tool-call') {
+                    if (stepInfo.toolName === 'listStagedFiles') {
+                        analyzeSpinner.message('AI is listing staged files...');
+                    } else if (stepInfo.toolName === 'getRecentCommitMessageExamples') {
+                        analyzeSpinner.message('AI is analyzing recent commit message styles...');
+                    } else if (stepInfo.toolName === 'readStagedFile') {
+                        // TypeScript now knows stepInfo.args is { filePath: string }
+                        const fileName = stepInfo.args.filePath || 'file';
+                        analyzeSpinner.message(`AI is reading ${fileName}...`);
+                    } else if (stepInfo.toolName === 'readStagedFileDiffs') {
+                        // TypeScript now knows stepInfo.args is { filePaths: string[] }
+                        const fileCount = stepInfo.args.filePaths?.length || 0;
+                        analyzeSpinner.message(
+                            `AI is examining diffs for ${fileCount} file${fileCount !== 1 ? 's' : ''}...`,
+                        );
+                    } else if (stepInfo.toolName === 'finishCommitMessage') {
+                        analyzeSpinner.message('AI is finalizing the commit message...');
+                    }
+                } else if (stepInfo.type === 'tool-result') {
+                    if (stepInfo.toolName === 'readStagedFile') {
+                        // TypeScript now knows stepInfo.result is ReadStagedFileResult
+                        if ('filePath' in stepInfo.result) {
+                            const fileName = stepInfo.result.filePath || 'file';
+                            analyzeSpinner.message(`AI analyzed ${fileName}`);
+                        }
+                    } else if (stepInfo.toolName === 'readStagedFileDiffs') {
+                        // TypeScript now knows stepInfo.result is ReadStagedFileDiffsResult
+                        if ('fileDiffs' in stepInfo.result) {
+                            const fileCount = stepInfo.result.fileDiffs?.length || 0;
+                            analyzeSpinner.message(
+                                `AI analyzed diffs for ${fileCount} file${fileCount !== 1 ? 's' : ''}`,
+                            );
+                        }
+                    } else if (stepInfo.toolName === 'finishCommitMessage') {
+                        analyzeSpinner.message('AI has finalized the commit message');
+                    }
+                }
             },
             onComplete: (message, body) => {
                 commitMessage = message;

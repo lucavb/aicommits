@@ -221,12 +221,6 @@ To set a configuration value for a specific profile:
 aicommits config set apiKey <key> --profile development
 ```
 
-#### locale
-
-Default: `en`
-
-The locale to use for the generated commit messages. Consult the list of codes in: https://wikipedia.org/wiki/List_of_ISO_639-1_codes.
-
 #### model
 
 **Required**
@@ -285,3 +279,7 @@ If you want to help fix a bug or implement a feature in [Issues](https://github.
 - [Report Issues](https://github.com/lucavb/aicommits/issues)
 - [NPM Package](https://www.npmjs.com/package/@lucavb/aicommits)
 - [License](./LICENSE)
+
+---
+
+_Testing agent pattern implementation where LLM examines staged files directly._
