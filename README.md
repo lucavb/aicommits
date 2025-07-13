@@ -1,5 +1,7 @@
 # @lucavb/aicommits
 
+**aicommits helps you write better commit messages by generating AI-powered summaries for your git diffs - and it keeps your work and private environments separate with configurable profiles.**
+
 [![npm version](https://img.shields.io/npm/v/@lucavb/aicommits.svg?style=flat)](https://www.npmjs.com/package/@lucavb/aicommits)
 [![Build Status](https://github.com/lucavb/aicommits/actions/workflows/test.yml/badge.svg)](https://github.com/lucavb/aicommits/actions)
 
