@@ -30,10 +30,7 @@ jobs:
               run: npm i
 
             - name: Code Quality
-              run: |
-                  npm run prettier
-                  npm run eslint
-                  npm run type-check
+              run: npm run cq
 
             - name: Tests
               run: npm run test
