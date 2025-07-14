@@ -157,7 +157,7 @@ export const aiCommits = async ({
             throw new KnownError('No commit message was generated. Try again.');
         }
 
-        const result = await streamingReviewAndRevise(aiCommitMessageService, commitMessage, commitBody, staged.diff);
+        const result = await streamingReviewAndRevise(aiCommitMessageService, commitMessage, commitBody, staged.files);
         if (!result?.accepted) {
             return;
         }

@@ -38,7 +38,7 @@ export const streamingReviewAndRevise = async (
     aiCommitMessageService: AICommitMessageService,
     message: string,
     body: string,
-    _diff: string,
+    stagedFiles: string[],
 ): Promise<{ accepted: boolean; message?: string; body?: string }> => {
     let currentMessage = message;
     let currentBody = body;
@@ -49,7 +49,7 @@ export const streamingReviewAndRevise = async (
             options: [
                 { value: 'commit', label: 'Commit with this message' },
                 { value: 'edit', label: 'Edit message manually' },
-                { value: 'regenerate', label: 'Generate a new message' },
+                { value: 'regenerate', label: 'Generate a new message with additional instructions' },
                 { value: 'cancel', label: 'Cancel' },
             ],
         });
@@ -103,22 +103,74 @@ export const streamingReviewAndRevise = async (
         }
 
         if (action === 'regenerate') {
-            const userPrompt = await text({
-                message: 'What would you like to change about the commit message?',
-                placeholder: 'e.g., "Make it more descriptive", "Use conventional commits format"',
+            const userInstructions = await text({
+                message: 'What changes would you like to make to the commit message?',
+                placeholder:
+                    'e.g., "Make it more descriptive", "Use conventional commits format", "Focus on the performance improvements"',
+                validate: (value) => {
+                    if (!value || value.trim().length === 0) {
+                        return 'Please provide instructions for how to improve the commit message.';
+                    }
+                    return undefined;
+                },
             });
 
-            if (userPrompt) {
+            if (userInstructions && typeof userInstructions === 'string') {
                 const regenerateSpinner = spinner();
-                regenerateSpinner.start('The AI is generating a new commit message');
+                regenerateSpinner.start(
+                    'The AI is analyzing your changes and generating a new commit message with your instructions',
+                );
 
-                // For now, we'll use a simple approach to regenerate
-                // In a more sophisticated version, we could use the agent pattern with the user prompt
                 try {
-                    currentMessage = 'Regenerated commit message (agent pattern would be used here)';
-                    currentBody = 'This would be generated using the agent pattern with the user prompt';
+                    await aiCommitMessageService.generateAgentCommitMessageWithInstructions({
+                        stagedFiles,
+                        userInstructions: userInstructions.trim(),
+                        onStepUpdate: (stepInfo) => {
+                            if (stepInfo.type === 'tool-call') {
+                                if (stepInfo.toolName === 'listStagedFiles') {
+                                    regenerateSpinner.message('AI is listing staged files...');
+                                } else if (stepInfo.toolName === 'getRecentCommitMessageExamples') {
+                                    regenerateSpinner.message('AI is analyzing recent commit message styles...');
+                                } else if (stepInfo.toolName === 'readStagedFile') {
+                                    const fileName = stepInfo.args.filePath || 'file';
+                                    regenerateSpinner.message(`AI is reading ${fileName}...`);
+                                } else if (stepInfo.toolName === 'readStagedFileDiffs') {
+                                    const fileCount = stepInfo.args.filePaths?.length || 0;
+                                    regenerateSpinner.message(
+                                        `AI is examining diffs for ${fileCount} file${fileCount !== 1 ? 's' : ''}...`,
+                                    );
+                                } else if (stepInfo.toolName === 'finishCommitMessage') {
+                                    regenerateSpinner.message(
+                                        'AI is finalizing the commit message with your instructions...',
+                                    );
+                                }
+                            } else if (stepInfo.type === 'tool-result') {
+                                if (stepInfo.toolName === 'readStagedFile') {
+                                    if ('filePath' in stepInfo.result) {
+                                        const fileName = stepInfo.result.filePath || 'file';
+                                        regenerateSpinner.message(`AI analyzed ${fileName}`);
+                                    }
+                                } else if (stepInfo.toolName === 'readStagedFileDiffs') {
+                                    if ('fileDiffs' in stepInfo.result) {
+                                        const fileCount = stepInfo.result.fileDiffs?.length || 0;
+                                        regenerateSpinner.message(
+                                            `AI analyzed diffs for ${fileCount} file${fileCount !== 1 ? 's' : ''}`,
+                                        );
+                                    }
+                                } else if (stepInfo.toolName === 'finishCommitMessage') {
+                                    regenerateSpinner.message(
+                                        'AI has generated the new commit message with your instructions',
+                                    );
+                                }
+                            }
+                        },
+                        onComplete: (message, body) => {
+                            currentMessage = message;
+                            currentBody = body;
+                        },
+                    });
 
-                    regenerateSpinner.stop('New commit message generated');
+                    regenerateSpinner.stop('New commit message generated with your instructions');
 
                     log.step('New commit message:');
                     log.message(green(currentMessage));
@@ -127,9 +179,11 @@ export const streamingReviewAndRevise = async (
                         log.step('New commit body:');
                         log.message(currentBody);
                     }
-                } catch {
+                } catch (error) {
                     regenerateSpinner.stop('Failed to generate new message');
-                    log.error('Failed to generate new commit message');
+                    log.error(
+                        `Failed to generate new commit message: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                    );
                 }
             }
         }
