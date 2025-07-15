@@ -10,20 +10,26 @@ When working with dependencies in this project:
 ## Adding Packages
 - **ALWAYS** use `npm install <package-name>` to add runtime dependencies
 - **ALWAYS** use `npm install --save-dev <package-name>` to add development dependencies
-- **NEVER** manually edit the "dependencies" or "devDependencies" keys in package.json directly
+- **ALWAYS** let npm manage the package.json dependencies and devDependencies automatically
 
 ## Removing Packages
-- **ALWAYS** use `npm uninstall <package-name>` to remove packages
-- **NEVER** manually delete entries from package.json dependencies
+- **ALWAYS** use `npm uninstall <package-name>` to remove packages cleanly
+- **ALWAYS** use npm commands to ensure proper dependency cleanup
 
 ## Updating Packages
-- Use `npm update <package-name>` for specific updates
-- Use `npm update` for updating all packages
-- Use `npm audit fix` to fix security vulnerabilities
+- Use `npm update <package-name>` for targeted package updates
+- Use `npm update` for comprehensive package updates
+- Use `npm audit fix` to resolve security vulnerabilities automatically
 
-## Why This Matters
-- Ensures package-lock.json stays in sync
+## Benefits of Proper Package Management
+- Ensures package-lock.json stays perfectly synchronized
+- Maintains consistent dependency resolution across environments
+- Provides seamless dependency management across the entire team
+- Automatically handles peer dependencies and version ranges correctly
 - Prevents version conflicts and dependency resolution issues
+
+Always leverage npm's built-in package management to maintain consistency and ensure reliable dependency handling.
+
 - Maintains consistent dependency management across the team
 - Automatically handles peer dependencies and version ranges
 
