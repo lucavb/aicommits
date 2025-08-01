@@ -15,16 +15,16 @@ program.addCommand(versionCommand);
 
 program
     .passThroughOptions(true)
-    .addOption(new Option('--api-key <apiKey>'))
-    .addOption(new Option('--base-url <baseUrl>'))
-    .addOption(new Option('--context-lines <contextLines>'))
-    .addOption(new Option('--exclude <exclude>'))
-    .addOption(new Option('--locale <locale>'))
-    .addOption(new Option('--max-length <maxLength>'))
-    .addOption(new Option('--model <model>'))
+    .addOption(new Option('--api-key <apiKey>', 'API key for the AI provider'))
+    .addOption(new Option('--base-url <baseUrl>', 'Base URL for the AI provider API'))
+    .addOption(new Option('--context-lines <contextLines>', 'Number of context lines to include in diff (default: 10)'))
+    .addOption(new Option('--exclude <exclude>', 'Glob patterns to exclude files from commit analysis'))
+    .addOption(new Option('--locale <locale>', 'Language locale for commit messages (default: en)'))
+    .addOption(new Option('--max-length <maxLength>', 'Maximum length of commit message (default: 50)'))
+    .addOption(new Option('--model <model>', 'AI model to use for generating commit messages'))
     .addOption(new Option('--profile <profile>', 'Configuration profile to use').default('default'))
-    .addOption(new Option('--stage-all'))
-    .addOption(new Option('--type <type>'))
+    .addOption(new Option('--stage-all', 'Stage all modified files before generating commit'))
+    .addOption(new Option('--type <type>', 'Commit message format type (conventional or empty)'))
     .action(async (options) => {
         container.bind(CLI_ARGUMENTS).toConstantValue(options);
         await aiCommits({ container, stageAll: options.stageAll, profile: options.profile });
