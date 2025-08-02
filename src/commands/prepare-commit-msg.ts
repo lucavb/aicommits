@@ -10,7 +10,7 @@ export const prepareCommitMsgCommand = new Command('prepare-commit-msg')
         const configService = container.get(ConfigService);
         const gitService = container.get(GitService);
         const aiCommitMessageService = container.get(AICommitMessageService);
-        const config = await configService.getConfig();
+        const config = configService.getConfig();
         const staged = await gitService.getStagedDiff(config.exclude, config.contextLines);
 
         if (!staged) {
