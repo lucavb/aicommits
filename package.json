@@ -58,7 +58,7 @@
         "prepare": "husky"
     },
     "dependencies": {
-        "@anthropic-ai/sdk": "0.57.0",
+        "@anthropic-ai/sdk": "0.58.0",
         "@clack/prompts": "0.11.0",
         "@commander-js/extra-typings": "14.0.0",
         "commander": "14.0.0",
