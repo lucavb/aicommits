@@ -1,7 +1,13 @@
 import { promises as fs } from 'fs';
 import { Container } from 'inversify';
 import { stringify as yamlStringify } from 'yaml';
-import { CLI_ARGUMENTS, CONFIG_FILE_PATH, ConfigService, FILE_SYSTEM_PROMISE_API } from './config.service';
+import {
+    CLI_ARGUMENTS,
+    CONFIG_FILE_PATH,
+    ConfigService,
+    FILE_SYSTEM_PROMISE_API,
+    ENVIRONMENT_VARIABLES,
+} from './config.service';
 import { Injectable } from '../utils/inversify';
 import { Config, ProfileConfig } from '../utils/config';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -41,6 +47,7 @@ describe('ConfigService', () => {
         container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
         container.bind(ConfigService).toSelf();
         container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
+        container.bind(ENVIRONMENT_VARIABLES).toConstantValue({});
 
         configService = container.get(ConfigService);
         mockFsApi = container.get(FILE_SYSTEM_PROMISE_API);
@@ -129,6 +136,92 @@ describe('ConfigService', () => {
             configService.updateConfigInMemory(invalidConfig);
             const result = configService.validConfig();
             expect(result.valid).toBe(false);
+        });
+    });
+
+    describe('getCurrentProfile', () => {
+        it('should return CLI profile when provided (highest precedence)', () => {
+            // CLI argument should have highest precedence
+            const container = new Container({ defaultScope: 'Singleton' });
+            container.bind(CLI_ARGUMENTS).toConstantValue({ profile: 'cli-profile' });
+            container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
+            container.bind(ConfigService).toSelf();
+            container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
+            container.bind(ENVIRONMENT_VARIABLES).toConstantValue({ AIC_PROFILE: 'env-profile' });
+
+            const configServiceWithCli = container.get(ConfigService);
+            configServiceWithCli.updateConfigInMemory({ currentProfile: 'config-profile' });
+            expect(configServiceWithCli.getCurrentProfile()).toBe('cli-profile');
+        });
+
+        it('should return AIC_PROFILE environment variable when CLI profile not provided', () => {
+            // Create config service without CLI profile argument
+            const container = new Container({ defaultScope: 'Singleton' });
+            container.bind(CLI_ARGUMENTS).toConstantValue({});
+            container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
+            container.bind(ConfigService).toSelf();
+            container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
+            container.bind(ENVIRONMENT_VARIABLES).toConstantValue({ AIC_PROFILE: 'env-profile' });
+
+            const configServiceWithoutCli = container.get(ConfigService);
+            configServiceWithoutCli.updateConfigInMemory({ currentProfile: 'config-profile' });
+            expect(configServiceWithoutCli.getCurrentProfile()).toBe('env-profile');
+        });
+
+        it('should return config currentProfile when neither CLI nor env var provided', async () => {
+            // Set up a config file with currentProfile
+            const configWithCurrentProfile = { currentProfile: 'config-profile', profiles: {} };
+            const fileContents = yamlStringify(configWithCurrentProfile);
+
+            // Create config service without CLI profile argument or env var
+            const container = new Container({ defaultScope: 'Singleton' });
+            container.bind(CLI_ARGUMENTS).toConstantValue({});
+            container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
+            container.bind(ConfigService).toSelf();
+            container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
+            container.bind(ENVIRONMENT_VARIABLES).toConstantValue({});
+
+            const mockFs = container.get<MockFsApi>(FILE_SYSTEM_PROMISE_API);
+            mockFs.readFile.mockResolvedValue(fileContents);
+
+            const configServiceWithoutCli = container.get(ConfigService);
+            await configServiceWithoutCli.readConfig();
+            expect(configServiceWithoutCli.getCurrentProfile()).toBe('config-profile');
+        });
+
+        it('should return default when no profile is specified anywhere', () => {
+            // Create config service without any profile configuration
+            const container = new Container({ defaultScope: 'Singleton' });
+            container.bind(CLI_ARGUMENTS).toConstantValue({});
+            container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
+            container.bind(ConfigService).toSelf();
+            container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
+            container.bind(ENVIRONMENT_VARIABLES).toConstantValue({});
+
+            const configServiceWithoutCli = container.get(ConfigService);
+            expect(configServiceWithoutCli.getCurrentProfile()).toBe('default');
+        });
+
+        it('should handle empty AIC_PROFILE environment variable', async () => {
+            // Set up a config file with currentProfile
+            const configWithCurrentProfile = { currentProfile: 'config-profile', profiles: {} };
+            const fileContents = yamlStringify(configWithCurrentProfile);
+
+            // Create config service without CLI profile argument
+            const container = new Container({ defaultScope: 'Singleton' });
+            container.bind(CLI_ARGUMENTS).toConstantValue({});
+            container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
+            container.bind(ConfigService).toSelf();
+            container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
+            container.bind(ENVIRONMENT_VARIABLES).toConstantValue({ AIC_PROFILE: '' });
+
+            const mockFs = container.get<MockFsApi>(FILE_SYSTEM_PROMISE_API);
+            mockFs.readFile.mockResolvedValue(fileContents);
+
+            const configServiceWithoutCli = container.get(ConfigService);
+            await configServiceWithoutCli.readConfig();
+            // Empty string should fallback to config currentProfile
+            expect(configServiceWithoutCli.getCurrentProfile()).toBe('config-profile');
         });
     });
 });

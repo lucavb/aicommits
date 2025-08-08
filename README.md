@@ -221,6 +221,8 @@ To set a configuration value for a specific profile:
 aicommits config set apiKey <key> --profile development
 ```
 
+You can also select the active profile via the `AIC_PROFILE` environment variable. See "Environment variables" below for details and precedence rules.
+
 #### locale
 
 Default: `en`
@@ -262,6 +264,26 @@ You can clear this option by setting it to an empty string:
 ```sh
 aicommits config set type ""
 ```
+
+### Environment variables
+
+You can control some behavior via environment variables:
+
+- **AIC_PROFILE**: Selects the active configuration profile when running the CLI.
+    - **Precedence**: `--profile` flag > `AIC_PROFILE` env var > `currentProfile` in `~/.aicommits.yaml` > `default`.
+    - **macOS/Linux**:
+        ```sh
+        AIC_PROFILE=production aicommits
+        ```
+    - **Windows (PowerShell)**:
+        ```powershell
+        $env:AIC_PROFILE = 'staging'; aicommits
+        ```
+    - **Windows (cmd.exe)**:
+        ```bat
+        set AIC_PROFILE=staging && aicommits
+        ```
+    - If `AIC_PROFILE` is an empty string or unset, the CLI falls back to the value from your config file's `currentProfile`, or `default` if not set.
 
 ## How it works
 

@@ -10,8 +10,14 @@ import { Inject, Injectable, Optional } from '../utils/inversify';
 export const CLI_ARGUMENTS = Symbol.for('CLI_ARGUMENTS');
 export const CONFIG_FILE_PATH = Symbol.for('CONFIG_FILE_PATH');
 export const FILE_SYSTEM_PROMISE_API = Symbol.for('FILE_SYSTEM_PROMISE_API');
+export const ENVIRONMENT_VARIABLES = Symbol.for('ENVIRONMENT_VARIABLES');
 
 type FileSystemApi = Pick<typeof fs, 'writeFile' | 'readFile'>;
+interface EnvironmentVariables {
+    HOME?: string;
+    USERPROFILE?: string;
+    AIC_PROFILE?: string;
+}
 type ConfigValidationResult = { valid: true } | { valid: false; errors: unknown[] };
 
 interface ConfigState {
@@ -28,9 +34,9 @@ export class ConfigService {
         @Optional() @Inject(CLI_ARGUMENTS) private readonly cliArguments: Partial<Config> & { profile?: string } = {},
         @Optional() @Inject(CONFIG_FILE_PATH) configFilePath: string | undefined,
         @Optional() @Inject(FILE_SYSTEM_PROMISE_API) private readonly fs: FileSystemApi,
+        @Optional() @Inject(ENVIRONMENT_VARIABLES) private readonly env: EnvironmentVariables = {},
     ) {
-        this.configFilePath =
-            configFilePath ?? join(process.env.HOME || process.env.USERPROFILE || '.', '.aicommits.yaml');
+        this.configFilePath = configFilePath ?? join(this.env.HOME || this.env.USERPROFILE || '.', '.aicommits.yaml');
     }
 
     public getConfigFilePath(): string {
@@ -85,7 +91,7 @@ export class ConfigService {
     }
 
     getCurrentProfile(): string {
-        return this.cliArguments.profile || this.inMemoryConfig.currentProfile || 'default';
+        return this.cliArguments.profile || this.env.AIC_PROFILE || this.inMemoryConfig.currentProfile || 'default';
     }
 
     getProfile(profileName: string): ProfileConfig | undefined {
