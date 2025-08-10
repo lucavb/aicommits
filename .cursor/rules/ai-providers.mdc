@@ -1,0 +1,17 @@
+---
+alwaysApply: true
+description: Rules for AI provider implementations and errors
+---
+### AI Providers
+
+- **Interface**: Implement `src/services/ai-provider.interface.ts`
+- **Providers**: Support OpenAI, Anthropic, Ollama
+- **Error handling**: Propagate meaningful errors with helpful messages; respect rate limits
+- **Configuration**: Validate provider settings with Zod via config service
+
+References:
+- [`ai-provider.interface.ts`](mdc:src/services/ai-provider.interface.ts)
+- [`openai-provider.ts`](mdc:src/services/openai-provider.ts)
+- [`anthropic-provider.ts`](mdc:src/services/anthropic-provider.ts)
+- [`ollama-provider.ts`](mdc:src/services/ollama-provider.ts)
+

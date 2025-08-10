@@ -1,0 +1,20 @@
+---
+alwaysApply: true
+description: Project structure, responsibilities, and layering
+---
+### Architecture Overview
+
+- **Commands**: `src/commands/` handle CLI interactions and orchestrate services
+  - Examples: [`aicommits.ts`](mdc:src/commands/aicommits.ts), [`prepare-commit-msg.ts`](mdc:src/commands/prepare-commit-msg.ts)
+
+- **Services**: `src/services/` contain business logic and integrations (use DI)
+  - Examples: [`ai-commit-message.service.ts`](mdc:src/services/ai-commit-message.service.ts), [`git.service.ts`](mdc:src/services/git.service.ts), [`config.service.ts`](mdc:src/services/config.service.ts)
+
+- **Providers**: implemented in `src/services/`, conforming to `ai-provider.interface.ts` for different AI backends
+  - Examples: [`openai-provider.ts`](mdc:src/services/openai-provider.ts), [`anthropic-provider.ts`](mdc:src/services/anthropic-provider.ts), [`ollama-provider.ts`](mdc:src/services/ollama-provider.ts)
+
+- **Utilities**: `src/utils/` host DI setup, error helpers, and type guards
+  - Examples: [`di.ts`](mdc:src/utils/di.ts), [`error.ts`](mdc:src/utils/error.ts), [`typeguards.ts`](mdc:src/utils/typeguards.ts)
+
+- **CLI entry point**: [`src/cli.ts`](mdc:src/cli.ts)
+

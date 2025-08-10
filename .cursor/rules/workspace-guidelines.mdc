@@ -1,0 +1,32 @@
+---
+alwaysApply: true
+description: High-level workspace guidelines for aicommits
+---
+### aicommits Workspace Guidelines
+
+- **Language & Tooling**
+  - Use TypeScript for all code
+  - Enforce ESLint and Prettier: `npm run eslint`, `npm run prettier:fix`
+  - Run type checks: `npm run type-check`
+
+- **Testing**
+  - Use Vitest: `npm test`, `npm run test:watch`, `npm run test:coverage`
+
+- **Development Workflow**
+  - Dev CLI: `npm run dev`
+  - Setup flow: `npm run dev:setup`
+  - Stage-all flow: `npm run dev:stage-all`
+
+- **Architecture (high level)**
+  - Commands in `src/commands/`
+  - Services in `src/services/` (use Inversify DI)
+  - Provider implementations in `src/services/`
+  - Utilities in `src/utils/`
+
+- **Helpful files**
+  - [`README.md`](mdc:README.md)
+  - [`package.json`](mdc:package.json)
+  - [`src/cli.ts`](mdc:src/cli.ts)
+  - [`src/services/`](mdc:src/services)
+  - [`src/commands/`](mdc:src/commands)
+

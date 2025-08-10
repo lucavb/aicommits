@@ -1,0 +1,15 @@
+---
+alwaysApply: true
+description: Commit message generation standards and customization
+---
+### Commit Message Generation
+
+- Generate meaningful, conventional commit messages
+- Support multiple formats and user customization
+- Respect conventional commit standards when configured
+- Provide previews and allow user edits before finalizing
+
+References:
+- [`ai-commit-message.service.ts`](mdc:src/services/ai-commit-message.service.ts)
+- [`prompt.service.ts`](mdc:src/services/prompt.service.ts)
+

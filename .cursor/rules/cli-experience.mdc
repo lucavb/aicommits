@@ -1,0 +1,16 @@
+---
+alwaysApply: true
+description: CLI UX rules and patterns
+---
+### CLI Experience
+
+- Use `@clack/prompts` for interactive flows
+- Provide clear, helpful error messages and guidance
+- Support both interactive and non-interactive modes
+- Offer conventional CLI patterns and comprehensive `--help`
+- Keep prompts minimal and focused; fail fast with actionable messages
+
+References:
+- [`src/commands/`](mdc:src/commands)
+- [`src/cli.ts`](mdc:src/cli.ts)
+

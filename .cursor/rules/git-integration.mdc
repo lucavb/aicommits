@@ -1,0 +1,15 @@
+---
+alwaysApply: true
+description: Git integration via simple-git and workflow expectations
+---
+### Git Integration
+
+- Use `simple-git` for all Git operations
+- Handle Git errors gracefully with clear messaging
+- Respect repository settings including `.gitignore`
+- Support diverse workflows (e.g., staging, hooks)
+
+References:
+- [`git.service.ts`](mdc:src/services/git.service.ts)
+- [`prepare-commit-msg.ts`](mdc:src/commands/prepare-commit-msg.ts)
+

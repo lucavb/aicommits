@@ -1,0 +1,16 @@
+---
+globs: **/*.spec.ts
+description: Testing standards using Vitest
+---
+### Testing Guidelines
+
+- **Framework**: Use Vitest
+- **Commands**: `npm test`, `npm run test:watch`, `npm run test:coverage`
+- **Placement**: Co-locate test files near source (e.g., `*.spec.ts`) or in `__tests__` directories
+- **Coverage**: Maintain high coverage for new features
+- **Type safety**: Do not compromise types in tests; avoid `any`; use proper fakes/mocks
+
+Helpful references:
+- [`vitest.config.ts`](mdc:vitest.config.ts)
+- [`setup-vitest.ts`](mdc:setup-vitest.ts)
+

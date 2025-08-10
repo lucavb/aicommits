@@ -1,36 +1,27 @@
 ---
-description: 
-globs: package.json
-alwaysApply: false
+alwaysApply: true
+description: npm package management rules for adding, removing, and updating dependencies
 ---
-# Package Management Rules
+### Package Management Rules
 
-When working with dependencies in this project:
+- **Adding packages**
+  - Runtime deps: `npm install <package-name>`
+  - Dev deps: `npm install --save-dev <package-name>`
 
-## Adding Packages
-- **ALWAYS** use `npm install <package-name>` to add runtime dependencies
-- **ALWAYS** use `npm install --save-dev <package-name>` to add development dependencies
-- **ALWAYS** let npm manage the package.json dependencies and devDependencies automatically
+- **Removing packages**
+  - `npm uninstall <package-name>`
 
-## Removing Packages
-- **ALWAYS** use `npm uninstall <package-name>` to remove packages cleanly
-- **ALWAYS** use npm commands to ensure proper dependency cleanup
+- **Updating packages**
+  - Targeted: `npm update <package-name>`
+  - All: `npm update`
+  - Security: `npm audit fix`
 
-## Updating Packages
-- Use `npm update <package-name>` for targeted package updates
-- Use `npm update` for comprehensive package updates
-- Use `npm audit fix` to resolve security vulnerabilities automatically
+- **Why**
+  - Keeps `package-lock.json` in sync
+  - Ensures consistent dependency resolution
+  - Handles peer deps and version ranges correctly
+  - Prevents version conflicts
 
-## Benefits of Proper Package Management
-- Ensures package-lock.json stays perfectly synchronized
-- Maintains consistent dependency resolution across environments
-- Provides seamless dependency management across the entire team
-- Automatically handles peer dependencies and version ranges correctly
-- Prevents version conflicts and dependency resolution issues
+Reference: [`package.json`](mdc:package.json)
 
-Always leverage npm's built-in package management to maintain consistency and ensure reliable dependency handling.
 
-- Maintains consistent dependency management across the team
-- Automatically handles peer dependencies and version ranges
-
-Always let npm handle the package.json modifications to maintain consistency and prevent errors.

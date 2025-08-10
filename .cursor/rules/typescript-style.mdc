@@ -1,0 +1,23 @@
+---
+globs: *.ts,*.tsx
+description: TypeScript style, typing, and DI rules
+---
+### TypeScript Style & Typing
+
+- **Types**
+  - Never use `any`; define precise interfaces/types or use `unknown`/`object` as appropriate
+  - Avoid excessive `as` assertions; prefer proper type narrowing and Zod validation
+  - Prefer explicit function signatures for exported/public APIs
+
+- **Environment variables**
+  - Inject env values via configuration/services rather than accessing `process.env` directly to enable testability
+
+- **Dependency Injection**
+  - Use Inversify for DI. Organize bindings in `src/utils/di.ts` and `src/utils/inversify.ts`
+  - Services should depend on interfaces, not concrete classes
+
+- **Code quality**
+  - Write self-documenting code with clear names and control flow
+  - Add comments only for non-obvious context or architectural decisions
+  - Match existing formatting; prefer multi-line clarity over complex one-liners
+

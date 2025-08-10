@@ -1,0 +1,15 @@
+---
+alwaysApply: true
+description: Configuration storage, validation, and access patterns
+---
+### Configuration
+
+- Store configuration in the user's home directory via the config service
+- Validate configuration with Zod schemas
+- Access configuration through the config service; avoid direct `process.env` access from feature code
+- Provide intuitive setup wizards for first-time users
+
+References:
+- [`config.service.ts`](mdc:src/services/config.service.ts)
+- [`src/commands/setup/`](mdc:src/commands/setup)
+
