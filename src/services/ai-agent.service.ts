@@ -21,10 +21,10 @@ export class AIAgentService {
         @Inject(GitToolsService) private readonly gitToolsService: GitToolsService,
     ) {}
 
-    async generateCommitWithAgent(): Promise<AgentResult> {
+    async generateCommitWithAgent({ onToolCall }: { onToolCall?: (msg: string) => void }): Promise<AgentResult> {
         const { locale, maxLength, type } = this.configService.getConfig();
 
-        const tools = this.createAllTools();
+        const tools = this.createAllTools(onToolCall);
 
         const systemPrompt = this.createAgentSystemPrompt();
         const userPrompt = this.createAgentUserPrompt(locale, maxLength, type ?? '');
@@ -56,17 +56,19 @@ export class AIAgentService {
     }
 
     async reviseCommitWithAgent({
-        currentMessage,
         currentBody,
+        currentMessage,
+        onToolCall,
         userRevisionPrompt,
     }: {
-        currentMessage: string;
         currentBody: string;
+        currentMessage: string;
+        onToolCall?: (msg: string) => void;
         userRevisionPrompt: string;
     }): Promise<AgentResult> {
         const { locale, maxLength, type } = this.configService.getConfig();
 
-        const tools = this.createAllTools();
+        const tools = this.createAllTools(onToolCall);
 
         const systemPrompt = this.createAgentSystemPrompt();
         const userPrompt = this.createAgentRevisionPrompt(
@@ -103,8 +105,10 @@ export class AIAgentService {
         }
     }
 
-    private createAllTools() {
-        const gitTools = this.gitToolsService.createTools();
+    private createAllTools(onToolCall?: (msg: string) => void) {
+        // Provide a no-op function if onToolCall is not provided
+        const toolCallFeedback = onToolCall ?? (() => {});
+        const gitTools = this.gitToolsService.createTools(toolCallFeedback);
 
         return {
             ...gitTools,
