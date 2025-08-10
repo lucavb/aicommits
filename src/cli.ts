@@ -5,6 +5,7 @@ import { versionCommand } from './commands/version';
 import { configCommand } from './commands/config';
 import { setupCommand } from './commands/setup';
 import { prepareCommitMsgCommand } from './commands/prepare-commit-msg';
+import { agentCommand } from './commands/agent';
 import { ignoreCommand } from './commands/ignore';
 import { container } from './utils/di';
 import { CLI_ARGUMENTS } from './services/config.service';
@@ -14,6 +15,7 @@ program.addCommand(setupCommand);
 program.addCommand(prepareCommitMsgCommand);
 program.addCommand(ignoreCommand);
 program.addCommand(versionCommand);
+program.addCommand(agentCommand);
 
 program
     .passThroughOptions(true)
@@ -29,7 +31,11 @@ program
     .addOption(new Option('--type <type>', 'Commit message format type (conventional or empty)'))
     .action(async (options) => {
         container.bind(CLI_ARGUMENTS).toConstantValue(options);
-        await aiCommits({ container, stageAll: options.stageAll, profile: options.profile });
+        await aiCommits({
+            container,
+            stageAll: options.stageAll,
+            profile: options.profile,
+        });
     });
 
 program.parse(process.argv);
