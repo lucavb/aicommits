@@ -14,7 +14,7 @@ export const configKeys = [
     'type',
 ] as const;
 
-export const providerNameSchema = z.enum(['openai', 'ollama', 'anthropic']);
+export const providerNameSchema = z.enum(['openai', 'anthropic']);
 
 export const profileConfigSchema = z.object({
     apiKey: z.string().min(1).optional(),
