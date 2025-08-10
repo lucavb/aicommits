@@ -1,19 +1,6 @@
-export interface AIProvider {
-    listModels(): Promise<string[]>;
-    generateCompletion(params: {
-        messages: { role: string; content: string }[];
-        model: string;
-        temperature?: number;
-        n?: number;
-    }): Promise<{ choices: { message: { content: string } }[] }>;
+import { type LanguageModel } from 'ai';
 
-    streamCompletion(params: {
-        messages: { role: string; content: string }[];
-        model: string;
-        onComplete: (finalContent: string) => void;
-        onMessageDelta: (content: string) => void;
-        temperature?: number;
-    }): Promise<void>;
-}
+export const AIModelSymbol = Symbol.for('AIModel');
 
-export const AIProviderSymbol = Symbol.for('AIProvider');
+// Re-export LanguageModel type for dependency injection
+export type { LanguageModel };
