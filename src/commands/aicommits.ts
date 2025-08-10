@@ -78,7 +78,6 @@ export const aiCommits = async ({
             stagingSpinner.stop('All files staged');
         }
 
-        // Handle agent mode
         if (agentMode) {
             return await handleAgentMode(aiAgentService, gitService, promptUI);
         }
@@ -107,7 +106,6 @@ export const aiCommits = async ({
         let commitBody = '';
         let messageBuffer = '';
 
-        // Use streaming API to generate and display commit message in real-time
         await aiCommitMessageService.generateStreamingCommitMessage({
             diff: staged.diff,
             onMessageUpdate: (content) => {
@@ -180,7 +178,6 @@ async function handleAgentMode(
 
     try {
         const result = await aiAgentService.generateCommitWithAgent();
-
         analyzeSpinner.stop('Repository analysis complete');
 
         // Display the generated commit message
