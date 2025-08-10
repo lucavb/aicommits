@@ -3,6 +3,7 @@ import { isString } from '../utils/typeguards';
 import { ConfigService } from './config.service';
 import { PromptService } from './prompt.service';
 import { AIProviderFactory } from './ai-provider.factory';
+import { AITextGenerationService } from './ai-text-generation.service';
 
 const sanitizeMessage = (message: string) =>
     message
@@ -18,13 +19,16 @@ export class AICommitMessageService {
         @Inject(AIProviderFactory) private readonly aiProviderFactory: AIProviderFactory,
         @Inject(ConfigService) private readonly configService: ConfigService,
         @Inject(PromptService) private readonly promptService: PromptService,
+        @Inject(AITextGenerationService) private readonly aiTextGenerationService: AITextGenerationService,
     ) {}
 
     async generateCommitMessage({ diff }: { diff: string }): Promise<{ commitMessages: string[]; bodies: string[] }> {
-        const { locale, maxLength, type, model } = this.configService.getConfig();
+        const { locale, maxLength, type } = this.configService.getConfig();
+        const model = this.aiProviderFactory.createModel();
 
-        const [commitMessageCompletion, commitBodyCompletion] = await Promise.all([
-            this.aiProviderFactory.createProvider().generateCompletion({
+        const [commitMessageResult, commitBodyResult] = await Promise.all([
+            this.aiTextGenerationService.generateText({
+                model,
                 messages: [
                     {
                         role: 'system',
@@ -36,27 +40,19 @@ export class AICommitMessageService {
                     },
                     { role: 'user', content: diff },
                 ],
-                model,
-                n: 1,
             }),
-            this.aiProviderFactory.createProvider().generateCompletion({
-                messages: [
-                    { role: 'system', content: this.promptService.generateSummaryPrompt(locale) },
-                    { role: 'user', content: diff },
-                ],
+            this.aiTextGenerationService.generateText({
                 model,
-                n: 1,
+                system: this.promptService.generateSummaryPrompt(locale),
+                messages: [{ role: 'user', content: diff }],
             }),
         ]);
 
         return {
             commitMessages: deduplicateMessages(
-                commitMessageCompletion.choices
-                    .map((choice) => choice.message.content)
-                    .filter(isString)
-                    .map((content) => sanitizeMessage(content)),
+                [commitMessageResult.text].filter(isString).map((content) => sanitizeMessage(content)),
             ),
-            bodies: commitBodyCompletion.choices.map((choice) => choice.message.content?.trim()).filter(isString),
+            bodies: [commitBodyResult.text.trim()].filter(isString),
         };
     }
 
@@ -71,7 +67,8 @@ export class AICommitMessageService {
         onBodyUpdate?: (content: string) => void;
         onComplete: (commitMessage: string, body: string) => void;
     }): Promise<void> {
-        const { locale, maxLength, type, model } = this.configService.getConfig();
+        const { locale, maxLength, type } = this.configService.getConfig();
+        const model = this.aiProviderFactory.createModel();
 
         let commitMessage = '';
         let body = '';
@@ -87,43 +84,47 @@ export class AICommitMessageService {
             };
 
             // Stream commit message
-            this.aiProviderFactory.createProvider().streamCompletion({
-                messages: [
-                    {
-                        role: 'system',
-                        content: this.promptService.getCommitMessageSystemPrompt(),
-                    },
-                    {
-                        role: 'user',
-                        content: this.promptService.generateCommitMessagePrompt(locale, maxLength, type ?? ''),
-                    },
-                    { role: 'user', content: diff },
-                ],
-                model,
-                onMessageDelta: (content) => {
-                    onMessageUpdate(content);
-                },
-                onComplete: (finalContent) => {
-                    commitMessage = sanitizeMessage(finalContent);
-                    checkComplete();
-                },
-            });
+            (async () => {
+                const { textStream } = this.aiTextGenerationService.streamText({
+                    model,
+                    messages: [
+                        {
+                            role: 'system',
+                            content: this.promptService.getCommitMessageSystemPrompt(),
+                        },
+                        {
+                            role: 'user',
+                            content: this.promptService.generateCommitMessagePrompt(locale, maxLength, type ?? ''),
+                        },
+                        { role: 'user', content: diff },
+                    ],
+                });
+
+                for await (const textPart of textStream) {
+                    commitMessage += textPart;
+                    onMessageUpdate(textPart);
+                }
+
+                commitMessage = sanitizeMessage(commitMessage);
+                checkComplete();
+            })();
 
             // Stream body
-            this.aiProviderFactory.createProvider().streamCompletion({
-                messages: [
-                    { role: 'system', content: this.promptService.generateSummaryPrompt(locale) },
-                    { role: 'user', content: diff },
-                ],
-                model,
-                onMessageDelta: (content) => {
-                    onBodyUpdate?.(content);
-                },
-                onComplete: (finalContent) => {
-                    body = finalContent.trim();
-                    checkComplete();
-                },
-            });
+            (async () => {
+                const { textStream } = this.aiTextGenerationService.streamText({
+                    messages: [{ role: 'user', content: diff }],
+                    model,
+                    system: this.promptService.generateSummaryPrompt(locale),
+                });
+
+                for await (const textPart of textStream) {
+                    body += textPart;
+                    onBodyUpdate?.(textPart);
+                }
+
+                body = body.trim();
+                checkComplete();
+            })();
         });
 
         // Wait for both streams to complete
@@ -140,10 +141,12 @@ export class AICommitMessageService {
         diff: string;
         userPrompt: string;
     }): Promise<{ commitMessages: string[]; bodies: string[] }> {
-        const { locale, maxLength, type, model } = this.configService.getConfig();
+        const { locale, maxLength, type } = this.configService.getConfig();
+        const model = this.aiProviderFactory.createModel();
 
-        const [commitMessageCompletion, commitBodyCompletion] = await Promise.all([
-            this.aiProviderFactory.createProvider().generateCompletion({
+        const [commitMessageResult, commitBodyResult] = await Promise.all([
+            this.aiTextGenerationService.generateText({
+                model,
                 messages: [
                     {
                         role: 'system',
@@ -158,33 +161,24 @@ export class AICommitMessageService {
                         content: `${diff}\n\nUser revision prompt: ${userPrompt}`,
                     },
                 ],
-                model,
-                n: 1,
             }),
-            this.aiProviderFactory.createProvider().generateCompletion({
+            this.aiTextGenerationService.generateText({
+                model,
+                system: this.promptService.generateSummaryPrompt(locale),
                 messages: [
-                    {
-                        role: 'system',
-                        content: this.promptService.generateSummaryPrompt(locale),
-                    },
                     {
                         role: 'user',
                         content: `${diff}\n\nUser revision prompt: ${userPrompt}`,
                     },
                 ],
-                model,
-                n: 1,
             }),
         ]);
 
         return {
             commitMessages: deduplicateMessages(
-                commitMessageCompletion.choices
-                    .map((choice) => choice.message.content)
-                    .filter(isString)
-                    .map((content) => sanitizeMessage(content)),
+                [commitMessageResult.text].filter(isString).map((content) => sanitizeMessage(content)),
             ),
-            bodies: commitBodyCompletion.choices.map((choice) => choice.message.content?.trim()).filter(isString),
+            bodies: [commitBodyResult.text.trim()].filter(isString),
         };
     }
 
@@ -201,7 +195,8 @@ export class AICommitMessageService {
         onBodyUpdate: (content: string) => void;
         onComplete: (commitMessage: string, body: string) => void;
     }): Promise<void> {
-        const { locale, maxLength, type, model } = this.configService.getConfig();
+        const { locale, maxLength, type } = this.configService.getConfig();
+        const model = this.aiProviderFactory.createModel();
 
         let commitMessage = '';
         let body = '';
@@ -216,52 +211,55 @@ export class AICommitMessageService {
             };
 
             // Stream commit message
-            this.aiProviderFactory.createProvider().streamCompletion({
-                messages: [
-                    {
-                        role: 'system',
-                        content: this.promptService.getCommitMessageSystemPrompt(),
-                    },
-                    {
-                        role: 'user',
-                        content: this.promptService.generateCommitMessagePrompt(locale, maxLength, type ?? ''),
-                    },
-                    {
-                        role: 'user',
-                        content: `${diff}\n\nUser revision prompt: ${userPrompt}`,
-                    },
-                ],
-                model,
-                onMessageDelta: (content) => {
-                    onMessageUpdate(content);
-                },
-                onComplete: (finalContent) => {
-                    commitMessage = sanitizeMessage(finalContent);
-                    checkComplete();
-                },
-            });
+            (async () => {
+                const { textStream } = this.aiTextGenerationService.streamText({
+                    model,
+                    messages: [
+                        {
+                            role: 'system',
+                            content: this.promptService.getCommitMessageSystemPrompt(),
+                        },
+                        {
+                            role: 'user',
+                            content: this.promptService.generateCommitMessagePrompt(locale, maxLength, type ?? ''),
+                        },
+                        {
+                            role: 'user',
+                            content: `${diff}\n\nUser revision prompt: ${userPrompt}`,
+                        },
+                    ],
+                });
+
+                for await (const textPart of textStream) {
+                    commitMessage += textPart;
+                    onMessageUpdate(textPart);
+                }
+
+                commitMessage = sanitizeMessage(commitMessage);
+                checkComplete();
+            })();
 
             // Stream body
-            this.aiProviderFactory.createProvider().streamCompletion({
-                messages: [
-                    {
-                        role: 'system',
-                        content: this.promptService.generateSummaryPrompt(locale),
-                    },
-                    {
-                        role: 'user',
-                        content: `${diff}\n\nUser revision prompt: ${userPrompt}`,
-                    },
-                ],
-                model,
-                onMessageDelta: (content) => {
-                    onBodyUpdate(content);
-                },
-                onComplete: (finalContent) => {
-                    body = finalContent.trim();
-                    checkComplete();
-                },
-            });
+            (async () => {
+                const { textStream } = this.aiTextGenerationService.streamText({
+                    model,
+                    system: this.promptService.generateSummaryPrompt(locale),
+                    messages: [
+                        {
+                            role: 'user',
+                            content: `${diff}\n\nUser revision prompt: ${userPrompt}`,
+                        },
+                    ],
+                });
+
+                for await (const textPart of textStream) {
+                    body += textPart;
+                    onBodyUpdate(textPart);
+                }
+
+                body = body.trim();
+                checkComplete();
+            })();
         });
 
         // Wait for both streams to complete

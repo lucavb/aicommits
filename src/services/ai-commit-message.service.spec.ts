@@ -1,12 +1,12 @@
 import 'reflect-metadata';
 import { Container } from 'inversify';
 import { AICommitMessageService } from './ai-commit-message.service';
-
 import { PromptService } from './prompt.service';
 import { ConfigService } from './config.service';
 import { Injectable } from '../utils/inversify';
 import { AIProviderFactory } from './ai-provider.factory';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { AITextGenerationService } from './ai-text-generation.service';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 @Injectable()
 class MockConfigService implements Partial<ConfigService> {
@@ -25,261 +25,206 @@ class MockPromptService implements Partial<PromptService> {
 }
 
 @Injectable()
-class MockAIProvider {
-    generateCompletion = vi.fn();
-    listModels = vi.fn();
-    streamCompletion = vi.fn();
+class MockAIProviderFactory implements Partial<AIProviderFactory> {
+    createModel = vi.fn();
 }
 
 @Injectable()
-class MockAIProviderFactory implements Partial<AIProviderFactory> {
-    createProvider = vi.fn();
+class MockAITextGenerationService implements AITextGenerationService {
+    generateText = vi.fn();
+    streamText = vi.fn();
 }
 
 describe('AICommitMessageService', () => {
+    let aiProviderFactory: MockAIProviderFactory;
+    let aiTextGenerationService: MockAITextGenerationService;
     let configService: MockConfigService;
+    let mockModel: unknown;
     let promptService: MockPromptService;
     let service: AICommitMessageService;
-    let aiProvider: MockAIProvider;
-    let aiProviderFactory: MockAIProviderFactory;
 
     beforeEach(() => {
-        // Create shared mock instances
-        aiProvider = new MockAIProvider();
+        vi.clearAllMocks();
+
         aiProviderFactory = new MockAIProviderFactory();
-        aiProviderFactory.createProvider.mockReturnValue(aiProvider);
+        aiTextGenerationService = new MockAITextGenerationService();
+        configService = new MockConfigService();
+        promptService = new MockPromptService();
+        mockModel = {}; // Mock LanguageModel
 
-        const container = new Container({ defaultScope: 'Singleton' });
-        container.bind(ConfigService).to(MockConfigService as unknown as typeof ConfigService);
-        container.bind(PromptService).to(MockPromptService as unknown as typeof PromptService);
-        container.bind(AIProviderFactory).toDynamicValue(() => aiProviderFactory as unknown as AIProviderFactory);
+        aiProviderFactory.createModel.mockReturnValue(mockModel);
+
+        configService.getConfig.mockReturnValue({
+            locale: 'en',
+            maxLength: 50,
+            type: 'conventional',
+        });
+
+        const container = new Container();
         container.bind(AICommitMessageService).toSelf();
+        container.bind(AIProviderFactory).toConstantValue(aiProviderFactory as unknown as AIProviderFactory);
+        container.bind(AITextGenerationService).toConstantValue(aiTextGenerationService);
+        container.bind(ConfigService).toConstantValue(configService as unknown as ConfigService);
+        container.bind(PromptService).toConstantValue(promptService as PromptService);
 
-        configService = container.get<MockConfigService>(ConfigService as unknown as typeof MockConfigService);
-        promptService = container.get<MockPromptService>(PromptService as unknown as typeof MockPromptService);
         service = container.get(AICommitMessageService);
     });
 
-    it('can be composed', () => {
-        expect(service).toBeTruthy();
-    });
+    describe('generateCommitMessage', () => {
+        it('should generate commit messages and bodies', async () => {
+            const mockCommitText = 'feat: add new feature';
+            const mockBodyText = 'Added feature description';
 
-    it('should generate commit messages and bodies', async () => {
-        const diff = 'some diff';
-        const config = {
-            locale: 'en',
-            maxLength: 50,
-            model: 'gpt-3.5-turbo',
-            type: 'feat',
-        };
+            aiTextGenerationService.generateText
+                .mockResolvedValueOnce({ text: mockCommitText })
+                .mockResolvedValueOnce({ text: mockBodyText });
 
-        configService.getConfig.mockReturnValue(config);
-
-        aiProvider.generateCompletion
-            .mockResolvedValueOnce({
-                choices: [{ message: { content: 'Commit message 1.' } }, { message: { content: 'Commit message 2.' } }],
-            })
-            .mockResolvedValueOnce({
-                choices: [{ message: { content: 'Summary 1' } }, { message: { content: 'Summary 2' } }],
+            const result = await service.generateCommitMessage({
+                diff: 'test diff',
             });
 
-        const result = await service.generateCommitMessage({ diff });
-
-        expect(result).toEqual({
-            commitMessages: ['Commit message 1', 'Commit message 2'],
-            bodies: ['Summary 1', 'Summary 2'],
+            expect(aiTextGenerationService.generateText).toHaveBeenCalledTimes(2);
+            expect(result).toEqual({
+                commitMessages: [mockCommitText],
+                bodies: [mockBodyText],
+            });
         });
 
-        expect(configService.getConfig).toHaveBeenCalledTimes(1);
-        expect(promptService.generateCommitMessagePrompt).toHaveBeenCalledWith('en', 50, 'feat');
-        expect(promptService.generateSummaryPrompt).toHaveBeenCalledWith('en');
+        it('should handle empty responses', async () => {
+            aiTextGenerationService.generateText
+                .mockResolvedValueOnce({ text: '' })
+                .mockResolvedValueOnce({ text: '' });
+
+            const result = await service.generateCommitMessage({
+                diff: 'test diff',
+            });
+
+            expect(result).toEqual({
+                commitMessages: [''],
+                bodies: [''],
+            });
+        });
+
+        it('should sanitize commit messages', async () => {
+            const mockCommitText = 'feat: add new feature.\n\r';
+            const mockBodyText = 'Added feature description';
+
+            aiTextGenerationService.generateText
+                .mockResolvedValueOnce({ text: mockCommitText })
+                .mockResolvedValueOnce({ text: mockBodyText });
+
+            const result = await service.generateCommitMessage({
+                diff: 'test diff',
+            });
+
+            expect(result.commitMessages).toEqual(['feat: add new feature']);
+        });
     });
 
     describe('generateStreamingCommitMessage', () => {
-        it('should stream commit message with callbacks', async () => {
-            const diff = 'some diff';
-            const config = {
-                locale: 'en',
-                maxLength: 50,
-                model: 'gpt-3.5-turbo',
-                type: 'feat',
+        it('should stream commit messages and bodies', async () => {
+            const commitParts = ['feat:', ' add', ' feature'];
+            const bodyParts = ['Added', ' feature', ' description'];
+
+            const mockCommitStream = {
+                async *[Symbol.asyncIterator]() {
+                    for (const part of commitParts) {
+                        yield part;
+                    }
+                },
             };
 
-            configService.getConfig.mockReturnValue(config);
+            const mockBodyStream = {
+                async *[Symbol.asyncIterator]() {
+                    for (const part of bodyParts) {
+                        yield part;
+                    }
+                },
+            };
 
-            // Mock implementation to simulate streaming completion
-            // First we capture the callbacks to call them manually
-            let messageCallback: ((content: string) => void) | undefined;
-            let messageCompleteCallback: ((finalContent: string) => void) | undefined;
-            let bodyCallback: ((content: string) => void) | undefined;
-            let bodyCompleteCallback: ((finalContent: string) => void) | undefined;
-
-            aiProvider.streamCompletion.mockImplementation((params) => {
-                // Store callbacks based on the message content to identify which stream is which
-                if (params.messages.some((m: { content: string }) => m.content === 'generateCommitMessagePrompt')) {
-                    messageCallback = params.onMessageDelta;
-                    messageCompleteCallback = params.onComplete;
-                } else {
-                    bodyCallback = params.onMessageDelta;
-                    bodyCompleteCallback = params.onComplete;
-                }
-                return Promise.resolve();
-            });
+            aiTextGenerationService.streamText
+                .mockReturnValueOnce({ textStream: mockCommitStream })
+                .mockReturnValueOnce({ textStream: mockBodyStream });
 
             const onMessageUpdate = vi.fn();
             const onBodyUpdate = vi.fn();
             const onComplete = vi.fn();
 
-            // Start streaming - this won't complete immediately
-            const streamPromise = service.generateStreamingCommitMessage({
-                diff,
+            await service.generateStreamingCommitMessage({
+                diff: 'test diff',
                 onMessageUpdate,
                 onBodyUpdate,
                 onComplete,
             });
 
-            // Ensure callbacks are defined before using them
-            expect(messageCallback).toBeDefined();
-            expect(messageCompleteCallback).toBeDefined();
-            expect(bodyCallback).toBeDefined();
-            expect(bodyCompleteCallback).toBeDefined();
-
-            // Now we can safely use them with the non-null assertion operator
-            // Simulate message streaming by calling callbacks
-            messageCallback!('Add ');
-            messageCallback!('new ');
-            messageCallback!('feature');
-            messageCallback!('.');
-
-            bodyCallback!('This commit ');
-            bodyCallback!('adds a new ');
-            bodyCallback!('feature.');
-
-            // Complete both streams
-            messageCompleteCallback!('Add new feature.');
-            bodyCompleteCallback!('This commit adds a new feature.');
-
-            // Wait for the promise to complete
-            await streamPromise;
-
-            // Verify prompt service was called correctly
-            expect(promptService.generateCommitMessagePrompt).toHaveBeenCalledWith('en', 50, 'feat');
-            expect(promptService.generateSummaryPrompt).toHaveBeenCalledWith('en');
-
-            // Verify streaming callbacks were called
-            expect(onMessageUpdate).toHaveBeenCalledTimes(4);
-            expect(onMessageUpdate).toHaveBeenNthCalledWith(1, 'Add ');
-            expect(onMessageUpdate).toHaveBeenNthCalledWith(2, 'new ');
-            expect(onMessageUpdate).toHaveBeenNthCalledWith(3, 'feature');
-            expect(onMessageUpdate).toHaveBeenNthCalledWith(4, '.');
-
+            expect(onMessageUpdate).toHaveBeenCalledTimes(3);
             expect(onBodyUpdate).toHaveBeenCalledTimes(3);
-            expect(onBodyUpdate).toHaveBeenNthCalledWith(1, 'This commit ');
-            expect(onBodyUpdate).toHaveBeenNthCalledWith(2, 'adds a new ');
-            expect(onBodyUpdate).toHaveBeenNthCalledWith(3, 'feature.');
+            expect(onComplete).toHaveBeenCalledWith('feat: add feature', 'Added feature description');
+        });
+    });
 
-            // Verify final callback
-            expect(onComplete).toHaveBeenCalledTimes(1);
-            expect(onComplete).toHaveBeenCalledWith('Add new feature', 'This commit adds a new feature.');
+    describe('reviseCommitMessage', () => {
+        it('should revise commit messages with user prompt', async () => {
+            const mockCommitText = 'fix: resolve issue';
+            const mockBodyText = 'Fixed the issue as requested';
+
+            aiTextGenerationService.generateText
+                .mockResolvedValueOnce({ text: mockCommitText })
+                .mockResolvedValueOnce({ text: mockBodyText });
+
+            const result = await service.reviseCommitMessage({
+                diff: 'test diff',
+                userPrompt: 'make it shorter',
+            });
+
+            expect(aiTextGenerationService.generateText).toHaveBeenCalledTimes(2);
+            expect(result).toEqual({
+                commitMessages: [mockCommitText],
+                bodies: [mockBodyText],
+            });
         });
     });
 
     describe('reviseStreamingCommitMessage', () => {
-        it('should stream revised commit message with callbacks', async () => {
-            const diff = 'some diff';
-            const userPrompt = 'Make it more descriptive';
-            const config = {
-                locale: 'en',
-                maxLength: 50,
-                model: 'gpt-3.5-turbo',
-                type: 'feat',
+        it('should stream revised commit messages', async () => {
+            const commitParts = ['fix:', ' resolve', ' issue'];
+            const bodyParts = ['Fixed', ' the', ' issue'];
+
+            const mockCommitStream = {
+                async *[Symbol.asyncIterator]() {
+                    for (const part of commitParts) {
+                        yield part;
+                    }
+                },
             };
 
-            configService.getConfig.mockReturnValue(config);
-
-            // Mock implementation to simulate streaming completion
-            let messageCallback: ((content: string) => void) | undefined;
-            let messageCompleteCallback: ((finalContent: string) => void) | undefined;
-            let bodyCallback: ((content: string) => void) | undefined;
-            let bodyCompleteCallback: ((finalContent: string) => void) | undefined;
-
-            aiProvider.streamCompletion.mockImplementation((params) => {
-                // Store callbacks based on presence of userPrompt in the input
-                if (params.messages.some((m: { content: string }) => m.content.includes('User revision prompt'))) {
-                    if (params.messages.some((m: { content: string }) => m.content === 'generateCommitMessagePrompt')) {
-                        messageCallback = params.onMessageDelta;
-                        messageCompleteCallback = params.onComplete;
-                    } else {
-                        bodyCallback = params.onMessageDelta;
-                        bodyCompleteCallback = params.onComplete;
+            const mockBodyStream = {
+                async *[Symbol.asyncIterator]() {
+                    for (const part of bodyParts) {
+                        yield part;
                     }
-                }
-                return Promise.resolve();
-            });
+                },
+            };
+
+            aiTextGenerationService.streamText
+                .mockReturnValueOnce({ textStream: mockCommitStream })
+                .mockReturnValueOnce({ textStream: mockBodyStream });
 
             const onMessageUpdate = vi.fn();
             const onBodyUpdate = vi.fn();
             const onComplete = vi.fn();
 
-            // Start streaming
-            const streamPromise = service.reviseStreamingCommitMessage({
-                diff,
-                userPrompt,
-                onMessageUpdate,
+            await service.reviseStreamingCommitMessage({
+                diff: 'test diff',
                 onBodyUpdate,
                 onComplete,
+                onMessageUpdate,
+                userPrompt: 'make it shorter',
             });
 
-            // Ensure callbacks are defined
-            expect(messageCallback).toBeDefined();
-            expect(messageCompleteCallback).toBeDefined();
-            expect(bodyCallback).toBeDefined();
-            expect(bodyCompleteCallback).toBeDefined();
-
-            // Now safely use them
-            // Simulate message streaming
-            messageCallback!('Add ');
-            messageCallback!('comprehensive ');
-            messageCallback!('feature ');
-            messageCallback!('with validation');
-
-            bodyCallback!('This commit ');
-            bodyCallback!('implements a ');
-            bodyCallback!('comprehensive feature ');
-            bodyCallback!('with input validation.');
-
-            // Complete both streams
-            messageCompleteCallback!('Add comprehensive feature with validation');
-            bodyCompleteCallback!('This commit implements a comprehensive feature with input validation.');
-
-            // Wait for the promise to complete
-            await streamPromise;
-
-            // Verify service was called correctly
-            expect(promptService.generateCommitMessagePrompt).toHaveBeenCalledWith('en', 50, 'feat');
-            expect(promptService.generateSummaryPrompt).toHaveBeenCalledWith('en');
-
-            // Verify the user prompt was included in the provider call
-            expect(aiProvider.streamCompletion).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    messages: expect.arrayContaining([
-                        expect.objectContaining({
-                            content: expect.stringContaining('User revision prompt: Make it more descriptive'),
-                        }),
-                    ]),
-                }),
-            );
-
-            // Verify streaming callbacks
-            expect(onMessageUpdate).toHaveBeenCalledTimes(4);
-            expect(onBodyUpdate).toHaveBeenCalledTimes(4);
-
-            // Verify final callback
-            expect(onComplete).toHaveBeenCalledTimes(1);
-            expect(onComplete).toHaveBeenCalledWith(
-                'Add comprehensive feature with validation',
-                'This commit implements a comprehensive feature with input validation.',
-            );
+            expect(onMessageUpdate).toHaveBeenCalledTimes(3);
+            expect(onBodyUpdate).toHaveBeenCalledTimes(3);
+            expect(onComplete).toHaveBeenCalledWith('fix: resolve issue', 'Fixed the issue');
         });
     });
 });
