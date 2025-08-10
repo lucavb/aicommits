@@ -1,10 +1,108 @@
+import { red } from 'kolorist';
+import { z } from 'zod';
 import { type ProfileConfig, ProviderName } from '../../utils/config';
 import { ClackPromptService } from '../../services/clack-prompt.service';
-import { red } from 'kolorist';
-import OpenAI from 'openai';
-import { OllamaProvider } from '../../services/ollama-provider';
-import Anthropic from '@anthropic-ai/sdk';
-import { Ollama } from 'ollama';
+
+// Zod schemas for API responses
+const openAIModelSchema = z.object({
+    id: z.string(),
+    object: z.string(),
+    created: z.number().optional(),
+    owned_by: z.string().optional(),
+});
+
+const openAIModelsResponseSchema = z.object({
+    object: z.string(),
+    data: z.array(openAIModelSchema),
+});
+
+const anthropicModelSchema = z.object({
+    id: z.string(),
+    type: z.string().optional(),
+    display_name: z.string().optional(),
+    created_at: z.string().optional(),
+});
+
+const anthropicModelsResponseSchema = z.object({
+    data: z.array(anthropicModelSchema),
+    has_more: z.boolean().optional(),
+    first_id: z.string().optional(),
+    last_id: z.string().optional(),
+});
+
+/**
+ * Fetch available models from OpenAI API
+ */
+async function fetchOpenAIModels(baseUrl: string, apiKey: string): Promise<{ value: string; label: string }[]> {
+    const response = await fetch(`${baseUrl}/models`, {
+        headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch models: ${response.statusText}`);
+    }
+
+    const rawData = await response.json();
+    const parseResult = openAIModelsResponseSchema.safeParse(rawData);
+
+    if (!parseResult.success) {
+        throw new Error(`Invalid response format from OpenAI API: ${parseResult.error.message}`);
+    }
+
+    const data = parseResult.data;
+    return data.data
+        .filter((model) => {
+            const id = model.id.toLowerCase();
+            return baseUrl.trim() === 'https://api.openai.com/v1'
+                ? id.includes('gpt') &&
+                      !id.includes('dall-e') &&
+                      !id.includes('audio') &&
+                      !id.includes('tts') &&
+                      !id.includes('transcribe') &&
+                      !id.includes('search') &&
+                      !id.includes('realtime') &&
+                      !id.includes('image') &&
+                      !id.includes('preview')
+                : true;
+        })
+        .map((model) => ({
+            value: model.id,
+            label: model.id,
+        }));
+}
+
+/**
+ * Fetch available models from Anthropic API
+ */
+async function fetchAnthropicModels(baseUrl: string, apiKey: string): Promise<{ value: string; label: string }[]> {
+    const response = await fetch(`${baseUrl}/v1/models`, {
+        headers: {
+            'x-api-key': apiKey,
+            'Content-Type': 'application/json',
+            'anthropic-version': '2023-06-01',
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch models: ${response.statusText}`);
+    }
+
+    const rawData = await response.json();
+    const parseResult = anthropicModelsResponseSchema.safeParse(rawData);
+
+    if (!parseResult.success) {
+        throw new Error(`Invalid response format from Anthropic API: ${parseResult.error.message}`);
+    }
+
+    const data = parseResult.data;
+    return data.data.map((model) => ({
+        value: model.id,
+        label: model.display_name || model.id,
+    }));
+}
 
 /**
  * Get the base URL placeholder based on the provider
@@ -12,9 +110,6 @@ import { Ollama } from 'ollama';
 export function getBaseUrlPlaceholder(provider: ProviderName): string {
     if (provider === 'openai') {
         return 'https://api.openai.com/v1';
-    }
-    if (provider === 'ollama') {
-        return 'http://localhost:11434';
     }
     return 'https://api.anthropic.com';
 }
@@ -25,9 +120,6 @@ export function getBaseUrlPlaceholder(provider: ProviderName): string {
 export function getBaseUrlMessage(provider: ProviderName): string {
     if (provider === 'openai') {
         return 'Enter the OpenAI API base URL';
-    }
-    if (provider === 'ollama') {
-        return 'Enter the Ollama API base URL';
     }
     return 'Enter the Anthropic API base URL';
 }
@@ -64,171 +156,68 @@ export async function setupModel(promptUI: ClackPromptService, provider: Provide
         },
     });
 
-    if (baseUrl === null) {
+    if (baseUrl === null || typeof baseUrl !== 'string' || !baseUrl.trim()) {
         return { baseUrl: null, apiKey: undefined, model: null };
     }
 
-    if (typeof baseUrl !== 'string') {
-        throw new Error('Base URL is required');
+    // 2. Get API key (required for both OpenAI and Anthropic)
+    const apiKeyInput = await promptUI.text({
+        message: `Enter your ${provider === 'openai' ? 'OpenAI' : 'Anthropic'} API key`,
+        placeholder: 'Your API key',
+        initialValue: currentConfig?.apiKey,
+        validate: (value) => {
+            if (!value) {
+                return 'API key is required';
+            }
+            return undefined;
+        },
+    });
+
+    if (apiKeyInput === null) {
+        return { baseUrl, apiKey: undefined, model: null };
     }
 
-    // 2. Get API key (only for OpenAI and Anthropic)
-    let apiKey: string | undefined;
-    if (provider === 'ollama') {
-        // Ollama doesn't require an API key
-        apiKey = undefined;
-    } else {
-        // OpenAI and Anthropic require an API key
-        const apiKeyInput = await promptUI.text({
-            message: `Enter your ${provider === 'openai' ? 'OpenAI' : 'Anthropic'} API key`,
-            placeholder: 'Your API key',
-            initialValue: currentConfig?.apiKey,
-            validate: (value) => {
-                if (!value) {
-                    return 'API key is required';
-                }
-                return undefined;
-            },
-        });
-
-        if (apiKeyInput === null) {
-            return { baseUrl, apiKey: undefined, model: null };
-        }
-
-        if (typeof apiKeyInput !== 'string') {
-            throw new Error('API key is required');
-        }
-
-        apiKey = apiKeyInput.trim();
+    if (typeof apiKeyInput !== 'string') {
+        throw new Error('API key is required');
     }
 
-    // 3. Get model
-    let model: string;
-    if (provider === 'ollama') {
-        // For Ollama, fetch available models
-        const s = promptUI.spinner();
-        s.start('Fetching available models from Ollama...');
-        try {
-            const ollama = new Ollama({ host: baseUrl.trim() });
-            const ollamaProvider = new OllamaProvider(ollama);
-            const models = await ollamaProvider.listModels();
-            const modelChoices = models.map((name: string) => ({
-                value: name,
-                label: name,
-            }));
+    const apiKey = apiKeyInput.trim();
 
-            if (modelChoices.length === 0) {
-                s.stop(red('No models found. Please pull a model first using `ollama pull <model>`'));
-                return { baseUrl, apiKey, model: null };
-            }
+    // 3. Get model by fetching from API
+    const s = promptUI.spinner();
+    s.start(`Fetching available models from ${provider === 'openai' ? 'OpenAI' : 'Anthropic'}...`);
 
-            s.stop('Models fetched.');
-
-            const selectedModel = await promptUI.select({
-                message: 'Select the Ollama model to use',
-                options: modelChoices,
-                initialValue:
-                    currentConfig?.model && modelChoices.some((c) => c.value === currentConfig?.model)
-                        ? currentConfig.model
-                        : modelChoices[0].value,
-            });
-
-            if (typeof selectedModel !== 'string') {
-                return { baseUrl, apiKey, model: null };
-            }
-
-            model = selectedModel;
-        } catch {
-            s.stop(red('Failed to fetch models. Please make sure Ollama is running and accessible.'));
-            return { baseUrl, apiKey, model: null };
+    let modelChoices: { value: string; label: string }[];
+    try {
+        if (provider === 'openai') {
+            modelChoices = await fetchOpenAIModels(baseUrl.trim(), apiKey);
+        } else {
+            modelChoices = await fetchAnthropicModels(baseUrl.trim(), apiKey);
         }
-    } else if (provider === 'anthropic') {
-        // For Anthropic, use static model list
-        const anthropic = new Anthropic({ baseURL: baseUrl.trim(), apiKey });
-        const s = promptUI.spinner();
-        s.start('Fetching available models from Anthropic...');
 
-        try {
-            const modelsResponse = await anthropic.models.list();
-            const modelChoices = modelsResponse.data.map((m) => ({
-                value: m.id,
-                label: m.id,
-            }));
-
-            s.stop('Models fetched.');
-
-            const selectedModel = await promptUI.select({
-                message: 'Select the Anthropic model to use',
-                options: modelChoices,
-                initialValue:
-                    currentConfig?.model && modelChoices.some((c) => c.value === currentConfig?.model)
-                        ? currentConfig.model
-                        : modelChoices[0].value,
-            });
-
-            if (typeof selectedModel !== 'string') {
-                return { baseUrl, apiKey, model: null };
-            }
-
-            model = selectedModel;
-        } catch {
-            s.stop(red('Failed to fetch models. Please check your base URL and API key.'));
-            return { baseUrl, apiKey, model: null };
+        if (modelChoices.length === 0) {
+            s.stop(red(`No ${provider === 'openai' ? 'GPT' : 'Claude'} models found for your credentials.`));
+            return { baseUrl: baseUrl.trim(), apiKey, model: null };
         }
-    } else {
-        // OpenAI: fetch available models
-        const s = promptUI.spinner();
-        s.start('Fetching available models from OpenAI...');
 
-        try {
-            const openai = new OpenAI({ baseURL: baseUrl.trim(), apiKey });
-            const modelsResponse = await openai.models.list();
-            const modelChoices = modelsResponse.data
-                .filter((m) => {
-                    const id = m.id.toLowerCase();
-                    return baseUrl.trim() === 'https://api.openai.com/v1'
-                        ? id.includes('gpt') &&
-                              !id.includes('dall-e') &&
-                              !id.includes('audio') &&
-                              !id.includes('tts') &&
-                              !id.includes('transcribe') &&
-                              !id.includes('search') &&
-                              !id.includes('realtime') &&
-                              !id.includes('image') &&
-                              !id.includes('preview')
-                        : true;
-                })
-                .map((m) => ({
-                    value: m.id,
-                    label: m.id,
-                }));
-
-            if (modelChoices.length === 0) {
-                s.stop(red('No GPT models found for your credentials.'));
-                return { baseUrl, apiKey, model: null };
-            }
-
-            s.stop('Models fetched.');
-
-            const selectedModel = await promptUI.select({
-                message: 'Select the OpenAI model to use',
-                options: modelChoices,
-                initialValue:
-                    currentConfig?.model && modelChoices.some((c) => c.value === currentConfig?.model)
-                        ? currentConfig.model
-                        : modelChoices[0].value,
-            });
-
-            if (typeof selectedModel !== 'string') {
-                return { baseUrl, apiKey, model: null };
-            }
-
-            model = selectedModel;
-        } catch {
-            s.stop(red('Failed to fetch models. Please check your base URL and API key.'));
-            return { baseUrl, apiKey, model: null };
-        }
+        s.stop('Models fetched.');
+    } catch {
+        s.stop(red('Failed to fetch models. Please check your base URL and API key.'));
+        return { baseUrl: baseUrl.trim(), apiKey, model: null };
     }
 
-    return { baseUrl: baseUrl.trim(), apiKey, model };
+    const selectedModel = await promptUI.select({
+        message: `Select the ${provider === 'openai' ? 'OpenAI' : 'Anthropic'} model to use`,
+        options: modelChoices,
+        initialValue:
+            currentConfig?.model && modelChoices.some((c) => c.value === currentConfig?.model)
+                ? currentConfig.model
+                : modelChoices[0].value,
+    });
+
+    if (typeof selectedModel !== 'string') {
+        return { baseUrl: baseUrl.trim(), apiKey, model: null };
+    }
+
+    return { baseUrl: baseUrl.trim(), apiKey, model: selectedModel };
 }

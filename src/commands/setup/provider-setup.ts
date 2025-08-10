@@ -12,7 +12,6 @@ export async function setupProvider(
         message: 'Select your AI provider',
         options: [
             { value: 'openai', label: 'OpenAI (compatible)' },
-            { value: 'ollama', label: 'Ollama' },
             { value: 'anthropic', label: 'Anthropic' },
         ],
         initialValue: currentConfig?.provider ?? 'openai',
@@ -22,9 +21,14 @@ export async function setupProvider(
         return null;
     }
 
-    if (typeof provider !== 'string' || !['openai', 'ollama', 'anthropic'].includes(provider)) {
-        throw new Error('Invalid provider');
+    if (typeof provider !== 'string') {
+        throw new Error(`Invalid provider type: ${typeof provider}`);
     }
 
-    return provider as ProviderName;
+    const trimmedProvider = provider.trim();
+    if (!['openai', 'anthropic'].includes(trimmedProvider)) {
+        throw new Error(`Invalid provider value: "${provider}"`);
+    }
+
+    return trimmedProvider as ProviderName;
 }

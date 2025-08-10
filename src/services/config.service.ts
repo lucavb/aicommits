@@ -62,7 +62,55 @@ export class ConfigService {
             };
         }
 
+        // Check for Ollama configs and show helpful migration message
+        this.checkForOllamaConfigs(parsed);
+
         return configSchema.parse(parsed);
+    }
+
+    private checkForOllamaConfigs(parsed: unknown): void {
+        if (typeof parsed !== 'object' || parsed === null) {
+            return;
+        }
+
+        const config = parsed as Record<string, unknown>;
+
+        // Check single profile config (legacy format)
+        if (config.provider === 'ollama') {
+            this.showOllamaMigrationWarning();
+            return;
+        }
+
+        // Check multi-profile config
+        if (config.profiles && typeof config.profiles === 'object') {
+            const profiles = config.profiles as Record<string, unknown>;
+
+            for (const [profileName, profile] of Object.entries(profiles)) {
+                if (typeof profile === 'object' && profile !== null) {
+                    const profileObj = profile as Record<string, unknown>;
+                    if (profileObj.provider === 'ollama') {
+                        this.showOllamaMigrationWarning(profileName);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    private showOllamaMigrationWarning(profileName?: string): void {
+        const profileInfo = profileName ? ` in profile "${profileName}"` : '';
+
+        console.warn(`\n⚠️  Ollama configuration detected${profileInfo}!`);
+        console.warn('\nDirect Ollama support has been temporarily removed in favor of Vercel AI SDK v5.');
+        console.warn('\nTo continue using Ollama:');
+        console.warn('1. Start Ollama with: OLLAMA_ORIGINS="*" ollama serve');
+        console.warn(`2. Run: aicommits setup${profileName ? ` --profile ${profileName}` : ''}`);
+        console.warn('3. Choose "OpenAI (compatible)" as provider');
+        console.warn('4. Set base URL: http://localhost:11434/v1');
+        console.warn('5. Use any API key (Ollama ignores it)');
+        console.warn('6. Select your local model name\n');
+
+        throw new Error(`Ollama configuration found${profileInfo}. Please run setup to reconfigure.`);
     }
 
     private getDefaultConfig(): ConfigState {
@@ -96,7 +144,24 @@ export class ConfigService {
 
     getProfile(profileName: string): ProfileConfig | undefined {
         const profile = this.inMemoryConfig.profiles?.[profileName];
-        return profile ? profileConfigSchema.parse(profile) : undefined;
+        if (!profile) {
+            return undefined;
+        }
+
+        const parseResult = profileConfigSchema.safeParse(profile);
+        if (parseResult.success) {
+            return parseResult.data;
+        }
+
+        // Check if this is an Ollama config and show migration guidance
+        if (typeof profile === 'object' && profile !== null) {
+            const profileObj = profile as Record<string, unknown>;
+            if (profileObj.provider === 'ollama') {
+                this.showOllamaMigrationWarning(profileName);
+            }
+        }
+
+        return undefined;
     }
 
     async flush(): Promise<void> {

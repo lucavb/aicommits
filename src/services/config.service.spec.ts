@@ -22,13 +22,13 @@ describe('ConfigService', () => {
     let configService: ConfigService;
     let mockFsApi: MockFsApi;
     let tempFilePath: string;
-    const mockCliArguments: Partial<ProfileConfig> & { profile?: string } = { baseUrl: 'https://api.ollama.local/v1' };
+    const mockCliArguments: Partial<ProfileConfig> & { profile?: string } = { baseUrl: 'https://api.openai.com/v1' };
     const mockConfig: Partial<Config> = {
         profiles: {
             default: {
-                model: 'llama3',
-                baseUrl: 'https://api.ollama.local/v1',
-                provider: 'ollama',
+                model: 'gpt-4',
+                baseUrl: 'https://api.openai.com/v1',
+                provider: 'openai',
                 stageAll: false,
                 contextLines: 10,
                 locale: 'en',
@@ -78,9 +78,9 @@ describe('ConfigService', () => {
             const savedConfig: Partial<Config> = {
                 profiles: {
                     default: {
-                        model: 'llama3',
-                        baseUrl: 'https://api.ollama.local/v1',
-                        provider: 'ollama',
+                        model: 'gpt-4',
+                        baseUrl: 'https://api.openai.com/v1',
+                        provider: 'openai',
                         stageAll: false,
                         contextLines: 10,
                         locale: 'en',
@@ -102,9 +102,10 @@ describe('ConfigService', () => {
             const savedConfig = {
                 profiles: {
                     default: {
-                        model: 'llama3',
-                        baseUrl: 'https://api.ollama.local/v1',
-                        provider: 'ollama',
+                        model: 'gpt-4',
+                        baseUrl: 'https://api.openai.com/v1',
+                        provider: 'openai',
+                        apiKey: 'test-api-key',
                         stageAll: false,
                         contextLines: 10,
                         locale: 'en',
@@ -123,8 +124,8 @@ describe('ConfigService', () => {
                 profiles: {
                     default: {
                         model: '',
-                        baseUrl: 'https://api.ollama.local/v1',
-                        provider: 'ollama',
+                        baseUrl: 'https://api.openai.com/v1',
+                        provider: 'openai',
                         stageAll: false,
                         contextLines: 10,
                         locale: 'en',
