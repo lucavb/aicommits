@@ -1,5 +1,4 @@
 import { inject as Inject, injectable as Injectable } from 'inversify';
-import { isString } from '../utils/typeguards';
 import { ConfigService } from './config.service';
 import { PromptService } from './prompt.service';
 import { AIProviderFactory } from './ai-provider.factory';
@@ -11,8 +10,6 @@ const sanitizeMessage = (message: string) =>
         .replace(/[\n\r]/g, '')
         .replace(/(\w)\.$/, '$1');
 
-const deduplicateMessages = (array: string[]) => Array.from(new Set(array));
-
 @Injectable()
 export class AICommitMessageService {
     constructor(
@@ -22,7 +19,7 @@ export class AICommitMessageService {
         @Inject(AITextGenerationService) private readonly aiTextGenerationService: AITextGenerationService,
     ) {}
 
-    async generateCommitMessage({ diff }: { diff: string }): Promise<{ commitMessages: string[]; bodies: string[] }> {
+    async generateCommitMessage({ diff }: { diff: string }): Promise<{ commitMessage: string; body: string }> {
         const { locale, maxLength, type } = this.configService.getConfig();
         const model = this.aiProviderFactory.createModel();
 
@@ -49,10 +46,8 @@ export class AICommitMessageService {
         ]);
 
         return {
-            commitMessages: deduplicateMessages(
-                [commitMessageResult.text].filter(isString).map((content) => sanitizeMessage(content)),
-            ),
-            bodies: [commitBodyResult.text.trim()].filter(isString),
+            commitMessage: sanitizeMessage(commitMessageResult.text),
+            body: commitBodyResult.text.trim(),
         };
     }
 
@@ -132,54 +127,6 @@ export class AICommitMessageService {
 
         // Call the completion callback with final results
         onComplete(commitMessage, body);
-    }
-
-    async reviseCommitMessage({
-        diff,
-        userPrompt,
-    }: {
-        diff: string;
-        userPrompt: string;
-    }): Promise<{ commitMessages: string[]; bodies: string[] }> {
-        const { locale, maxLength, type } = this.configService.getConfig();
-        const model = this.aiProviderFactory.createModel();
-
-        const [commitMessageResult, commitBodyResult] = await Promise.all([
-            this.aiTextGenerationService.generateText({
-                model,
-                messages: [
-                    {
-                        role: 'system',
-                        content: this.promptService.getCommitMessageSystemPrompt(),
-                    },
-                    {
-                        role: 'user',
-                        content: this.promptService.generateCommitMessagePrompt(locale, maxLength, type ?? ''),
-                    },
-                    {
-                        role: 'user',
-                        content: `${diff}\n\nUser revision prompt: ${userPrompt}`,
-                    },
-                ],
-            }),
-            this.aiTextGenerationService.generateText({
-                model,
-                system: this.promptService.generateSummaryPrompt(locale),
-                messages: [
-                    {
-                        role: 'user',
-                        content: `${diff}\n\nUser revision prompt: ${userPrompt}`,
-                    },
-                ],
-            }),
-        ]);
-
-        return {
-            commitMessages: deduplicateMessages(
-                [commitMessageResult.text].filter(isString).map((content) => sanitizeMessage(content)),
-            ),
-            bodies: [commitBodyResult.text.trim()].filter(isString),
-        };
     }
 
     async reviseStreamingCommitMessage({

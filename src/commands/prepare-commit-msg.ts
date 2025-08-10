@@ -17,13 +17,10 @@ export const prepareCommitMsgCommand = new Command('prepare-commit-msg')
             return;
         }
 
-        const {
-            commitMessages: [firstCommitMessage],
-            bodies: [firstBody],
-        } = await aiCommitMessageService.generateCommitMessage({ diff: staged.diff });
+        const { commitMessage, body } = await aiCommitMessageService.generateCommitMessage({ diff: staged.diff });
 
-        if (firstCommitMessage && firstBody) {
-            const fullMessage = `${firstCommitMessage}\n\n${firstBody}`.trim();
+        if (commitMessage && body) {
+            const fullMessage = `${commitMessage}\n\n${body}`.trim();
             console.log(fullMessage);
         }
     });
