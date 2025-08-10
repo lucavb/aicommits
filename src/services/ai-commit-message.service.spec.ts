@@ -94,8 +94,8 @@ describe('AICommitMessageService', () => {
 
             expect(aiTextGenerationService.generateText).toHaveBeenCalledTimes(2);
             expect(result).toEqual({
-                commitMessages: [mockCommitText],
-                bodies: [mockBodyText],
+                commitMessage: mockCommitText,
+                body: mockBodyText,
             });
         });
 
@@ -109,8 +109,8 @@ describe('AICommitMessageService', () => {
             });
 
             expect(result).toEqual({
-                commitMessages: [''],
-                bodies: [''],
+                commitMessage: '',
+                body: '',
             });
         });
 
@@ -126,7 +126,7 @@ describe('AICommitMessageService', () => {
                 diff: 'test diff',
             });
 
-            expect(result.commitMessages).toEqual(['feat: add new feature']);
+            expect(result.commitMessage).toEqual('feat: add new feature');
         });
     });
 
@@ -169,28 +169,6 @@ describe('AICommitMessageService', () => {
             expect(onMessageUpdate).toHaveBeenCalledTimes(3);
             expect(onBodyUpdate).toHaveBeenCalledTimes(3);
             expect(onComplete).toHaveBeenCalledWith('feat: add feature', 'Added feature description');
-        });
-    });
-
-    describe('reviseCommitMessage', () => {
-        it('should revise commit messages with user prompt', async () => {
-            const mockCommitText = 'fix: resolve issue';
-            const mockBodyText = 'Fixed the issue as requested';
-
-            aiTextGenerationService.generateText
-                .mockResolvedValueOnce({ text: mockCommitText })
-                .mockResolvedValueOnce({ text: mockBodyText });
-
-            const result = await service.reviseCommitMessage({
-                diff: 'test diff',
-                userPrompt: 'make it shorter',
-            });
-
-            expect(aiTextGenerationService.generateText).toHaveBeenCalledTimes(2);
-            expect(result).toEqual({
-                commitMessages: [mockCommitText],
-                bodies: [mockBodyText],
-            });
         });
     });
 
