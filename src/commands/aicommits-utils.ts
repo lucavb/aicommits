@@ -42,6 +42,94 @@ const openInEditor = (
     }
 };
 
+interface RevisionConfig {
+    reviseLabel: string;
+    promptMessage: string;
+    promptPlaceholder: string;
+    revise: (
+        userPrompt: string,
+        currentMessage: string,
+        currentBody: string,
+    ) => Promise<{ message: string; body: string }>;
+}
+
+const reviewAndRevise = async (
+    promptUI: ClackPromptService,
+    message: string,
+    body: string,
+    config: RevisionConfig,
+): Promise<{ accepted: boolean; message?: string; body?: string }> => {
+    let currentMessage = message;
+    let currentBody = body;
+
+    for (let i = 0; i < 10; i++) {
+        const confirmed = await promptUI.select({
+            message: `Proposed commit message:\n\n${cyan(
+                currentMessage,
+            )}\n\n${cyan(currentBody)}\n\nWhat would you like to do?`,
+            options: [
+                { label: 'Accept and commit', value: 'accept' },
+                { label: config.reviseLabel, value: 'revise' },
+                { label: 'Edit in $EDITOR', value: 'edit' },
+                { label: 'Cancel', value: 'cancel' },
+            ],
+        });
+
+        if (confirmed === 'accept') {
+            return { accepted: true, message: currentMessage, body: currentBody };
+        } else if (confirmed === 'cancel' || promptUI.isCancel(confirmed)) {
+            promptUI.outro('Commit cancelled');
+            return { accepted: false };
+        } else if (confirmed === 'revise') {
+            const userPrompt = await promptUI.text({
+                message: config.promptMessage,
+                placeholder: config.promptPlaceholder,
+            });
+            if (!userPrompt || promptUI.isCancel(userPrompt)) {
+                promptUI.outro('Commit cancelled');
+                return { accepted: false };
+            }
+
+            try {
+                const result = await config.revise(userPrompt, currentMessage, currentBody);
+                currentMessage = result.message;
+                currentBody = result.body;
+            } catch (error) {
+                promptUI.outro(`Failed to revise: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                return { accepted: false };
+            }
+        } else if (confirmed === 'edit') {
+            const result = handleEditorRevision(promptUI, currentMessage, currentBody);
+            if (!result) {
+                return { accepted: false };
+            }
+            currentMessage = result.message;
+            currentBody = result.body;
+        }
+    }
+    promptUI.outro('Too many revisions requested, commit cancelled.');
+    return { accepted: false };
+};
+
+const handleEditorRevision = (
+    promptUI: ClackPromptService,
+    currentMessage: string,
+    currentBody: string,
+): { message: string; body: string } | null => {
+    const initial = `${currentMessage}\n\n${currentBody}`.trim();
+    const edited = openInEditor(initial, promptUI);
+    if (edited === null) {
+        promptUI.outro('Commit cancelled');
+        return null;
+    }
+    // Split edited message into subject and body (first line = subject, rest = body)
+    const [firstLine, ...rest] = edited.split('\n');
+    return {
+        message: firstLine.trim(),
+        body: rest.join('\n').trim(),
+    };
+};
+
 export const streamingReviewAndRevise = async ({
     aiCommitMessageService,
     promptUI,
@@ -55,44 +143,19 @@ export const streamingReviewAndRevise = async ({
     body: string;
     diff: string;
 }): Promise<{ accepted: boolean; message?: string; body?: string }> => {
-    let currentMessage = message;
-    let currentBody = body;
-
-    for (let i = 0; i < 10; i++) {
-        const confirmed = await promptUI.select({
-            message: `Proposed commit message:\n\n${cyan(
-                currentMessage,
-            )}\n\n${cyan(currentBody)}\n\nWhat would you like to do?`,
-            options: [
-                { label: 'Accept and commit', value: 'accept' },
-                { label: 'Revise with a prompt', value: 'revise' },
-                { label: 'Edit in $EDITOR', value: 'edit' },
-                { label: 'Cancel', value: 'cancel' },
-            ],
-        });
-
-        if (confirmed === 'accept') {
-            return { accepted: true, message: currentMessage, body: currentBody };
-        } else if (confirmed === 'cancel' || promptUI.isCancel(confirmed)) {
-            promptUI.outro('Commit cancelled');
-            return { accepted: false };
-        } else if (confirmed === 'revise') {
-            const userPrompt = await promptUI.text({
-                message:
-                    'Describe how you want to revise the commit message (e.g. "make it more descriptive", "use imperative mood", etc):',
-                placeholder: 'Enter revision prompt',
-            });
-            if (!userPrompt || promptUI.isCancel(userPrompt)) {
-                promptUI.outro('Commit cancelled');
-                return { accepted: false };
-            }
-
+    const config: RevisionConfig = {
+        reviseLabel: 'Revise with a prompt',
+        promptMessage:
+            'Describe how you want to revise the commit message (e.g. "make it more descriptive", "use imperative mood", etc):',
+        promptPlaceholder: 'Enter revision prompt',
+        revise: async (userPrompt: string) => {
             const reviseSpinner = promptUI.spinner();
             reviseSpinner.start('The AI is revising your commit message');
 
             let messageBuffer = '';
+            let updatedMessage = '';
+            let updatedBody = '';
 
-            // Use streaming to show revision in real-time
             await aiCommitMessageService.reviseStreamingCommitMessage({
                 diff,
                 userPrompt,
@@ -105,36 +168,27 @@ export const streamingReviewAndRevise = async ({
                 onBodyUpdate: () => {
                     // Don't show body updates in real-time
                 },
-                onComplete: (updatedMessage, updatedBody) => {
-                    currentMessage = updatedMessage;
-                    currentBody = updatedBody;
+                onComplete: (message, body) => {
+                    updatedMessage = message;
+                    updatedBody = body;
                     reviseSpinner.stop('Revision complete');
 
                     // Display the updated message and body
                     promptUI.log.step('Updated commit message:');
-                    promptUI.log.message(green(updatedMessage));
+                    promptUI.log.message(green(message));
 
-                    if (updatedBody) {
+                    if (body) {
                         promptUI.log.step('Updated commit body:');
-                        promptUI.log.message(updatedBody);
+                        promptUI.log.message(body);
                     }
                 },
             });
-        } else if (confirmed === 'edit') {
-            const initial = `${currentMessage}\n\n${currentBody}`.trim();
-            const edited = openInEditor(initial, promptUI);
-            if (edited === null) {
-                promptUI.outro('Commit cancelled');
-                return { accepted: false };
-            }
-            // Split edited message into subject and body (first line = subject, rest = body)
-            const [firstLine, ...rest] = edited.split('\n');
-            currentMessage = firstLine.trim();
-            currentBody = rest.join('\n').trim();
-        }
-    }
-    promptUI.outro('Too many revisions requested, commit cancelled.');
-    return { accepted: false };
+
+            return { message: updatedMessage, body: updatedBody };
+        },
+    };
+
+    return reviewAndRevise(promptUI, message, body, config);
 };
 
 export const agentStreamingReviewAndRevise = async ({
@@ -148,81 +202,35 @@ export const agentStreamingReviewAndRevise = async ({
     message: string;
     body: string;
 }): Promise<{ accepted: boolean; message?: string; body?: string }> => {
-    let currentMessage = message;
-    let currentBody = body;
-
-    for (let i = 0; i < 10; i++) {
-        const confirmed = await promptUI.select({
-            message: `Proposed commit message:\n\n${cyan(
-                currentMessage,
-            )}\n\n${cyan(currentBody)}\n\nWhat would you like to do?`,
-            options: [
-                { label: 'Accept and commit', value: 'accept' },
-                { label: 'Revise with AI agent', value: 'revise' },
-                { label: 'Edit in $EDITOR', value: 'edit' },
-                { label: 'Cancel', value: 'cancel' },
-            ],
-        });
-
-        if (confirmed === 'accept') {
-            return { accepted: true, message: currentMessage, body: currentBody };
-        } else if (confirmed === 'cancel' || promptUI.isCancel(confirmed)) {
-            promptUI.outro('Commit cancelled');
-            return { accepted: false };
-        } else if (confirmed === 'revise') {
-            const userPrompt = await promptUI.text({
-                message:
-                    'Describe how you want the AI agent to revise the commit message (e.g. "make it more descriptive", "use imperative mood", "check related files for context"):',
-                placeholder: 'Enter revision prompt for the AI agent',
-            });
-            if (!userPrompt || promptUI.isCancel(userPrompt)) {
-                promptUI.outro('Commit cancelled');
-                return { accepted: false };
-            }
-
+    const config: RevisionConfig = {
+        reviseLabel: 'Revise with AI agent',
+        promptMessage:
+            'Describe how you want the AI agent to revise the commit message (e.g. "make it more descriptive", "use imperative mood", "check related files for context"):',
+        promptPlaceholder: 'Enter revision prompt for the AI agent',
+        revise: async (userPrompt: string, currentMessage: string, currentBody: string) => {
             const reviseSpinner = promptUI.spinner();
             reviseSpinner.start('AI agent is revising your commit message...');
 
-            try {
-                const result = await aiAgentService.reviseCommitWithAgent({
-                    currentMessage,
-                    currentBody,
-                    userRevisionPrompt: userPrompt,
-                });
+            const result = await aiAgentService.reviseCommitWithAgent({
+                currentMessage,
+                currentBody,
+                userRevisionPrompt: userPrompt,
+            });
 
-                reviseSpinner.stop('Agent revision complete');
+            reviseSpinner.stop('Agent revision complete');
 
-                currentMessage = result.commitMessage;
-                currentBody = result.body;
+            // Display the updated message and body
+            promptUI.log.step('Agent-revised commit message:');
+            promptUI.log.message(green(result.commitMessage));
 
-                // Display the updated message and body
-                promptUI.log.step('Agent-revised commit message:');
-                promptUI.log.message(green(result.commitMessage));
-
-                if (result.body) {
-                    promptUI.log.step('Agent-revised commit body:');
-                    promptUI.log.message(result.body);
-                }
-            } catch (error) {
-                reviseSpinner.stop('Agent revision failed');
-                promptUI.outro(
-                    `Failed to revise with agent: ${error instanceof Error ? error.message : 'Unknown error'}`,
-                );
-                return { accepted: false };
+            if (result.body) {
+                promptUI.log.step('Agent-revised commit body:');
+                promptUI.log.message(result.body);
             }
-        } else if (confirmed === 'edit') {
-            const initial = `${currentMessage}\n\n${currentBody}`.trim();
-            const edited = openInEditor(initial, promptUI);
-            if (edited === null) {
-                promptUI.outro('Commit cancelled');
-                return { accepted: false };
-            }
-            // Split edited message into subject and body (first line = subject, rest = body)
-            const [firstLine, ...rest] = edited.split('\n');
-            currentMessage = firstLine.trim();
-            currentBody = rest.join('\n').trim();
-        }
-    }
-    promptUI.outro('Too many revisions requested, commit cancelled.');
-    return { accepted: false };
+
+            return { message: result.commitMessage, body: result.body };
+        },
+    };
+
+    return reviewAndRevise(promptUI, message, body, config);
 };
