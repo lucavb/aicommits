@@ -177,7 +177,11 @@ async function handleAgentMode(
     analyzeSpinner.start('AI agent is analyzing the repository...');
 
     try {
-        const result = await aiAgentService.generateCommitWithAgent();
+        const result = await aiAgentService.generateCommitWithAgent({
+            onToolCall: (message: string) => {
+                analyzeSpinner.message(`AI agent: ${message}`);
+            },
+        });
         analyzeSpinner.stop('Repository analysis complete');
 
         // Display the generated commit message
