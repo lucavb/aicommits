@@ -215,6 +215,9 @@ export const agentStreamingReviewAndRevise = async ({
                 currentMessage,
                 currentBody,
                 userRevisionPrompt: userPrompt,
+                onToolCall: (message: string) => {
+                    reviseSpinner.message(`AI agent: ${message}`);
+                },
             });
 
             reviseSpinner.stop('Agent revision complete');

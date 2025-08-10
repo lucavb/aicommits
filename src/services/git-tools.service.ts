@@ -1,15 +1,16 @@
 import { z } from 'zod';
 import { Inject, Injectable } from '../utils/inversify';
 import { GitService } from './git.service';
-import { tool } from 'ai';
 import { readdir, readFile, stat } from 'fs/promises';
 import { join } from 'path';
+
+import { tool } from 'ai';
 
 @Injectable()
 export class GitToolsService {
     constructor(@Inject(GitService) private readonly gitService: GitService) {}
 
-    createTools() {
+    createTools(onToolCall: (msg: string) => void | Promise<void>) {
         return {
             getDiff: tool({
                 description:
@@ -21,6 +22,8 @@ export class GitToolsService {
                     contextLines: z.number().optional().describe('Number of context lines to include in diff'),
                 }),
                 execute: async ({ type, contextLines }) => {
+                    onToolCall('Analyzing git diff to understand changes');
+
                     const contextLinesValue = contextLines ?? 3;
                     try {
                         if (type === 'staged') {
@@ -49,6 +52,8 @@ export class GitToolsService {
                     includeHidden: z.boolean().optional().describe('Include hidden files starting with dot'),
                 }),
                 execute: async ({ directory, includeHidden }) => {
+                    onToolCall('Exploring repository files and structure');
+
                     const directoryValue = directory ?? '.';
                     const includeHiddenValue = includeHidden ?? false;
                     try {
@@ -75,11 +80,12 @@ export class GitToolsService {
                     }
                 },
             }),
-
             getStagedFiles: tool({
                 description: 'Get list of files that are currently staged for commit.',
                 inputSchema: z.object({}),
                 execute: async () => {
+                    onToolCall('Checking which files are staged for commit');
+
                     try {
                         const staged = await this.gitService.getStagedDiff([], 0);
                         if (!staged) {
@@ -98,6 +104,8 @@ export class GitToolsService {
                     files: z.array(z.string()).describe('Array of file paths to stage'),
                 }),
                 execute: async ({ files }) => {
+                    onToolCall('Staging files for commit');
+
                     try {
                         await this.gitService.stageFiles(files);
                         return `Successfully staged ${files.length} file(s): ${files.join(', ')}`;
@@ -113,6 +121,8 @@ export class GitToolsService {
                     files: z.array(z.string()).describe('Array of file paths to unstage'),
                 }),
                 execute: async ({ files }) => {
+                    onToolCall('Unstaging files');
+
                     try {
                         await this.gitService.unstageFiles(files);
                         return `Successfully unstaged ${files.length} file(s): ${files.join(', ')}`;
@@ -129,6 +139,8 @@ export class GitToolsService {
                     maxLines: z.number().optional().describe('Maximum number of lines to return'),
                 }),
                 execute: async ({ filePath, maxLines }) => {
+                    onToolCall('Reading file contents for context');
+
                     const maxLinesValue = maxLines ?? 100;
                     try {
                         const gitRoot = await this.gitService.assertGitRepo();
@@ -155,6 +167,8 @@ export class GitToolsService {
                     count: z.number().optional().describe('Number of recent commits to retrieve'),
                 }),
                 execute: async ({ count }) => {
+                    onToolCall('Reviewing recent commit history for patterns');
+
                     const countValue = count ?? 5;
                     try {
                         return this.gitService.getCommitHistory(countValue);
@@ -168,6 +182,8 @@ export class GitToolsService {
                 description: 'Get current git status showing staged, unstaged, and untracked files.',
                 inputSchema: z.object({}),
                 execute: async () => {
+                    onToolCall('Checking git repository status');
+
                     try {
                         return this.gitService.getStatus();
                     } catch (error) {
