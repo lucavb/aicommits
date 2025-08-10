@@ -2,6 +2,8 @@
 
 **aicommits helps you write better commit messages by generating AI-powered summaries for your git diffs - and it keeps your work and private environments separate with configurable profiles.**
 
+> **🆕 Latest**: Now powered by Vercel AI SDK v5 for improved performance and better AI provider integration!
+
 [![npm version](https://img.shields.io/npm/v/@lucavb/aicommits.svg?style=flat)](https://www.npmjs.com/package/@lucavb/aicommits)
 [![Build Status](https://github.com/lucavb/aicommits/actions/workflows/test.yml/badge.svg)](https://github.com/lucavb/aicommits/actions)
 
@@ -50,9 +52,9 @@ feat: Add user authentication and update login flow
     ```
 
     This will guide you through:
-    - Selecting your AI provider (OpenAI, Ollama, or Anthropic)
+    - Selecting your AI provider (OpenAI or Anthropic)
     - Configuring the API base URL
-    - Setting up your API key (if required)
+    - Setting up your API key
     - Choosing the model to use
 
     You can also set up different profiles for different projects or environments:
@@ -61,7 +63,15 @@ feat: Add user authentication and update login flow
     aicommits setup --profile development
     ```
 
-    > Note: For OpenAI, you'll need an API key from [OpenAI's platform](https://platform.openai.com/account/api-keys). Make sure you have an account and billing set up.
+    > **Note**: For OpenAI, you'll need an API key from [OpenAI's platform](https://platform.openai.com/account/api-keys). Make sure you have an account and billing set up.
+
+    > **Ollama Users**: Direct Ollama support is temporarily unavailable in the latest version due to the migration to Vercel AI SDK v5. As a workaround, you can use Ollama's OpenAI-compatible API by:
+    >
+    > 1. Starting Ollama with: `OLLAMA_ORIGINS="*" ollama serve`
+    > 2. Setting up aicommits with provider "OpenAI" and base URL `http://localhost:11434/v1`
+    > 3. Using any API key (Ollama ignores it)
+    >
+    > Native Ollama support will be restored once it's available in AI SDK v5.
 
 ### Upgrading
 
@@ -202,8 +212,9 @@ Required
 The base URL for your AI provider's API. Default values:
 
 - OpenAI: `https://api.openai.com/v1`
-- Ollama: `http://localhost:11434`
 - Anthropic: `https://api.anthropic.com`
+
+For Ollama users, use `http://localhost:11434/v1` with the OpenAI provider (see setup notes above).
 
 #### profile
 
@@ -235,9 +246,9 @@ The locale to use for the generated commit messages. Consult the list of codes i
 
 The model to use for generating commit messages. The available models depend on your chosen provider:
 
-- OpenAI: Various GPT models (e.g., `gpt-4.1`, `gpt-4o`)
-- Ollama: Local models you have pulled (e.g., `llama4`, `mistral`)
-- Anthropic: Claude models (e.g., `claude-3-7-sonnet-20250219`)
+- OpenAI: Various GPT models (e.g., `gpt-4`, `gpt-4o`, `gpt-4o-mini`)
+- Anthropic: Claude models (e.g., `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022`)
+- Ollama: Use your local model names with the OpenAI provider setup (e.g., `llama3.2`, `mistral`)
 
 #### max-length
 
@@ -287,9 +298,38 @@ You can control some behavior via environment variables:
 
 ## How it works
 
-This CLI tool runs `git diff` to grab all your latest code changes, sends them to OpenAI's GPT-3, then returns the AI generated commit message.
+This CLI tool runs `git diff` to grab all your latest code changes, sends them to your chosen AI provider, then returns the AI generated commit message.
 
 Video coming soon where I rebuild it from scratch to show you how to easily build your own CLI tools powered by AI.
+
+## Recent Changes
+
+### 🚀 **Migration to Vercel AI SDK v5**
+
+We've completely migrated from custom AI provider implementations to the official [Vercel AI SDK v5](https://ai-sdk.dev/), bringing several improvements:
+
+**✅ Benefits:**
+
+- **Better Performance**: Direct integration with AI SDK's optimized request handling
+- **Improved Reliability**: Uses battle-tested provider implementations
+- **Future-Proof**: Automatic access to new AI SDK features and provider updates
+- **Simplified Codebase**: Removed ~400+ lines of custom provider wrapper code
+
+**⚠️ Breaking Changes:**
+
+- **Ollama**: Temporarily removed native support (use OpenAI-compatible mode as workaround)
+- **Configuration**: Users with Ollama configs will need to run `aicommits setup` to reconfigure
+
+**🔄 For Ollama Users:**
+
+1. Start Ollama: `OLLAMA_ORIGINS="*" ollama serve`
+2. Run: `aicommits setup`
+3. Choose "OpenAI (compatible)" as provider
+4. Set base URL: `http://localhost:11434/v1`
+5. Use any API key (ignored by Ollama)
+6. Select your local model name
+
+Native Ollama support will return once the AI SDK v5 adds official support.
 
 ## Maintainers
 

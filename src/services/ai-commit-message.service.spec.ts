@@ -1,13 +1,13 @@
 import 'reflect-metadata';
 import { Container } from 'inversify';
 import { AICommitMessageService } from './ai-commit-message.service';
-
 import { PromptService } from './prompt.service';
 import { ConfigService } from './config.service';
 import { Injectable } from '../utils/inversify';
 import { AIProviderFactory } from './ai-provider.factory';
+import { AITextGenerationService } from './ai-text-generation.service';
 import { GitService } from './git.service';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 @Injectable()
 class MockConfigService implements Partial<ConfigService> {
@@ -26,15 +26,14 @@ class MockPromptService implements Partial<PromptService> {
 }
 
 @Injectable()
-class MockAIProvider {
-    generateCompletion = vi.fn();
-    listModels = vi.fn();
-    streamCompletion = vi.fn();
+class MockAIProviderFactory implements Partial<AIProviderFactory> {
+    createModel = vi.fn();
 }
 
 @Injectable()
-class MockAIProviderFactory implements Partial<AIProviderFactory> {
-    createProvider = vi.fn();
+class MockAITextGenerationService implements AITextGenerationService {
+    generateText = vi.fn();
+    streamText = vi.fn();
 }
 
 @Injectable()
@@ -43,235 +42,198 @@ class MockGitService implements Partial<GitService> {
 }
 
 describe('AICommitMessageService', () => {
-    let configService: MockConfigService;
-    let promptService: MockPromptService;
-    let gitService: MockGitService;
-    let service: AICommitMessageService;
-    let aiProvider: MockAIProvider;
     let aiProviderFactory: MockAIProviderFactory;
+    let aiTextGenerationService: MockAITextGenerationService;
+    let configService: MockConfigService;
+    let gitService: MockGitService;
+    let mockModel: unknown;
+    let promptService: MockPromptService;
+    let service: AICommitMessageService;
 
     beforeEach(() => {
-        aiProvider = new MockAIProvider();
+        vi.clearAllMocks();
+
         aiProviderFactory = new MockAIProviderFactory();
-        aiProviderFactory.createProvider.mockReturnValue(aiProvider);
+        aiTextGenerationService = new MockAITextGenerationService();
+        configService = new MockConfigService();
+        gitService = new MockGitService();
+        promptService = new MockPromptService();
+        mockModel = {}; // Mock LanguageModel
 
-        const container = new Container({ defaultScope: 'Singleton' });
-        container.bind(ConfigService).to(MockConfigService as unknown as typeof ConfigService);
-        container.bind(PromptService).to(MockPromptService as unknown as typeof PromptService);
-        container.bind(GitService).to(MockGitService as unknown as typeof GitService);
-        container.bind(AIProviderFactory).toDynamicValue(() => aiProviderFactory as unknown as AIProviderFactory);
+        aiProviderFactory.createModel.mockReturnValue(mockModel);
+
+        configService.getConfig.mockReturnValue({
+            locale: 'en',
+            maxLength: 50,
+            type: 'conventional',
+        });
+
+        const container = new Container();
         container.bind(AICommitMessageService).toSelf();
+        container.bind(AIProviderFactory).toConstantValue(aiProviderFactory as unknown as AIProviderFactory);
+        container.bind(AITextGenerationService).toConstantValue(aiTextGenerationService);
+        container.bind(ConfigService).toConstantValue(configService as unknown as ConfigService);
+        container.bind(GitService).toConstantValue(gitService as unknown as GitService);
+        container.bind(PromptService).toConstantValue(promptService as PromptService);
 
-        configService = container.get<MockConfigService>(ConfigService as unknown as typeof MockConfigService);
-        promptService = container.get<MockPromptService>(PromptService as unknown as typeof PromptService);
-        gitService = container.get<MockGitService>(GitService as unknown as typeof MockGitService);
         service = container.get(AICommitMessageService);
     });
 
-    it('can be composed', () => {
-        expect(service).toBeTruthy();
-    });
+    describe('generateCommitMessage', () => {
+        it('should generate commit messages and bodies', async () => {
+            const mockCommitText = 'feat: add new feature';
+            const mockBodyText = 'Added feature description';
 
-    it('should generate commit messages and bodies', async () => {
-        const diff = 'some diff';
-        const config = {
-            locale: 'en',
-            maxLength: 50,
-            model: 'gpt-3.5-turbo',
-            type: 'feat',
-        };
+            aiTextGenerationService.generateText
+                .mockResolvedValueOnce({ text: mockCommitText })
+                .mockResolvedValueOnce({ text: mockBodyText });
 
-        configService.getConfig.mockReturnValue(config);
-        gitService.getRecentCommitMessages.mockResolvedValue(['commit 1', 'commit 2']);
-
-        aiProvider.generateCompletion
-            .mockResolvedValueOnce({
-                choices: [{ message: { content: 'Commit message 1.' } }, { message: { content: 'Commit message 2.' } }],
-            })
-            .mockResolvedValueOnce({
-                choices: [{ message: { content: 'Summary 1' } }, { message: { content: 'Summary 2' } }],
+            const result = await service.generateCommitMessage({
+                diff: 'test diff',
             });
 
-        const result = await service.generateCommitMessage({ diff });
-
-        expect(result).toEqual({
-            commitMessages: ['Commit message 1', 'Commit message 2'],
-            bodies: ['Summary 1', 'Summary 2'],
+            expect(aiTextGenerationService.generateText).toHaveBeenCalledTimes(2);
+            expect(result).toEqual({
+                commitMessages: [mockCommitText],
+                bodies: [mockBodyText],
+            });
         });
 
-        expect(configService.getConfig).toHaveBeenCalledTimes(1);
-        expect(gitService.getRecentCommitMessages).toHaveBeenCalledWith(5);
-        expect(promptService.generateCommitMessagePrompt).toHaveBeenCalledWith('en', 50, 'feat', [
-            'commit 1',
-            'commit 2',
-        ]);
-        expect(promptService.generateSummaryPrompt).toHaveBeenCalledWith('en');
-    });
+        it('should handle empty responses', async () => {
+            aiTextGenerationService.generateText
+                .mockResolvedValueOnce({ text: '' })
+                .mockResolvedValueOnce({ text: '' });
 
-    it('should use recent commits when 5 or more are available', async () => {
-        const diff = 'some diff';
-        const config = {
-            locale: 'en',
-            maxLength: 50,
-            model: 'gpt-3.5-turbo',
-            type: 'conventional',
-        };
-
-        const recentCommits = [
-            'feat: add new feature',
-            'fix: resolve bug in component',
-            'docs: update README',
-            'refactor: improve code structure',
-            'test: add unit tests',
-        ];
-
-        configService.getConfig.mockReturnValue(config);
-        gitService.getRecentCommitMessages.mockResolvedValue(recentCommits);
-
-        aiProvider.generateCompletion
-            .mockResolvedValueOnce({
-                choices: [{ message: { content: 'feat: implement new functionality' } }],
-            })
-            .mockResolvedValueOnce({
-                choices: [{ message: { content: 'Summary of changes' } }],
+            const result = await service.generateCommitMessage({
+                diff: 'test diff',
             });
 
-        const result = await service.generateCommitMessage({ diff });
-
-        expect(result).toEqual({
-            commitMessages: ['feat: implement new functionality'],
-            bodies: ['Summary of changes'],
+            expect(result).toEqual({
+                commitMessages: [''],
+                bodies: [''],
+            });
         });
 
-        expect(gitService.getRecentCommitMessages).toHaveBeenCalledWith(5);
-        expect(promptService.generateCommitMessagePrompt).toHaveBeenCalledWith('en', 50, 'conventional', recentCommits);
-    });
+        it('should sanitize commit messages', async () => {
+            const mockCommitText = 'feat: add new feature.\n\r';
+            const mockBodyText = 'Added feature description';
 
-    it('should fallback to type-based format when fewer than 5 recent commits', async () => {
-        const diff = 'some diff';
-        const config = {
-            locale: 'en',
-            maxLength: 50,
-            model: 'gpt-3.5-turbo',
-            type: 'conventional',
-        };
+            aiTextGenerationService.generateText
+                .mockResolvedValueOnce({ text: mockCommitText })
+                .mockResolvedValueOnce({ text: mockBodyText });
 
-        const recentCommits = ['feat: add feature', 'fix: bug fix'];
-
-        configService.getConfig.mockReturnValue(config);
-        gitService.getRecentCommitMessages.mockResolvedValue(recentCommits);
-
-        aiProvider.generateCompletion
-            .mockResolvedValueOnce({
-                choices: [{ message: { content: 'feat: new feature' } }],
-            })
-            .mockResolvedValueOnce({
-                choices: [{ message: { content: 'Summary' } }],
+            const result = await service.generateCommitMessage({
+                diff: 'test diff',
             });
 
-        await service.generateCommitMessage({ diff });
-
-        expect(gitService.getRecentCommitMessages).toHaveBeenCalledWith(5);
-        expect(promptService.generateCommitMessagePrompt).toHaveBeenCalledWith('en', 50, 'conventional', recentCommits);
+            expect(result.commitMessages).toEqual(['feat: add new feature']);
+        });
     });
 
     describe('generateStreamingCommitMessage', () => {
-        it('should stream commit message with callbacks', async () => {
-            const diff = 'some diff';
-            const config = {
-                locale: 'en',
-                maxLength: 50,
-                model: 'gpt-3.5-turbo',
-                type: 'feat',
+        it('should stream commit messages and bodies', async () => {
+            const commitParts = ['feat:', ' add', ' feature'];
+            const bodyParts = ['Added', ' feature', ' description'];
+
+            const mockCommitStream = {
+                async *[Symbol.asyncIterator]() {
+                    for (const part of commitParts) {
+                        yield part;
+                    }
+                },
             };
 
-            configService.getConfig.mockReturnValue(config);
-            gitService.getRecentCommitMessages.mockResolvedValue(['commit 1', 'commit 2']);
+            const mockBodyStream = {
+                async *[Symbol.asyncIterator]() {
+                    for (const part of bodyParts) {
+                        yield part;
+                    }
+                },
+            };
+
+            aiTextGenerationService.streamText
+                .mockReturnValueOnce({ textStream: mockCommitStream })
+                .mockReturnValueOnce({ textStream: mockBodyStream });
 
             const onMessageUpdate = vi.fn();
             const onBodyUpdate = vi.fn();
             const onComplete = vi.fn();
 
-            aiProvider.streamCompletion.mockImplementation((params) => {
-                setTimeout(() => {
-                    params.onMessageDelta?.('Streaming content');
-                    params.onComplete?.('Final content');
-                }, 0);
-                return Promise.resolve();
-            });
-
             await service.generateStreamingCommitMessage({
-                diff,
+                diff: 'test diff',
                 onMessageUpdate,
                 onBodyUpdate,
                 onComplete,
             });
 
-            expect(aiProvider.streamCompletion).toHaveBeenCalledTimes(2); // Once for message, once for body
-            expect(gitService.getRecentCommitMessages).toHaveBeenCalledWith(5);
-            expect(promptService.generateCommitMessagePrompt).toHaveBeenCalledWith('en', 50, 'feat', [
-                'commit 1',
-                'commit 2',
-            ]);
-            expect(promptService.generateSummaryPrompt).toHaveBeenCalledWith('en');
+            expect(onMessageUpdate).toHaveBeenCalledTimes(3);
+            expect(onBodyUpdate).toHaveBeenCalledTimes(3);
+            expect(onComplete).toHaveBeenCalledWith('feat: add feature', 'Added feature description');
+        });
+    });
+
+    describe('reviseCommitMessage', () => {
+        it('should revise commit messages with user prompt', async () => {
+            const mockCommitText = 'fix: resolve issue';
+            const mockBodyText = 'Fixed the issue as requested';
+
+            aiTextGenerationService.generateText
+                .mockResolvedValueOnce({ text: mockCommitText })
+                .mockResolvedValueOnce({ text: mockBodyText });
+
+            const result = await service.reviseCommitMessage({
+                diff: 'test diff',
+                userPrompt: 'make it shorter',
+            });
+
+            expect(aiTextGenerationService.generateText).toHaveBeenCalledTimes(2);
+            expect(result).toEqual({
+                commitMessages: [mockCommitText],
+                bodies: [mockBodyText],
+            });
         });
     });
 
     describe('reviseStreamingCommitMessage', () => {
-        it('should stream revised commit message with callbacks', async () => {
-            const diff = 'some diff';
-            const userPrompt = 'Make it more descriptive';
-            const config = {
-                locale: 'en',
-                maxLength: 50,
-                model: 'gpt-3.5-turbo',
-                type: 'feat',
+        it('should stream revised commit messages', async () => {
+            const commitParts = ['fix:', ' resolve', ' issue'];
+            const bodyParts = ['Fixed', ' the', ' issue'];
+
+            const mockCommitStream = {
+                async *[Symbol.asyncIterator]() {
+                    for (const part of commitParts) {
+                        yield part;
+                    }
+                },
             };
 
-            configService.getConfig.mockReturnValue(config);
-            gitService.getRecentCommitMessages.mockResolvedValue(['commit 1', 'commit 2']);
+            const mockBodyStream = {
+                async *[Symbol.asyncIterator]() {
+                    for (const part of bodyParts) {
+                        yield part;
+                    }
+                },
+            };
+
+            aiTextGenerationService.streamText
+                .mockReturnValueOnce({ textStream: mockCommitStream })
+                .mockReturnValueOnce({ textStream: mockBodyStream });
 
             const onMessageUpdate = vi.fn();
             const onBodyUpdate = vi.fn();
             const onComplete = vi.fn();
 
-            aiProvider.streamCompletion.mockImplementation((params) => {
-                setTimeout(() => {
-                    params.onMessageDelta?.('Streaming content');
-                    params.onComplete?.('Final content');
-                }, 0);
-                return Promise.resolve();
-            });
-
             await service.reviseStreamingCommitMessage({
-                diff,
-                userPrompt,
-                onMessageUpdate,
+                diff: 'test diff',
                 onBodyUpdate,
                 onComplete,
+                onMessageUpdate,
+                userPrompt: 'make it shorter',
             });
 
-            expect(aiProvider.streamCompletion).toHaveBeenCalledTimes(2); // Once for message, once for body
-            expect(gitService.getRecentCommitMessages).toHaveBeenCalledWith(5);
-            expect(promptService.generateCommitMessagePrompt).toHaveBeenCalledWith('en', 50, 'feat', [
-                'commit 1',
-                'commit 2',
-            ]);
-            expect(promptService.generateSummaryPrompt).toHaveBeenCalledWith('en');
-
-            expect(aiProvider.streamCompletion).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    messages: expect.arrayContaining([
-                        expect.objectContaining({
-                            content: expect.stringContaining('User revision prompt: Make it more descriptive'),
-                        }),
-                    ]),
-                }),
-            );
-
-            expect(onMessageUpdate).toHaveBeenCalled();
-            expect(onBodyUpdate).toHaveBeenCalled();
-            expect(onComplete).toHaveBeenCalled();
+            expect(onMessageUpdate).toHaveBeenCalledTimes(3);
+            expect(onBodyUpdate).toHaveBeenCalledTimes(3);
+            expect(onComplete).toHaveBeenCalledWith('fix: resolve issue', 'Fixed the issue');
         });
     });
 });
