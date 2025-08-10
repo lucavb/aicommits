@@ -1,5 +1,5 @@
 import { inject as Inject, injectable as Injectable } from 'inversify';
-import { generateText, stepCountIs, tool } from 'ai';
+import { generateText, GenerateTextResult, stepCountIs, tool, ToolSet } from 'ai';
 import { z } from 'zod';
 import { ConfigService } from './config.service';
 import { PromptService } from './prompt.service';
@@ -47,32 +47,58 @@ export class AIAgentService {
                 stopWhen: stepCountIs(25),
             });
 
-            const finishStepContent = result.steps
-                .at(-1)
-                ?.response.messages.find((x) => x.role === 'tool' && x.content[0].toolName === 'finishCommit')
-                ?.content[0];
-            if (
-                result.finishReason === 'stop' &&
-                typeof finishStepContent === 'object' &&
-                finishStepContent.type === 'tool-result' &&
-                finishStepContent.output.type === 'json' &&
-                finishStepContent.output.value &&
-                typeof finishStepContent.output.value === 'object' &&
-                'commitMessage' in finishStepContent.output.value &&
-                typeof finishStepContent.output.value.commitMessage === 'string' &&
-                typeof finishStepContent.output.value.commitBody === 'string'
-            ) {
-                return {
-                    analysis: '',
-                    body: finishStepContent.output.value.commitBody,
-                    commitMessage: finishStepContent.output.value.commitMessage,
-                };
-            }
-
-            throw new Error('Agent did not call finishCommit tool to provide the final result');
+            return this.extractCommitFromResult(result);
         } catch (error) {
             throw new Error(
                 `Agent failed to generate commit message: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+        }
+    }
+
+    async reviseCommitWithAgent({
+        currentMessage,
+        currentBody,
+        userRevisionPrompt,
+    }: {
+        currentMessage: string;
+        currentBody: string;
+        userRevisionPrompt: string;
+    }): Promise<AgentResult> {
+        const { locale, maxLength, type } = this.configService.getConfig();
+
+        const tools = this.createAllTools();
+
+        const systemPrompt = this.createAgentSystemPrompt();
+        const userPrompt = this.createAgentRevisionPrompt(
+            currentMessage,
+            currentBody,
+            userRevisionPrompt,
+            locale,
+            maxLength,
+            type ?? '',
+        );
+
+        try {
+            const result = await generateText({
+                model: this.aiProviderFactory.createModel(),
+                tools,
+                messages: [
+                    {
+                        role: 'system',
+                        content: systemPrompt,
+                    },
+                    {
+                        role: 'user',
+                        content: userPrompt,
+                    },
+                ],
+                stopWhen: stepCountIs(25),
+            });
+
+            return this.extractCommitFromResult(result);
+        } catch (error) {
+            throw new Error(
+                `Agent failed to revise commit message: ${error instanceof Error ? error.message : 'Unknown error'}`,
             );
         }
     }
@@ -142,45 +168,70 @@ export class AIAgentService {
         return basePrompt.join('\n');
     }
 
-    private parseAgentResponse(response: string): { commitMessage: string; body: string } {
-        // Look for the final commit message and body in the expected format
-        const commitMessageMatch = response.match(/COMMIT_MESSAGE:\s*(.+)/);
-        const commitBodyMatch = response.match(/COMMIT_BODY:\s*(.+)/);
+    private createAgentRevisionPrompt(
+        currentMessage: string,
+        currentBody: string,
+        userRevisionPrompt: string,
+        locale: string,
+        maxLength: number,
+        commitType: string,
+    ): string {
+        const basePrompt = [
+            'I need you to revise a commit message based on user feedback.',
+            '',
+            'CURRENT COMMIT MESSAGE:',
+            currentMessage,
+            '',
+            'CURRENT COMMIT BODY:',
+            currentBody || '(empty)',
+            '',
+            'USER REVISION REQUEST:',
+            userRevisionPrompt,
+            '',
+            "Please use your tools to re-examine the repository and generate a revised commit message that addresses the user's feedback.",
+            `Message language: ${locale}`,
+            `Commit message must be a maximum of ${maxLength} characters.`,
+            '',
+            'You can use the git tools to:',
+            '- Re-examine the staged changes',
+            '- Look at additional context in the repository',
+            '- Check commit history for patterns',
+            '- Understand the broader impact of the changes',
+            '',
+            'Then call the finishCommit tool with your revised commit message and optional body.',
+        ];
 
-        let commitMessage = commitMessageMatch?.[1]?.trim() || '';
-        let body = commitBodyMatch?.[1]?.trim() || '';
-
-        // Clean up the messages
-        commitMessage = this.sanitizeMessage(commitMessage);
-
-        // If body is empty or just says "empty", set it to empty string
-        if (body.toLowerCase() === 'empty' || body === '-' || body === 'none') {
-            body = '';
+        if (commitType) {
+            basePrompt.push(`Follow the ${commitType} commit format.`);
         }
 
-        // Fallback: if we couldn't parse the format, try to extract from the last part of the response
-        if (!commitMessage) {
-            const lines = response.split('\n').filter((line) => line.trim());
-            const lastMeaningfulLine = lines[lines.length - 1];
-            if (lastMeaningfulLine && !lastMeaningfulLine.startsWith('```')) {
-                commitMessage = this.sanitizeMessage(lastMeaningfulLine);
-            }
-        }
-
-        if (!commitMessage) {
-            throw new Error('Could not extract commit message from agent response');
-        }
-
-        return { commitMessage, body };
+        return basePrompt.join('\n');
     }
 
-    private sanitizeMessage(message: string): string {
-        return message
-            .trim()
-            .replace(/[\n\r]/g, '')
-            .replace(/(\w)\.$/, '$1')
-            .replace(/^["']|["']$/g, '') // Remove surrounding quotes
-            .replace(/^COMMIT_MESSAGE:\s*/i, '') // Remove any remaining prefix
-            .trim();
+    private extractCommitFromResult<Tools extends ToolSet, Output>(result: GenerateTextResult<Tools, Output>) {
+        const finishStepContent = result.steps
+            .at(-1)
+            ?.response.messages.find(({ role, content }) => role === 'tool' && content[0].toolName === 'finishCommit')
+            ?.content[0];
+
+        if (
+            result.finishReason === 'stop' &&
+            typeof finishStepContent === 'object' &&
+            finishStepContent.type === 'tool-result' &&
+            finishStepContent.output.type === 'json' &&
+            finishStepContent.output.value &&
+            typeof finishStepContent.output.value === 'object' &&
+            'commitMessage' in finishStepContent.output.value &&
+            typeof finishStepContent.output.value.commitMessage === 'string' &&
+            typeof finishStepContent.output.value.commitBody === 'string'
+        ) {
+            return {
+                analysis: '',
+                body: finishStepContent.output.value.commitBody,
+                commitMessage: finishStepContent.output.value.commitMessage,
+            } as const satisfies AgentResult;
+        }
+
+        throw new Error('Agent did not call finishCommit tool to provide the final result');
     }
 }
