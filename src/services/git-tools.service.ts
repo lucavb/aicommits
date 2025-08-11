@@ -191,6 +191,89 @@ export class GitToolsService {
                     }
                 },
             }),
+
+            getWorkingChangesAsHunks: tool({
+                description: 'Get working directory changes as structured hunks using parse-diff library.',
+                inputSchema: z.object({}),
+                execute: async () => {
+                    onToolCall('Analyzing working directory changes and extracting hunks with parse-diff');
+
+                    try {
+                        const hunks = await this.gitService.getWorkingChangesAsHunks();
+                        if (hunks.length === 0) {
+                            return 'No working directory changes found.';
+                        }
+
+                        const result = hunks
+                            .map(
+                                (hunk) =>
+                                    `Hunk ID: ${hunk.hunkId}\n` +
+                                    `File: ${hunk.file}\n` +
+                                    `Summary: ${hunk.summary}\n` +
+                                    `Lines: ${hunk.oldStart}-${hunk.oldStart + hunk.chunk.oldLines} → ${hunk.newStart}-${hunk.newStart + hunk.chunk.newLines}\n` +
+                                    `Changes: +${hunk.linesAdded} -${hunk.linesRemoved}\n` +
+                                    `Changes detail:\n${hunk.chunk.changes
+                                        .map((c) => {
+                                            let prefix: string;
+                                            if (c.type === 'add') {
+                                                prefix = '+';
+                                            } else if (c.type === 'del') {
+                                                prefix = '-';
+                                            } else {
+                                                prefix = ' ';
+                                            }
+                                            return `${prefix}${c.content}`;
+                                        })
+                                        .join('\n')}\n`,
+                            )
+                            .join('\n---\n');
+
+                        return `Found ${hunks.length} hunks in ${new Set(hunks.map((h) => h.file)).size} files:\n\n${result}`;
+                    } catch (error) {
+                        return `Error getting working changes as hunks: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                    }
+                },
+            }),
+
+            stageSelectedHunks: tool({
+                description:
+                    'Stage specific hunks by their IDs using git native patch application for precise commit control.',
+                inputSchema: z.object({
+                    hunkIds: z.array(z.string()).describe('Array of hunk IDs from getWorkingChangesAsHunks to stage'),
+                }),
+                execute: async ({ hunkIds }) => {
+                    onToolCall('Staging selected hunks by ID using git patch application');
+
+                    try {
+                        // First get all available hunks
+                        const allHunks = await this.gitService.getWorkingChangesAsHunks();
+
+                        // Filter to only the requested hunks
+                        const selectedHunks = allHunks.filter((hunk) => hunkIds.includes(hunk.hunkId));
+
+                        if (selectedHunks.length === 0) {
+                            return 'No matching hunks found for the provided IDs.';
+                        }
+
+                        if (selectedHunks.length !== hunkIds.length) {
+                            const missing = hunkIds.filter((id) => !selectedHunks.some((h) => h.hunkId === id));
+                            return `Warning: Could not find hunks with IDs: ${missing.join(', ')}. Found ${selectedHunks.length} of ${hunkIds.length} requested hunks.`;
+                        }
+
+                        // Stage the selected hunks
+                        await this.gitService.stageSelectedHunks(
+                            selectedHunks.map((hunk) => ({
+                                file: hunk.file,
+                                chunk: hunk.chunk,
+                            })),
+                        );
+
+                        return `Successfully staged ${selectedHunks.length} hunk(s) from ${new Set(selectedHunks.map((h) => h.file)).size} file(s)`;
+                    } catch (error) {
+                        return `Error staging hunks: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                    }
+                },
+            }),
         } as const;
     }
 }

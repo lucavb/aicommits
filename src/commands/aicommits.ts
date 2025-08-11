@@ -3,11 +3,12 @@ import { handleCliError, KnownError } from '../utils/error';
 import { isError } from '../utils/typeguards';
 import { Container } from 'inversify';
 import { AICommitMessageService } from '../services/ai-commit-message.service';
+import { AICommitSplittingService } from '../services/ai-commit-splitting.service';
 import { AIAgentService } from '../services/ai-agent.service';
 import { GitService } from '../services/git.service';
 import { ConfigService } from '../services/config.service';
 import { ClackPromptService } from '../services/clack-prompt.service';
-import { streamingReviewAndRevise, agentStreamingReviewAndRevise } from './aicommits-utils';
+import { streamingReviewAndRevise, agentStreamingReviewAndRevise, handleCommitSplitting } from './aicommits-utils';
 import { trimLines } from '../utils/string';
 
 export const aiCommits = async ({
@@ -15,23 +16,32 @@ export const aiCommits = async ({
     stageAll = false,
     profile = 'default',
     agentMode = false,
+    splitMode = false,
 }: {
     container: Container;
     stageAll?: boolean;
     profile?: string;
     agentMode?: boolean;
+    splitMode?: boolean;
 }) => {
     const configService = container.get(ConfigService);
     const gitService = container.get(GitService);
     const aiCommitMessageService = container.get(AICommitMessageService);
+    const aiCommitSplittingService = container.get(AICommitSplittingService);
+    const aiAgentService = container.get(AIAgentService);
     const promptUI = container.get(ClackPromptService);
 
     try {
         await configService.readConfig();
 
-        const aiAgentService = container.get(AIAgentService);
+        let modeText = ' aicommits ';
+        if (splitMode) {
+            modeText = ' aicommits split ';
+        } else if (agentMode) {
+            modeText = ' aicommits agent ';
+        }
 
-        promptUI.intro(bgCyan(black(agentMode ? ' aicommits agent ' : ' aicommits ')));
+        promptUI.intro(bgCyan(black(modeText)));
         const validResult = configService.validConfig();
         if (!validResult.valid) {
             promptUI.note(
@@ -76,6 +86,10 @@ export const aiCommits = async ({
             stagingSpinner.start('Staging all files');
             await gitService.stageAllFiles();
             stagingSpinner.stop('All files staged');
+        }
+
+        if (splitMode) {
+            return await handleSplitMode(aiCommitSplittingService, aiCommitMessageService, gitService, promptUI);
         }
 
         if (agentMode) {
@@ -228,4 +242,36 @@ const handleStandardMode = async (
     await gitService.commitChanges(fullMessage);
 
     promptUI.outro(`${green('✔')} Successfully committed`);
+};
+
+const handleSplitMode = async (
+    aiCommitSplittingService: AICommitSplittingService,
+    aiCommitMessageService: AICommitMessageService,
+    gitService: GitService,
+    promptUI: ClackPromptService,
+): Promise<void> => {
+    // Check if we have staged changes
+    const hasStagedChanges = await gitService.hasStagedChanges();
+    if (!hasStagedChanges) {
+        throw new KnownError(
+            trimLines(`
+                No staged changes found. Stage your changes manually, or automatically stage all changes with the \`--stage-all\` flag.
+            `),
+        );
+    }
+
+    const result = await handleCommitSplitting({
+        aiCommitSplittingService,
+        aiCommitMessageService,
+        gitService,
+        promptUI,
+    });
+
+    if (result.accepted && result.commitCount && result.commitCount > 0) {
+        promptUI.outro(
+            `${green('✔')} Successfully created ${result.commitCount} commit${result.commitCount > 1 ? 's' : ''} using AI-guided splitting`,
+        );
+    } else {
+        promptUI.outro(`${red('✖')} No commits were created`);
+    }
 };
