@@ -1,7 +1,7 @@
 import type { SimpleGit } from 'simple-git';
 import simpleGit from 'simple-git';
 import parseDiff from 'parse-diff';
-import { writeFileSync, unlinkSync } from 'fs';
+import { unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { Inject, Injectable, Optional } from '../utils/inversify';
