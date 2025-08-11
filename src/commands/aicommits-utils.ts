@@ -6,6 +6,8 @@ import { spawnSync } from 'child_process';
 import { AICommitMessageService } from '../services/ai-commit-message.service';
 import { ClackPromptService } from '../services/clack-prompt.service';
 import { AIAgentService } from '../services/ai-agent.service';
+import { AICommitSplittingService } from '../services/ai-commit-splitting.service';
+import { GitService } from '../services/git.service';
 
 const openInEditor = (
     initialContent: string,
@@ -236,4 +238,216 @@ export const agentStreamingReviewAndRevise = async ({
     };
 
     return reviewAndRevise(promptUI, message, body, config);
+};
+
+interface CommitHunk {
+    file: string;
+    hunkId: string;
+    summary: string;
+}
+
+interface CommitGroup {
+    id: string;
+    title: string;
+    description: string;
+    hunks: CommitHunk[];
+    priority: number;
+    reasoning: string;
+}
+
+interface SplittingAnalysis {
+    groups: CommitGroup[];
+    explanation: string;
+}
+
+export const handleCommitSplitting = async ({
+    aiCommitSplittingService,
+    aiCommitMessageService,
+    gitService,
+    promptUI,
+}: {
+    aiCommitSplittingService: AICommitSplittingService;
+    aiCommitMessageService: AICommitMessageService;
+    gitService: GitService;
+    promptUI: ClackPromptService;
+}): Promise<{ accepted: boolean; commitCount?: number }> => {
+    // Step 1: Analyze staged changes and get splitting suggestions
+    const analyzeSpinner = promptUI.spinner();
+    analyzeSpinner.start('AI agent is analyzing staged changes for logical groupings...');
+
+    let analysis: SplittingAnalysis;
+    try {
+        analysis = await aiCommitSplittingService.analyzeStagedChangesForSplitting({
+            onToolCall: (message: string) => {
+                analyzeSpinner.message(`AI agent: ${message}`);
+            },
+        });
+        analyzeSpinner.stop('Change analysis complete');
+    } catch (error) {
+        analyzeSpinner.stop('Analysis failed');
+        throw error;
+    }
+
+    // Step 2: Display the analysis and get user confirmation
+    promptUI.log.step('AI Analysis Result:');
+    promptUI.log.message(analysis.explanation);
+    promptUI.log.message('');
+
+    promptUI.log.step('Proposed commit groups:');
+    analysis.groups.forEach((group, index) => {
+        let priorityLabel = '🟢 Low';
+        if (group.priority === 1) {
+            priorityLabel = '🔴 High';
+        } else if (group.priority === 2) {
+            priorityLabel = '🟡 Medium';
+        }
+        promptUI.log.message(`${index + 1}. ${cyan(group.title)} (${priorityLabel})`);
+        promptUI.log.message(`   ${group.description}`);
+        promptUI.log.message(
+            `   Hunks: ${group.hunks.length} changes across ${new Set(group.hunks.map((h) => h.file)).size} files`,
+        );
+        promptUI.log.message(`   Files: ${[...new Set(group.hunks.map((h) => h.file))].join(', ')}`);
+        promptUI.log.message(`   Reasoning: ${group.reasoning}`);
+        promptUI.log.message('');
+    });
+
+    const proceedWithSplit = await promptUI.confirm({
+        message: 'Do you want to proceed with creating separate commits for these groups?',
+    });
+
+    if (promptUI.isCancel(proceedWithSplit) || !proceedWithSplit) {
+        promptUI.outro('Commit splitting cancelled');
+        return { accepted: false };
+    }
+
+    // Step 3: Process each commit group
+    let commitCount = 0;
+    const groupsToProcess = [...analysis.groups].sort((a, b) => a.priority - b.priority);
+
+    for (let i = 0; i < groupsToProcess.length; i++) {
+        const group = groupsToProcess[i];
+        const isLast = i === groupsToProcess.length - 1;
+
+        promptUI.log.step(`Processing commit group ${i + 1}/${groupsToProcess.length}: ${cyan(group.title)}`);
+
+        // Ask user if they want to commit this group
+        const commitThisGroup = await promptUI.confirm({
+            message: `Create commit for "${group.title}"?`,
+        });
+
+        if (promptUI.isCancel(commitThisGroup)) {
+            promptUI.outro('Commit splitting cancelled');
+            return { accepted: false, commitCount };
+        }
+
+        if (!commitThisGroup) {
+            promptUI.log.message('Skipping this group...');
+            continue;
+        }
+
+        try {
+            // First, reset all staged files
+            await gitService.resetAllStaged();
+
+            // Get all available hunks and find the ones for this group
+            const allHunks = await gitService.getWorkingChangesAsHunks();
+            const selectedHunks = allHunks.filter((hunk) =>
+                group.hunks.some((groupHunk) => groupHunk.hunkId === hunk.hunkId),
+            );
+
+            if (selectedHunks.length === 0) {
+                promptUI.log.message('Skipping group - no matching hunks found');
+                continue;
+            }
+
+            // Stage only the specific hunks for this group
+            const stagingSpinner = promptUI.spinner();
+            stagingSpinner.start('Staging selected hunks...');
+
+            await gitService.stageSelectedHunks(
+                selectedHunks.map((hunk) => ({
+                    file: hunk.file,
+                    chunk: hunk.chunk,
+                })),
+            );
+
+            // Get the diff for the staged hunks
+            const groupDiff = await gitService.getStagedDiff([], 3);
+            if (!groupDiff) {
+                stagingSpinner.stop('No changes found for this group');
+                promptUI.log.message('Skipping group - no staged changes found');
+                continue;
+            }
+            stagingSpinner.stop('Hunks staged successfully');
+
+            // Generate commit message for this group
+            const messageSpinner = promptUI.spinner();
+            messageSpinner.start('Generating commit message for this group...');
+
+            let commitMessage = '';
+            let commitBody = '';
+            let messageBuffer = '';
+
+            await aiCommitMessageService.generateStreamingCommitMessage({
+                diff: groupDiff.diff,
+                onMessageUpdate: (content) => {
+                    messageBuffer += content;
+                    const previewContent =
+                        messageBuffer.length > 50 ? messageBuffer.substring(0, 47) + '...' : messageBuffer;
+                    messageSpinner.message(`Generating: ${previewContent}`);
+                },
+                onBodyUpdate: () => {
+                    // Don't show body updates in real-time
+                },
+                onComplete: (message, body) => {
+                    commitMessage = message;
+                    commitBody = body;
+                },
+            });
+
+            messageSpinner.stop('Commit message generated');
+
+            // Review and commit this group
+            promptUI.log.step(`Proposed commit message for "${group.title}":`);
+            promptUI.log.message(green(commitMessage));
+            if (commitBody) {
+                promptUI.log.step('Commit body:');
+                promptUI.log.message(commitBody);
+            }
+
+            const confirmCommit = await promptUI.confirm({
+                message: `Commit these changes${isLast ? ' (final commit)' : ''}?`,
+            });
+
+            if (promptUI.isCancel(confirmCommit)) {
+                promptUI.outro('Commit splitting cancelled');
+                return { accepted: false, commitCount };
+            }
+
+            if (confirmCommit) {
+                const fullMessage = `${commitMessage}\n\n${commitBody}`.trim();
+                await gitService.commitChanges(fullMessage);
+                commitCount++;
+                promptUI.log.message(green(`✔ Committed: ${commitMessage}`));
+            } else {
+                promptUI.log.message('Skipping this commit...');
+                // Note: No need to re-stage hunks since we're working with working directory changes
+                // The next iteration will analyze the remaining working directory changes
+            }
+        } catch (error) {
+            promptUI.outro(
+                `Failed to process group "${group.title}": ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+            return { accepted: false, commitCount };
+        }
+
+        promptUI.log.message('');
+    }
+
+    if (commitCount === 0) {
+        promptUI.outro('No commits were created');
+        return { accepted: false, commitCount: 0 };
+    }
+
+    return { accepted: true, commitCount };
 };
