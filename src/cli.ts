@@ -1,11 +1,11 @@
 import 'reflect-metadata';
 import { Option, program } from '@commander-js/extra-typings';
 import { aiCommits } from './commands/aicommits';
+import { agentCommand } from './commands/agent';
 import { versionCommand } from './commands/version';
 import { configCommand } from './commands/config';
 import { setupCommand } from './commands/setup';
 import { prepareCommitMsgCommand } from './commands/prepare-commit-msg';
-import { agentCommand } from './commands/agent';
 import { container } from './utils/di';
 import { CLI_ARGUMENTS } from './services/config.service';
 
@@ -31,8 +31,8 @@ program
         container.bind(CLI_ARGUMENTS).toConstantValue(options);
         await aiCommits({
             container,
-            stageAll: options.stageAll,
             profile: options.profile,
+            stageAll: options.stageAll,
         });
     });
 

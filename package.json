@@ -47,15 +47,16 @@
         "cq:prettier:fix": "prettier -w --ignore-unknown .",
         "cq:type-check": "tsc --noEmit --pretty --incremental --skipLibCheck",
         "dev": "tsx src/cli.ts",
+        "dev:agent": "tsx src/cli.ts agent",
         "dev:setup": "tsx src/cli.ts setup",
         "dev:stage-all": "tsx src/cli.ts --stage-all",
         "prepack": "npm run build",
+        "prepare": "husky",
         "release": "semantic-release",
         "release:dry-run": "semantic-release --dry-run",
         "test": "vitest run",
         "test:coverage": "vitest run --coverage",
-        "test:watch": "vitest",
-        "prepare": "husky"
+        "test:watch": "vitest"
     },
     "dependencies": {
         "@ai-sdk/anthropic": "2.0.1",
