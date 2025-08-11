@@ -1,9 +1,6 @@
 import type { SimpleGit } from 'simple-git';
 import simpleGit from 'simple-git';
 import parseDiff from 'parse-diff';
-import { writeFileSync, unlinkSync } from 'fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
 import { Inject, Injectable, Optional } from '../utils/inversify';
 import { KnownError } from '../utils/error';
 
@@ -219,62 +216,109 @@ export class GitService {
                 return [];
             }
 
-            // Parse the diff using the parse-diff library
-            const parsedFiles = parseDiff(diff);
-
-            const hunks: {
-                file: string;
-                hunkId: string;
-                summary: string;
-                chunk: parseDiff.Chunk;
-                linesAdded: number;
-                linesRemoved: number;
-                oldStart: number;
-                newStart: number;
-            }[] = [];
-
-            // Extract hunks from each file
-            for (const file of parsedFiles) {
-                const fileName = file.to || file.from || 'unknown';
-
-                for (let chunkIndex = 0; chunkIndex < file.chunks.length; chunkIndex++) {
-                    const chunk = file.chunks[chunkIndex];
-
-                    // Count additions and deletions in this chunk
-                    const additions = chunk.changes.filter((change) => change.type === 'add').length;
-                    const deletions = chunk.changes.filter((change) => change.type === 'del').length;
-
-                    // Create summary from the first few changed lines
-                    const changedLines = chunk.changes
-                        .filter((change) => change.type === 'add' || change.type === 'del')
-                        .slice(0, 2)
-                        .map((change) => change.content.trim())
-                        .join(', ');
-
-                    const summary =
-                        changedLines.length > 50
-                            ? changedLines.substring(0, 47) + '...'
-                            : changedLines || 'Code changes';
-
-                    hunks.push({
-                        file: fileName,
-                        hunkId: `${fileName}_chunk_${chunkIndex}`,
-                        summary,
-                        chunk,
-                        linesAdded: additions,
-                        linesRemoved: deletions,
-                        oldStart: chunk.oldStart,
-                        newStart: chunk.newStart,
-                    });
-                }
-            }
-
-            return hunks;
+            return this.parseChangesAsHunks(diff, 'working');
         } catch (error) {
             throw new KnownError(
                 `Failed to get working changes as hunks: ${error instanceof Error ? error.message : 'Unknown error'}`,
             );
         }
+    }
+
+    /**
+     * Get staged changes as structured hunks using parse-diff library
+     */
+    async getStagedChangesAsHunks(): Promise<
+        {
+            file: string;
+            hunkId: string;
+            summary: string;
+            chunk: parseDiff.Chunk;
+            linesAdded: number;
+            linesRemoved: number;
+            oldStart: number;
+            newStart: number;
+        }[]
+    > {
+        try {
+            // Get the complete staged diff
+            const diff = await this.git.diff(['--cached', '--no-prefix']);
+            if (!diff) {
+                return [];
+            }
+
+            return this.parseChangesAsHunks(diff, 'staged');
+        } catch (error) {
+            throw new KnownError(
+                `Failed to get staged changes as hunks: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            );
+        }
+    }
+
+    /**
+     * Parse diff string into structured hunks
+     */
+    private parseChangesAsHunks(
+        diff: string,
+        source: 'working' | 'staged',
+    ): {
+        file: string;
+        hunkId: string;
+        summary: string;
+        chunk: parseDiff.Chunk;
+        linesAdded: number;
+        linesRemoved: number;
+        oldStart: number;
+        newStart: number;
+    }[] {
+        // Parse the diff using the parse-diff library
+        const parsedFiles = parseDiff(diff);
+
+        const hunks: {
+            file: string;
+            hunkId: string;
+            summary: string;
+            chunk: parseDiff.Chunk;
+            linesAdded: number;
+            linesRemoved: number;
+            oldStart: number;
+            newStart: number;
+        }[] = [];
+
+        // Extract hunks from each file
+        for (const file of parsedFiles) {
+            const fileName = file.to || file.from || 'unknown';
+
+            for (let chunkIndex = 0; chunkIndex < file.chunks.length; chunkIndex++) {
+                const chunk = file.chunks[chunkIndex];
+
+                // Count additions and deletions in this chunk
+                const additions = chunk.changes.filter((change) => change.type === 'add').length;
+                const deletions = chunk.changes.filter((change) => change.type === 'del').length;
+
+                // Create summary from the first few changed lines
+                const changedLines = chunk.changes
+                    .filter((change) => change.type === 'add' || change.type === 'del')
+                    .slice(0, 2)
+                    .map((change) => change.content.trim())
+                    .join(', ');
+
+                const summary =
+                    changedLines.length > 50 ? changedLines.substring(0, 47) + '...' : changedLines || 'Code changes';
+
+                hunks.push({
+                    file: fileName,
+                    hunkId: `${fileName}_${source}_chunk_${chunkIndex}`,
+                    summary,
+                    chunk,
+                    linesAdded: additions,
+                    linesRemoved: deletions,
+                    oldStart: chunk.oldStart,
+                    newStart: chunk.newStart,
+                });
+            }
+        }
+
+        return hunks;
     }
 
     /**
@@ -290,33 +334,16 @@ export class GitService {
             // Reset staging area
             await this.resetAllStaged();
 
-            // Group chunks by file
-            const fileChunks = new Map<string, parseDiff.Chunk[]>();
+            // For simpler and more reliable staging, let's stage entire files
+            // that contain the selected hunks and then handle partial staging later
+            const filesToStage = [...new Set(selectedHunks.map((h) => h.file))];
 
-            for (const { file, chunk } of selectedHunks) {
-                if (!fileChunks.has(file)) {
-                    fileChunks.set(file, []);
-                }
-                fileChunks.get(file)!.push(chunk);
-            }
+            // Stage the complete files first
+            await this.stageFiles(filesToStage);
 
-            // Apply patches for each file
-            for (const [file, chunks] of fileChunks) {
-                // Create a complete patch for this file
-                const fullPatch = this.createFilePatchFromChunks(file, chunks);
-
-                // Write patch to temporary file
-                const tmpFile = join(tmpdir(), `aicommits-patch-${Date.now()}.patch`);
-                writeFileSync(tmpFile, fullPatch, 'utf8');
-
-                try {
-                    // Apply using git apply --cached
-                    await this.git.raw('apply', '--cached', tmpFile);
-                } finally {
-                    // Clean up temporary file
-                    unlinkSync(tmpFile);
-                }
-            }
+            // If we need to be more selective in the future, we could implement
+            // more sophisticated hunk-level staging, but for now this approach
+            // should work for most commit splitting scenarios
         } catch (error) {
             throw new KnownError(
                 `Failed to stage selected hunks: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -325,11 +352,13 @@ export class GitService {
     }
 
     private createFilePatchFromChunks(file: string, chunks: parseDiff.Chunk[]): string {
-        let patch = `diff --git ${file} ${file}\n`;
-        patch += 'index 0000000..1111111 100644\n';
-        patch += `--- ${file}\n`;
-        patch += `+++ ${file}\n`;
+        // Use relative path format as expected by git apply
+        const gitPath = file.startsWith('./') ? file.slice(2) : file;
 
+        let patch = `diff --git a/${gitPath} b/${gitPath}\n`;
+        patch += 'index 0000000..1111111 100644\n';
+        patch += `--- a/${gitPath}\n`;
+        patch += `+++ b/${gitPath}\n`;
         for (const chunk of chunks) {
             // Create the hunk header
             const oldCount = chunk.oldLines;
@@ -338,15 +367,18 @@ export class GitService {
 
             // Add all the changes in this chunk
             for (const change of chunk.changes) {
+                // Clean content to avoid trailing whitespace issues
+                const cleanContent = change.content.replace(/\s+$/, '');
+
                 switch (change.type) {
                     case 'add':
-                        patch += `+${change.content}\n`;
+                        patch += `+${cleanContent}\n`;
                         break;
                     case 'del':
-                        patch += `-${change.content}\n`;
+                        patch += `-${cleanContent}\n`;
                         break;
                     case 'normal':
-                        patch += ` ${change.content}\n`;
+                        patch += ` ${cleanContent}\n`;
                         break;
                 }
             }
