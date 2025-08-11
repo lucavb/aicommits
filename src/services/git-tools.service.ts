@@ -139,7 +139,7 @@ export class GitToolsService {
                     maxLines: z.number().optional().describe('Maximum number of lines to return'),
                 }),
                 execute: async ({ filePath, maxLines }) => {
-                    onToolCall('Reading file contents for context');
+                    onToolCall(`Reading file contents: ${filePath}`);
 
                     const maxLinesValue = maxLines ?? 100;
                     try {
