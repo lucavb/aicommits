@@ -192,7 +192,10 @@ export const agentCommand = new Command('agent')
     .addOption(new Option('--model <model>', 'AI model to use for generating commit messages'))
     .addOption(new Option('--profile <profile>', 'Configuration profile to use').default('default'))
     .addOption(
-        new Option('--split', 'Enable AI-guided commit splitting mode to group related changes into separate commits'),
+        new Option(
+            '--split',
+            'Enable AI-guided commit splitting mode to group related changes into separate commits',
+        ).default(false),
     )
     .addOption(new Option('--stage-all', 'Stage all modified files before generating commit'))
     .action(async (options) => {
