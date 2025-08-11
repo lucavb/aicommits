@@ -48,6 +48,7 @@
         "cq:type-check": "tsc --noEmit --pretty --incremental --skipLibCheck",
         "dev": "tsx src/cli.ts",
         "dev:agent": "tsx src/cli.ts agent",
+        "dev:agent:split": "tsx src/cli.ts agent --split",
         "dev:setup": "tsx src/cli.ts setup",
         "dev:stage-all": "tsx src/cli.ts --stage-all",
         "install:link": "npm run build && npm link",

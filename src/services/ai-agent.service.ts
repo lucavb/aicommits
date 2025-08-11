@@ -22,12 +22,10 @@ export class AIAgentService {
     ) {}
 
     async generateCommitWithAgent({ onToolCall }: { onToolCall?: (msg: string) => void }): Promise<AgentResult> {
-        const { locale, maxLength, type } = this.configService.getConfig();
-
         const tools = this.createAllTools(onToolCall);
 
-        const systemPrompt = this.createAgentSystemPrompt();
-        const userPrompt = this.createAgentUserPrompt(locale, maxLength, type ?? '');
+        const systemPrompt = this.promptService.createAgentSystemPrompt();
+        const userPrompt = this.promptService.createAgentUserPrompt();
 
         try {
             const model = this.aiProviderFactory.createModel();
@@ -66,18 +64,13 @@ export class AIAgentService {
         onToolCall?: (msg: string) => void;
         userRevisionPrompt: string;
     }): Promise<AgentResult> {
-        const { locale, maxLength, type } = this.configService.getConfig();
-
         const tools = this.createAllTools(onToolCall);
 
-        const systemPrompt = this.createAgentSystemPrompt();
-        const userPrompt = this.createAgentRevisionPrompt(
+        const systemPrompt = this.promptService.createAgentSystemPrompt();
+        const userPrompt = this.promptService.createAgentRevisionPrompt(
             currentMessage,
             currentBody,
             userRevisionPrompt,
-            locale,
-            maxLength,
-            type ?? '',
         );
 
         try {
@@ -123,94 +116,6 @@ export class AIAgentService {
                 execute: (x) => x,
             }),
         };
-    }
-
-    private createAgentSystemPrompt(): string {
-        return [
-            'You are an AI agent that helps generate git commit messages by autonomously analyzing a git repository.',
-            'You have access to tools that allow you to:',
-            '- Check git status and see what files are staged/modified',
-            '- View diffs of changes',
-            '- List files in the repository',
-            '- Read file contents',
-            '- View recent commit history',
-            '- Stage/unstage files as needed',
-            '- Finish with a commit message when ready',
-            '',
-            'Your goal is to:',
-            '1. Analyze the current state of the repository',
-            '2. Understand what changes have been made',
-            '3. Generate a meaningful commit message and body',
-            '',
-            'IMPORTANT GUIDELINES:',
-            '- Use the tools to explore and understand the changes before generating the commit message',
-            '- Focus on the actual changes made (lines with + or - in diffs)',
-            '- Generate commit messages that follow best practices',
-            '- Use imperative mood (e.g., "Add feature", "Fix bug")',
-            '- Be specific about what was changed and why',
-            '- If no files are staged, you may suggest staging relevant files first',
-            '',
-            'CRITICAL: When you are ready to provide the final commit message, you MUST call the "finishCommit" tool with your commit message and optional body.',
-            'Do not include the commit message in your regular text response - only use the finishCommit tool for the final result.',
-        ].join('\n');
-    }
-
-    private createAgentUserPrompt(locale: string, maxLength: number, commitType: string): string {
-        const basePrompt = [
-            'Please analyze the current git repository and generate an appropriate commit message.',
-            `Message language: ${locale}`,
-            `Commit message must be a maximum of ${maxLength} characters.`,
-            '',
-            'Start by checking the current git status and examining any changes.',
-            'Use the available tools to understand what has been modified.',
-            'Then call the finishCommit tool with your final commit message and optional body.',
-        ];
-
-        if (commitType) {
-            basePrompt.push(`Follow the ${commitType} commit format.`);
-        }
-
-        return basePrompt.join('\n');
-    }
-
-    private createAgentRevisionPrompt(
-        currentMessage: string,
-        currentBody: string,
-        userRevisionPrompt: string,
-        locale: string,
-        maxLength: number,
-        commitType: string,
-    ): string {
-        const basePrompt = [
-            'I need you to revise a commit message based on user feedback.',
-            '',
-            'CURRENT COMMIT MESSAGE:',
-            currentMessage,
-            '',
-            'CURRENT COMMIT BODY:',
-            currentBody || '(empty)',
-            '',
-            'USER REVISION REQUEST:',
-            userRevisionPrompt,
-            '',
-            "Please use your tools to re-examine the repository and generate a revised commit message that addresses the user's feedback.",
-            `Message language: ${locale}`,
-            `Commit message must be a maximum of ${maxLength} characters.`,
-            '',
-            'You can use the git tools to:',
-            '- Re-examine the staged changes',
-            '- Look at additional context in the repository',
-            '- Check commit history for patterns',
-            '- Understand the broader impact of the changes',
-            '',
-            'Then call the finishCommit tool with your revised commit message and optional body.',
-        ];
-
-        if (commitType) {
-            basePrompt.push(`Follow the ${commitType} commit format.`);
-        }
-
-        return basePrompt.join('\n');
     }
 
     private extractCommitFromResult<Tools extends ToolSet, Output>(result: GenerateTextResult<Tools, Output>) {
