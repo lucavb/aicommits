@@ -81,8 +81,9 @@ export class AIAgentService {
         );
 
         try {
+            const model = this.aiProviderFactory.createModel();
             const result = await generateText({
-                model: this.aiProviderFactory.createModel(),
+                model,
                 tools,
                 messages: [
                     {

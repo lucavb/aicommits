@@ -1,5 +1,6 @@
 import { Container } from 'inversify';
 import { AICommitMessageService } from '../services/ai-commit-message.service';
+import { AICommitSplittingService } from '../services/ai-commit-splitting.service';
 import { AIAgentService } from '../services/ai-agent.service';
 import { ConfigService, FILE_SYSTEM_PROMISE_API, ENVIRONMENT_VARIABLES } from '../services/config.service';
 import { GitService } from '../services/git.service';
@@ -14,6 +15,7 @@ export const container = new Container({ defaultScope: 'Singleton' });
 
 // Bind services
 container.bind(AICommitMessageService).toSelf();
+container.bind(AICommitSplittingService).toSelf();
 container.bind(AIAgentService).toSelf();
 container.bind(ConfigService).toSelf();
 container.bind(GitService).toSelf();

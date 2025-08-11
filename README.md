@@ -133,6 +133,59 @@ This feature can be useful if your project follows the Conventional Commits stan
 
 3. Save and close the editor to commit!
 
+### AI-Guided Commit Splitting
+
+Need to split a large change into multiple focused commits? The `--split` mode uses AI to analyze your staged changes and intelligently group related modifications into separate logical commits.
+
+```sh
+git add <files...>
+aicommits --split
+```
+
+**How it works:**
+
+1. **AI Analysis**: The AI agent examines all staged changes and identifies logical groupings based on:
+    - Related functionality changes (e.g., feature + tests)
+    - Different types of changes (bug fixes vs features vs refactoring)
+    - File relationships (implementation + types/interfaces)
+    - Change dependencies
+
+2. **Interactive Review**: You'll see a detailed breakdown of proposed commit groups with:
+    - Priority levels (high, medium, low)
+    - File lists for each group
+    - Reasoning for the groupings
+    - Clear descriptions of what each commit would contain
+
+3. **Selective Committing**: For each group, you can:
+    - Accept and commit the group
+    - Skip the group
+    - Review the generated commit message before confirming
+
+**Example output:**
+
+```
+🔴 High Priority: Add user authentication system
+   Files: src/auth/, tests/auth.spec.ts
+   Reasoning: Core authentication functionality with corresponding tests
+
+🟡 Medium Priority: Update configuration files
+   Files: package.json, tsconfig.json
+   Reasoning: Project configuration updates to support new auth system
+
+🟢 Low Priority: Fix code formatting
+   Files: src/utils/helpers.ts
+   Reasoning: Style-only changes separate from functional updates
+```
+
+This mode is perfect for:
+
+- Breaking down large features into reviewable chunks
+- Separating functional changes from styling/formatting updates
+- Creating atomic commits that follow single-responsibility principle
+- Maintaining clean git history with logical commit boundaries
+
+> **Note**: Split mode requires staged changes. Use `--stage-all` to automatically stage all modified files.
+
 ## Commit Message Standards
 
 This project uses [commitlint](https://commitlint.js.org/) with [Conventional Commits](https://conventionalcommits.org/) to ensure consistent commit message formatting. The configuration is automatically enforced via Git hooks powered by [husky](https://typicode.github.io/husky/).
