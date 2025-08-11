@@ -47,18 +47,19 @@
         "cq:prettier:fix": "prettier -w --ignore-unknown .",
         "cq:type-check": "tsc --noEmit --pretty --incremental --skipLibCheck",
         "dev": "tsx src/cli.ts",
+        "dev:agent": "tsx src/cli.ts agent",
         "dev:setup": "tsx src/cli.ts setup",
         "dev:stage-all": "tsx src/cli.ts --stage-all",
+        "install:link": "npm run build && npm link",
+        "install:test": "npm run build && npm pack && npm install -g ./lucavb-aicommits-*.tgz && rm ./lucavb-aicommits-*.tgz",
         "prepack": "npm run build",
+        "prepare": "husky",
         "release": "semantic-release",
         "release:dry-run": "semantic-release --dry-run",
         "test": "vitest run",
         "test:coverage": "vitest run --coverage",
         "test:watch": "vitest",
-        "install:link": "npm run build && npm link",
-        "install:test": "npm run build && npm pack && npm install -g ./lucavb-aicommits-*.tgz && rm ./lucavb-aicommits-*.tgz",
-        "uninstall:test": "npm uninstall -g @lucavb/aicommits",
-        "prepare": "husky"
+        "uninstall:test": "npm uninstall -g @lucavb/aicommits"
     },
     "dependencies": {
         "@ai-sdk/anthropic": "2.0.1",
