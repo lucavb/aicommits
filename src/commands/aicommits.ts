@@ -82,81 +82,7 @@ export const aiCommits = async ({
             return await handleAgentMode(aiAgentService, gitService, promptUI);
         }
 
-        const detectingFiles = promptUI.spinner();
-        detectingFiles.start('Detecting staged files');
-        const staged = await gitService.getStagedDiff(config.exclude, config.contextLines);
-
-        if (!staged) {
-            detectingFiles.stop('Detecting staged files');
-            throw new KnownError(
-                trimLines(`
-                    No staged changes found. Stage your changes manually, or automatically stage all changes with the \`--stage-all\` flag.
-                `),
-            );
-        }
-
-        detectingFiles.stop(
-            `${gitService.getDetectedMessage(staged.files)}:\n${staged.files.map((file) => `     ${file}`).join('\n')}`,
-        );
-
-        const analyzeSpinner = promptUI.spinner();
-        analyzeSpinner.start('The AI is analyzing your changes');
-
-        let commitMessage = '';
-        let commitBody = '';
-        let messageBuffer = '';
-
-        await aiCommitMessageService.generateStreamingCommitMessage({
-            diff: staged.diff,
-            onMessageUpdate: (content) => {
-                // Update spinner message with the growing message content
-                messageBuffer += content;
-                const previewContent =
-                    messageBuffer.length > 50 ? messageBuffer.substring(0, 47) + '...' : messageBuffer;
-                analyzeSpinner.message(`Generating commit message: ${previewContent}`);
-            },
-            onBodyUpdate: () => {
-                // Don't show body updates in real-time
-            },
-            onComplete: (message, body) => {
-                commitMessage = message;
-                commitBody = body;
-            },
-        });
-
-        analyzeSpinner.stop('Commit message generated');
-
-        // Display the full message after generation
-        promptUI.log.step('Generated commit message:');
-        promptUI.log.message(green(commitMessage));
-
-        if (commitBody) {
-            promptUI.log.step('Commit body:');
-            promptUI.log.message(commitBody);
-        }
-
-        if (!commitMessage) {
-            throw new KnownError('No commit message was generated. Try again.');
-        }
-
-        const result = await streamingReviewAndRevise({
-            aiCommitMessageService,
-            promptUI,
-            message: commitMessage,
-            body: commitBody,
-            diff: staged.diff,
-        });
-        if (!result?.accepted) {
-            return;
-        }
-
-        const message = result.message ?? '';
-        const body = result.body ?? '';
-
-        const fullMessage = `${message}\n\n${body}`.trim();
-        await gitService.commitChanges(fullMessage);
-
-        promptUI.outro(`${green('✔')} Successfully committed`);
+        return await handleStandardMode(aiCommitMessageService, gitService, promptUI, config);
     } catch (error) {
         if (isError(error)) {
             promptUI.outro(`${red('✖')} ${error.message}`);
@@ -221,3 +147,85 @@ async function handleAgentMode(
         throw error;
     }
 }
+
+const handleStandardMode = async (
+    aiCommitMessageService: AICommitMessageService,
+    gitService: GitService,
+    promptUI: ClackPromptService,
+    config: { exclude?: string[]; contextLines?: number },
+): Promise<void> => {
+    const detectingFiles = promptUI.spinner();
+    detectingFiles.start('Detecting staged files');
+    const staged = await gitService.getStagedDiff(config.exclude, config.contextLines ?? 10);
+
+    if (!staged) {
+        detectingFiles.stop('Detecting staged files');
+        throw new KnownError(
+            trimLines(`
+                No staged changes found. Stage your changes manually, or automatically stage all changes with the \`--stage-all\` flag.
+            `),
+        );
+    }
+
+    detectingFiles.stop(
+        `${gitService.getDetectedMessage(staged.files)}:\n${staged.files.map((file) => `     ${file}`).join('\n')}`,
+    );
+
+    const analyzeSpinner = promptUI.spinner();
+    analyzeSpinner.start('The AI is analyzing your changes');
+
+    let commitMessage = '';
+    let commitBody = '';
+    let messageBuffer = '';
+
+    await aiCommitMessageService.generateStreamingCommitMessage({
+        diff: staged.diff,
+        onMessageUpdate: (content) => {
+            // Update spinner message with the growing message content
+            messageBuffer += content;
+            const previewContent = messageBuffer.length > 50 ? messageBuffer.substring(0, 47) + '...' : messageBuffer;
+            analyzeSpinner.message(`Generating commit message: ${previewContent}`);
+        },
+        onBodyUpdate: () => {
+            // Don't show body updates in real-time
+        },
+        onComplete: (message, body) => {
+            commitMessage = message;
+            commitBody = body;
+        },
+    });
+
+    analyzeSpinner.stop('Commit message generated');
+
+    // Display the full message after generation
+    promptUI.log.step('Generated commit message:');
+    promptUI.log.message(green(commitMessage));
+
+    if (commitBody) {
+        promptUI.log.step('Commit body:');
+        promptUI.log.message(commitBody);
+    }
+
+    if (!commitMessage) {
+        throw new KnownError('No commit message was generated. Try again.');
+    }
+
+    const result = await streamingReviewAndRevise({
+        aiCommitMessageService,
+        promptUI,
+        message: commitMessage,
+        body: commitBody,
+        diff: staged.diff,
+    });
+    if (!result?.accepted) {
+        return;
+    }
+
+    const message = result.message ?? '';
+    const body = result.body ?? '';
+
+    const fullMessage = `${message}\n\n${body}`.trim();
+    await gitService.commitChanges(fullMessage);
+
+    promptUI.outro(`${green('✔')} Successfully committed`);
+};
