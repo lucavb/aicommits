@@ -42,6 +42,80 @@ const commitTypes: Record<CommitType, string> = {
 
 @Injectable()
 export class PromptService {
+    createAgentSystemPrompt(): string {
+        return [
+            'You are an AI agent that helps generate git commit messages by autonomously analyzing a git repository.',
+            'You have access to tools that allow you to:',
+            '- Check git status and see what files are staged/modified',
+            '- View diffs of changes',
+            '- List files in the repository',
+            '- Read file contents',
+            '- View recent commit history',
+            '- Stage/unstage files as needed',
+            '- Finish with a commit message when ready',
+            '',
+            'Your goal is to:',
+            '1. Analyze the current state of the repository',
+            '2. Understand what changes have been made',
+            '3. Generate a meaningful commit message and body',
+            '',
+            'IMPORTANT GUIDELINES:',
+            '- Use the tools to explore and understand the changes before generating the commit message',
+            '- Focus on the actual changes made (lines with + or - in diffs)',
+            '- Generate commit messages that follow best practices',
+            '- Use imperative mood (e.g., "Add feature", "Fix bug")',
+            '- Be specific about what was changed and why',
+            '- If no files are staged, you may suggest staging relevant files first',
+            '',
+            'CRITICAL: When you are ready to provide the final commit message, you MUST call the "finishCommit" tool with your commit message and optional body.',
+            'Do not include the commit message in your regular text response - only use the finishCommit tool for the final result.',
+        ].join('\n');
+    }
+
+    createAgentUserPrompt(): string {
+        return [
+            'Please analyze the current git repository and generate an appropriate commit message.',
+            '',
+            'Start by:',
+            '1. Checking the current git status and examining any changes',
+            '2. Looking at recent commit history to understand the typical patterns:',
+            '   - Message length and format',
+            '   - Language and style',
+            '   - Commit type conventions (conventional commits, etc.)',
+            '   - Overall patterns and preferences',
+            '',
+            "Use the available tools to understand what has been modified and the repository's commit style.",
+            'Generate a commit message that matches the established patterns in this repository.',
+            'Then call the finishCommit tool with your final commit message and optional body.',
+        ].join('\n');
+    }
+
+    createAgentRevisionPrompt(currentMessage: string, currentBody: string, userRevisionPrompt: string): string {
+        return [
+            'I need you to revise a commit message based on user feedback.',
+            '',
+            'CURRENT COMMIT MESSAGE:',
+            currentMessage,
+            '',
+            'CURRENT COMMIT BODY:',
+            currentBody || '(empty)',
+            '',
+            'USER REVISION REQUEST:',
+            userRevisionPrompt,
+            '',
+            "Please use your tools to re-examine the repository and generate a revised commit message that addresses the user's feedback.",
+            '',
+            'Use the git tools to:',
+            '- Re-examine the staged changes',
+            '- Look at additional context in the repository',
+            '- Check commit history for patterns and typical style',
+            '- Understand the broader impact of the changes',
+            '',
+            'Ensure your revised message matches the established style, language, format, and conventions from the commit history.',
+            'Then call the finishCommit tool with your revised commit message and optional body.',
+        ].join('\n');
+    }
+
     getCommitMessageSystemPrompt() {
         return [
             'You are a git commit message generator.',
