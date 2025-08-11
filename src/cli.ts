@@ -9,11 +9,11 @@ import { prepareCommitMsgCommand } from './commands/prepare-commit-msg';
 import { container } from './utils/di';
 import { CLI_ARGUMENTS } from './services/config.service';
 
-program.addCommand(configCommand);
-program.addCommand(setupCommand);
-program.addCommand(prepareCommitMsgCommand);
-program.addCommand(versionCommand);
 program.addCommand(agentCommand);
+program.addCommand(configCommand);
+program.addCommand(prepareCommitMsgCommand);
+program.addCommand(setupCommand);
+program.addCommand(versionCommand);
 
 program
     .passThroughOptions(true)
