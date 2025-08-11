@@ -1,11 +1,14 @@
-import { select } from '@clack/prompts';
 import { type ProfileConfig, ProviderName } from '../../utils/config';
+import { ClackPromptService } from '../../services/clack-prompt.service';
 
 /**
  * Prompt the user to select an AI provider
  */
-export async function setupProvider(currentConfig?: ProfileConfig): Promise<ProviderName | null> {
-    const provider = await select({
+export async function setupProvider(
+    promptUI: ClackPromptService,
+    currentConfig?: ProfileConfig,
+): Promise<ProviderName | null> {
+    const provider = await promptUI.select({
         message: 'Select your AI provider',
         options: [
             { value: 'openai', label: 'OpenAI (compatible)' },

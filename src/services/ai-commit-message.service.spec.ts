@@ -5,7 +5,7 @@ import { AICommitMessageService } from './ai-commit-message.service';
 import { PromptService } from './prompt.service';
 import { ConfigService } from './config.service';
 import { Injectable } from '../utils/inversify';
-import { AIProviderSymbol } from './ai-provider.interface';
+import { AIProviderFactory } from './ai-provider.factory';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 @Injectable()
@@ -31,23 +31,33 @@ class MockAIProvider {
     streamCompletion = vi.fn();
 }
 
+@Injectable()
+class MockAIProviderFactory implements Partial<AIProviderFactory> {
+    createProvider = vi.fn();
+}
+
 describe('AICommitMessageService', () => {
     let configService: MockConfigService;
     let promptService: MockPromptService;
     let service: AICommitMessageService;
     let aiProvider: MockAIProvider;
+    let aiProviderFactory: MockAIProviderFactory;
 
     beforeEach(() => {
+        // Create shared mock instances
+        aiProvider = new MockAIProvider();
+        aiProviderFactory = new MockAIProviderFactory();
+        aiProviderFactory.createProvider.mockReturnValue(aiProvider);
+
         const container = new Container({ defaultScope: 'Singleton' });
         container.bind(ConfigService).to(MockConfigService as unknown as typeof ConfigService);
         container.bind(PromptService).to(MockPromptService as unknown as typeof PromptService);
-        container.bind(AIProviderSymbol).to(MockAIProvider);
+        container.bind(AIProviderFactory).toDynamicValue(() => aiProviderFactory as unknown as AIProviderFactory);
         container.bind(AICommitMessageService).toSelf();
 
         configService = container.get<MockConfigService>(ConfigService as unknown as typeof MockConfigService);
         promptService = container.get<MockPromptService>(PromptService as unknown as typeof MockPromptService);
         service = container.get(AICommitMessageService);
-        aiProvider = container.get(AIProviderSymbol);
     });
 
     it('can be composed', () => {

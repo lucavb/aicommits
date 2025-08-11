@@ -1,12 +1,12 @@
 import { cyan, green } from 'kolorist';
-import { isCancel, log, outro, select, spinner, text } from '@clack/prompts';
 import { readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { spawnSync } from 'child_process';
 import { AICommitMessageService } from '../services/ai-commit-message.service';
+import { ClackPromptService } from '../services/clack-prompt.service';
 
-const openInEditor = (initialContent: string): string | null => {
+const openInEditor = (initialContent: string, promptUI: ClackPromptService): string | null => {
     const editor = process.env.EDITOR || (process.platform === 'win32' ? 'notepad' : 'vi');
     const tmpFile = join(tmpdir(), `aicommits-msg-${Date.now()}.txt`);
     writeFileSync(tmpFile, initialContent, { encoding: 'utf8' });
@@ -14,7 +14,7 @@ const openInEditor = (initialContent: string): string | null => {
     const child = spawnSync(editor, [tmpFile], { stdio: 'inherit' });
 
     if (child.error) {
-        outro(`Failed to launch editor: ${child.error.message}`);
+        promptUI.outro(`Failed to launch editor: ${child.error.message}`);
         unlinkSync(tmpFile);
         return null;
     }
@@ -25,22 +25,29 @@ const openInEditor = (initialContent: string): string | null => {
         return edited;
     } catch {
         unlinkSync(tmpFile);
-        outro('Could not read edited commit message.');
+        promptUI.outro('Could not read edited commit message.');
         return null;
     }
 };
 
-export const streamingReviewAndRevise = async (
-    aiCommitMessageService: AICommitMessageService,
-    message: string,
-    body: string,
-    diff: string,
-): Promise<{ accepted: boolean; message?: string; body?: string }> => {
+export const streamingReviewAndRevise = async ({
+    aiCommitMessageService,
+    promptUI,
+    message,
+    body,
+    diff,
+}: {
+    aiCommitMessageService: AICommitMessageService;
+    promptUI: ClackPromptService;
+    message: string;
+    body: string;
+    diff: string;
+}): Promise<{ accepted: boolean; message?: string; body?: string }> => {
     let currentMessage = message;
     let currentBody = body;
 
     for (let i = 0; i < 10; i++) {
-        const confirmed = await select({
+        const confirmed = await promptUI.select({
             message: `Proposed commit message:\n\n${cyan(
                 currentMessage,
             )}\n\n${cyan(currentBody)}\n\nWhat would you like to do?`,
@@ -54,21 +61,21 @@ export const streamingReviewAndRevise = async (
 
         if (confirmed === 'accept') {
             return { accepted: true, message: currentMessage, body: currentBody };
-        } else if (confirmed === 'cancel' || isCancel(confirmed)) {
-            outro('Commit cancelled');
+        } else if (confirmed === 'cancel' || promptUI.isCancel(confirmed)) {
+            promptUI.outro('Commit cancelled');
             return { accepted: false };
         } else if (confirmed === 'revise') {
-            const userPrompt = await text({
+            const userPrompt = await promptUI.text({
                 message:
                     'Describe how you want to revise the commit message (e.g. "make it more descriptive", "use imperative mood", etc):',
                 placeholder: 'Enter revision prompt',
             });
-            if (!userPrompt || isCancel(userPrompt)) {
-                outro('Commit cancelled');
+            if (!userPrompt || promptUI.isCancel(userPrompt)) {
+                promptUI.outro('Commit cancelled');
                 return { accepted: false };
             }
 
-            const reviseSpinner = spinner();
+            const reviseSpinner = promptUI.spinner();
             reviseSpinner.start('The AI is revising your commit message');
 
             let messageBuffer = '';
@@ -92,20 +99,20 @@ export const streamingReviewAndRevise = async (
                     reviseSpinner.stop('Revision complete');
 
                     // Display the updated message and body
-                    log.step('Updated commit message:');
-                    log.message(green(updatedMessage));
+                    promptUI.log.step('Updated commit message:');
+                    promptUI.log.message(green(updatedMessage));
 
                     if (updatedBody) {
-                        log.step('Updated commit body:');
-                        log.message(updatedBody);
+                        promptUI.log.step('Updated commit body:');
+                        promptUI.log.message(updatedBody);
                     }
                 },
             });
         } else if (confirmed === 'edit') {
             const initial = `${currentMessage}\n\n${currentBody}`.trim();
-            const edited = openInEditor(initial);
+            const edited = openInEditor(initial, promptUI);
             if (edited === null) {
-                outro('Commit cancelled');
+                promptUI.outro('Commit cancelled');
                 return { accepted: false };
             }
             // Split edited message into subject and body (first line = subject, rest = body)
@@ -114,6 +121,6 @@ export const streamingReviewAndRevise = async (
             currentBody = rest.join('\n').trim();
         }
     }
-    outro('Too many revisions requested, commit cancelled.');
+    promptUI.outro('Too many revisions requested, commit cancelled.');
     return { accepted: false };
 };

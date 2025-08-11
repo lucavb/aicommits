@@ -1,5 +1,5 @@
-import { select, spinner, text } from '@clack/prompts';
 import { type ProfileConfig, ProviderName } from '../../utils/config';
+import { ClackPromptService } from '../../services/clack-prompt.service';
 import { red } from 'kolorist';
 import OpenAI from 'openai';
 import { OllamaProvider } from '../../services/ollama-provider';
@@ -45,9 +45,9 @@ export function getBaseUrlInitialValue(provider: ProviderName, currentConfig?: P
 /**
  * Setup the base URL, API key, and model
  */
-export async function setupModel(provider: ProviderName, currentConfig?: ProfileConfig) {
+export async function setupModel(promptUI: ClackPromptService, provider: ProviderName, currentConfig?: ProfileConfig) {
     // 1. Get base URL
-    const baseUrl = await text({
+    const baseUrl = await promptUI.text({
         message: getBaseUrlMessage(provider),
         placeholder: getBaseUrlPlaceholder(provider),
         initialValue: getBaseUrlInitialValue(provider, currentConfig),
@@ -79,7 +79,7 @@ export async function setupModel(provider: ProviderName, currentConfig?: Profile
         apiKey = undefined;
     } else {
         // OpenAI and Anthropic require an API key
-        const apiKeyInput = await text({
+        const apiKeyInput = await promptUI.text({
             message: `Enter your ${provider === 'openai' ? 'OpenAI' : 'Anthropic'} API key`,
             placeholder: 'Your API key',
             initialValue: currentConfig?.apiKey,
@@ -106,7 +106,7 @@ export async function setupModel(provider: ProviderName, currentConfig?: Profile
     let model: string;
     if (provider === 'ollama') {
         // For Ollama, fetch available models
-        const s = spinner();
+        const s = promptUI.spinner();
         s.start('Fetching available models from Ollama...');
         try {
             const ollama = new Ollama({ host: baseUrl.trim() });
@@ -124,7 +124,7 @@ export async function setupModel(provider: ProviderName, currentConfig?: Profile
 
             s.stop('Models fetched.');
 
-            const selectedModel = await select({
+            const selectedModel = await promptUI.select({
                 message: 'Select the Ollama model to use',
                 options: modelChoices,
                 initialValue:
@@ -145,7 +145,7 @@ export async function setupModel(provider: ProviderName, currentConfig?: Profile
     } else if (provider === 'anthropic') {
         // For Anthropic, use static model list
         const anthropic = new Anthropic({ baseURL: baseUrl.trim(), apiKey });
-        const s = spinner();
+        const s = promptUI.spinner();
         s.start('Fetching available models from Anthropic...');
 
         try {
@@ -157,7 +157,7 @@ export async function setupModel(provider: ProviderName, currentConfig?: Profile
 
             s.stop('Models fetched.');
 
-            const selectedModel = await select({
+            const selectedModel = await promptUI.select({
                 message: 'Select the Anthropic model to use',
                 options: modelChoices,
                 initialValue:
@@ -177,7 +177,7 @@ export async function setupModel(provider: ProviderName, currentConfig?: Profile
         }
     } else {
         // OpenAI: fetch available models
-        const s = spinner();
+        const s = promptUI.spinner();
         s.start('Fetching available models from OpenAI...');
 
         try {
@@ -210,7 +210,7 @@ export async function setupModel(provider: ProviderName, currentConfig?: Profile
 
             s.stop('Models fetched.');
 
-            const selectedModel = await select({
+            const selectedModel = await promptUI.select({
                 message: 'Select the OpenAI model to use',
                 options: modelChoices,
                 initialValue:

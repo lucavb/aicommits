@@ -2,7 +2,7 @@ import { inject as Inject, injectable as Injectable } from 'inversify';
 import { isString } from '../utils/typeguards';
 import { ConfigService } from './config.service';
 import { PromptService } from './prompt.service';
-import { type AIProvider, AIProviderSymbol } from './ai-provider.interface';
+import { AIProviderFactory } from './ai-provider.factory';
 
 const sanitizeMessage = (message: string) =>
     message
@@ -15,7 +15,7 @@ const deduplicateMessages = (array: string[]) => Array.from(new Set(array));
 @Injectable()
 export class AICommitMessageService {
     constructor(
-        @Inject(AIProviderSymbol) private readonly aiProvider: AIProvider,
+        @Inject(AIProviderFactory) private readonly aiProviderFactory: AIProviderFactory,
         @Inject(ConfigService) private readonly configService: ConfigService,
         @Inject(PromptService) private readonly promptService: PromptService,
     ) {}
@@ -24,7 +24,7 @@ export class AICommitMessageService {
         const { locale, maxLength, type, model } = this.configService.getConfig();
 
         const [commitMessageCompletion, commitBodyCompletion] = await Promise.all([
-            this.aiProvider.generateCompletion({
+            this.aiProviderFactory.createProvider().generateCompletion({
                 messages: [
                     {
                         role: 'system',
@@ -39,7 +39,7 @@ export class AICommitMessageService {
                 model,
                 n: 1,
             }),
-            this.aiProvider.generateCompletion({
+            this.aiProviderFactory.createProvider().generateCompletion({
                 messages: [
                     { role: 'system', content: this.promptService.generateSummaryPrompt(locale) },
                     { role: 'user', content: diff },
@@ -87,7 +87,7 @@ export class AICommitMessageService {
             };
 
             // Stream commit message
-            this.aiProvider.streamCompletion({
+            this.aiProviderFactory.createProvider().streamCompletion({
                 messages: [
                     {
                         role: 'system',
@@ -110,7 +110,7 @@ export class AICommitMessageService {
             });
 
             // Stream body
-            this.aiProvider.streamCompletion({
+            this.aiProviderFactory.createProvider().streamCompletion({
                 messages: [
                     { role: 'system', content: this.promptService.generateSummaryPrompt(locale) },
                     { role: 'user', content: diff },
@@ -143,7 +143,7 @@ export class AICommitMessageService {
         const { locale, maxLength, type, model } = this.configService.getConfig();
 
         const [commitMessageCompletion, commitBodyCompletion] = await Promise.all([
-            this.aiProvider.generateCompletion({
+            this.aiProviderFactory.createProvider().generateCompletion({
                 messages: [
                     {
                         role: 'system',
@@ -161,7 +161,7 @@ export class AICommitMessageService {
                 model,
                 n: 1,
             }),
-            this.aiProvider.generateCompletion({
+            this.aiProviderFactory.createProvider().generateCompletion({
                 messages: [
                     {
                         role: 'system',
@@ -216,7 +216,7 @@ export class AICommitMessageService {
             };
 
             // Stream commit message
-            this.aiProvider.streamCompletion({
+            this.aiProviderFactory.createProvider().streamCompletion({
                 messages: [
                     {
                         role: 'system',
@@ -242,7 +242,7 @@ export class AICommitMessageService {
             });
 
             // Stream body
-            this.aiProvider.streamCompletion({
+            this.aiProviderFactory.createProvider().streamCompletion({
                 messages: [
                     {
                         role: 'system',

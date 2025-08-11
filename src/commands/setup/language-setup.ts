@@ -1,5 +1,5 @@
-import { text } from '@clack/prompts';
 import { type ProfileConfig } from '../../utils/config';
+import { ClackPromptService } from '../../services/clack-prompt.service';
 import type { LanguageCode } from 'iso-639-1';
 import iso6391 from 'iso-639-1';
 
@@ -32,9 +32,12 @@ export const detectLocale = (): LanguageCode => {
 /**
  * Setup the language preference
  */
-export async function setupLanguage(currentConfig?: ProfileConfig): Promise<LanguageCode | null> {
+export async function setupLanguage(
+    promptUI: ClackPromptService,
+    currentConfig?: ProfileConfig,
+): Promise<LanguageCode | null> {
     const detectedLocale = detectLocale();
-    const locale = await text({
+    const locale = await promptUI.text({
         message: 'Enter your preferred language code (e.g., en, es, fr)',
         placeholder: detectedLocale,
         initialValue: currentConfig?.locale || detectedLocale,

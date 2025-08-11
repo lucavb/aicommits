@@ -1,11 +1,11 @@
 import { bgCyan, black, green, red, yellow } from 'kolorist';
-import { intro, log, note, outro, spinner } from '@clack/prompts';
 import { handleCliError, KnownError } from '../utils/error';
 import { isError } from '../utils/typeguards';
 import { Container } from 'inversify';
 import { AICommitMessageService } from '../services/ai-commit-message.service';
 import { GitService } from '../services/git.service';
 import { ConfigService } from '../services/config.service';
+import { ClackPromptService } from '../services/clack-prompt.service';
 import { streamingReviewAndRevise } from './aicommits-utils';
 import { trimLines } from '../utils/string';
 
@@ -18,16 +18,18 @@ export const aiCommits = async ({
     stageAll?: boolean;
     profile?: string;
 }) => {
+    const configService = container.get(ConfigService);
+    const gitService = container.get(GitService);
+    const aiCommitMessageService = container.get(AICommitMessageService);
+    const promptUI = container.get(ClackPromptService);
+
     try {
-        const configService = container.get(ConfigService);
         await configService.readConfig();
 
-        const gitService = container.get(GitService);
-        const aiCommitMessageService = container.get(AICommitMessageService);
-        intro(bgCyan(black(' aicommits ')));
+        promptUI.intro(bgCyan(black(' aicommits ')));
         const validResult = configService.validConfig();
         if (!validResult.valid) {
-            note(
+            promptUI.note(
                 trimLines(`
                 It looks like you haven't set up aicommits yet. Let's get you started!
                 
@@ -40,7 +42,7 @@ export const aiCommits = async ({
         const currentProfile = configService.getProfile(profile);
         if (!currentProfile) {
             const config = configService.getProfileNames();
-            note(
+            promptUI.note(
                 trimLines(`
                 Profile "${profile}" not found. Available profiles: ${config.join(', ')}
                 
@@ -53,7 +55,7 @@ export const aiCommits = async ({
         const config = currentProfile;
 
         // Display provider and model information
-        note(
+        promptUI.note(
             trimLines(`
              Profile: ${yellow(profile)}
              Provider: ${yellow(config.provider)}
@@ -65,13 +67,13 @@ export const aiCommits = async ({
         await gitService.assertGitRepo();
 
         if (stageAll) {
-            const stagingSpinner = spinner();
+            const stagingSpinner = promptUI.spinner();
             stagingSpinner.start('Staging all files');
             await gitService.stageAllFiles();
             stagingSpinner.stop('All files staged');
         }
 
-        const detectingFiles = spinner();
+        const detectingFiles = promptUI.spinner();
         detectingFiles.start('Detecting staged files');
         const staged = await gitService.getStagedDiff(config.exclude, config.contextLines);
 
@@ -88,7 +90,7 @@ export const aiCommits = async ({
             `${gitService.getDetectedMessage(staged.files)}:\n${staged.files.map((file) => `     ${file}`).join('\n')}`,
         );
 
-        const analyzeSpinner = spinner();
+        const analyzeSpinner = promptUI.spinner();
         analyzeSpinner.start('The AI is analyzing your changes');
 
         let commitMessage = '';
@@ -117,19 +119,25 @@ export const aiCommits = async ({
         analyzeSpinner.stop('Commit message generated');
 
         // Display the full message after generation
-        log.step('Generated commit message:');
-        log.message(green(commitMessage));
+        promptUI.log.step('Generated commit message:');
+        promptUI.log.message(green(commitMessage));
 
         if (commitBody) {
-            log.step('Commit body:');
-            log.message(commitBody);
+            promptUI.log.step('Commit body:');
+            promptUI.log.message(commitBody);
         }
 
         if (!commitMessage) {
             throw new KnownError('No commit message was generated. Try again.');
         }
 
-        const result = await streamingReviewAndRevise(aiCommitMessageService, commitMessage, commitBody, staged.diff);
+        const result = await streamingReviewAndRevise({
+            aiCommitMessageService,
+            promptUI,
+            message: commitMessage,
+            body: commitBody,
+            diff: staged.diff,
+        });
         if (!result?.accepted) {
             return;
         }
@@ -140,12 +148,12 @@ export const aiCommits = async ({
         const fullMessage = `${message}\n\n${body}`.trim();
         await gitService.commitChanges(fullMessage);
 
-        outro(`${green('✔')} Successfully committed`);
+        promptUI.outro(`${green('✔')} Successfully committed`);
     } catch (error) {
         if (isError(error)) {
-            outro(`${red('✖')} ${error.message}`);
+            promptUI.outro(`${red('✖')} ${error.message}`);
         } else {
-            outro(`${red('✖')} An unknown error occurred`);
+            promptUI.outro(`${red('✖')} An unknown error occurred`);
         }
         handleCliError(error);
         process.exit(1);

@@ -1,11 +1,14 @@
-import { select } from '@clack/prompts';
 import { type ProfileConfig } from '../../utils/config';
+import { ClackPromptService } from '../../services/clack-prompt.service';
 
 /**
  * Setup the commit message format
  */
-export async function setupCommitFormat(currentConfig?: ProfileConfig): Promise<'conventional' | 'simple' | null> {
-    const type = await select({
+export async function setupCommitFormat(
+    promptUI: ClackPromptService,
+    currentConfig?: ProfileConfig,
+): Promise<'conventional' | 'simple' | null> {
+    const type = await promptUI.select({
         message: 'Select commit message format',
         options: [
             { value: 'conventional', label: 'Conventional Commits (e.g., feat: add new feature)' },
