@@ -22,6 +22,9 @@ class MockPromptService implements Partial<PromptService> {
         .mockReturnValue(
             'You are a git commit message generator. Your task is to write clear, concise, and descriptive commit messages that follow best practices. Always use the imperative mood and focus on the intent and impact of the change. Do not include file names, code snippets, or unnecessary details. Never include explanations, commentary, or formatting outside the commit message itself.',
         );
+    createAgentSystemPrompt = vi.fn().mockReturnValue('agent system prompt');
+    createAgentUserPrompt = vi.fn().mockReturnValue('agent user prompt');
+    createAgentRevisionPrompt = vi.fn().mockReturnValue('agent revision prompt');
 }
 
 @Injectable()
@@ -65,7 +68,7 @@ describe('AICommitMessageService', () => {
         container.bind(AIProviderFactory).toConstantValue(aiProviderFactory as unknown as AIProviderFactory);
         container.bind(AITextGenerationService).toConstantValue(aiTextGenerationService);
         container.bind(ConfigService).toConstantValue(configService as unknown as ConfigService);
-        container.bind(PromptService).toConstantValue(promptService as PromptService);
+        container.bind(PromptService).toConstantValue(promptService as unknown as PromptService);
 
         service = container.get(AICommitMessageService);
     });
