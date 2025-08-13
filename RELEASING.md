@@ -46,6 +46,51 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/). 
 ## Branches
 
 - **main**: Production releases (e.g., `1.0.0`, `1.1.0`, `1.1.1`)
+- **beta**: Beta pre-releases (e.g., `1.1.0-beta.1`, `1.1.0-beta.2`)
+- **alpha**: Alpha pre-releases (e.g., `1.1.0-alpha.1`, `1.1.0-alpha.2`)
+
+### Pre-release Workflow
+
+1. **Alpha releases**: Push to the `alpha` branch for experimental features
+
+    ```bash
+    git checkout -b alpha
+    git push origin alpha
+    ```
+
+    This will publish versions like `1.2.0-alpha.1`
+
+2. **Beta releases**: Push to the `beta` branch for testing candidate releases
+
+    ```bash
+    git checkout -b beta
+    git push origin beta
+    ```
+
+    This will publish versions like `1.2.0-beta.1`
+
+3. **Production releases**: Merge to `main` for stable releases
+    ```bash
+    git checkout main
+    git merge beta  # or alpha
+    git push origin main
+    ```
+    This will publish versions like `1.2.0`
+
+### Installing Pre-releases
+
+Users can install pre-release versions using npm tags:
+
+```bash
+# Install latest alpha version
+npm install @lucavb/aicommits@alpha
+
+# Install latest beta version
+npm install @lucavb/aicommits@beta
+
+# Install specific pre-release version
+npm install @lucavb/aicommits@1.2.0-alpha.1
+```
 
 ## Manual Release
 
