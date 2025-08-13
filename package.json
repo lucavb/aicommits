@@ -55,6 +55,9 @@
         "test": "vitest run",
         "test:coverage": "vitest run --coverage",
         "test:watch": "vitest",
+        "install:link": "npm run build && npm link",
+        "install:test": "npm run build && npm pack && npm install -g ./lucavb-aicommits-*.tgz && rm ./lucavb-aicommits-*.tgz",
+        "uninstall:test": "npm uninstall -g @lucavb/aicommits",
         "prepare": "husky"
     },
     "dependencies": {
