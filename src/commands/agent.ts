@@ -103,6 +103,16 @@ async function handleAgentMode(
     gitService: GitService,
     promptUI: ClackPromptService,
 ): Promise<void> {
+    // Check if we have staged changes
+    const hasStagedChanges = await gitService.hasStagedChanges();
+    if (!hasStagedChanges) {
+        throw new KnownError(
+            trimLines(`
+                No staged changes found. Stage your changes manually, or automatically stage all changes with the \`--stage-all\` flag.
+            `),
+        );
+    }
+
     const analyzeSpinner = promptUI.spinner();
     analyzeSpinner.start('AI agent is analyzing the repository...');
 
