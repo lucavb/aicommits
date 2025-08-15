@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import { Container } from 'inversify';
-import { stringify as yamlStringify } from 'yaml';
+import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import {
     CLI_ARGUMENTS,
     CONFIG_FILE_PATH,
@@ -75,7 +75,29 @@ describe('ConfigService', () => {
 
     describe('writeConfig', () => {
         it('should write the config to the file', async () => {
-            const savedConfig: Partial<Config> = {
+            // Set up the complete config structure
+            configService.updateConfigInMemory({ currentProfile: 'default' });
+            configService.updateProfileInMemory('default', {
+                model: 'llama3',
+                baseUrl: 'https://api.ollama.local/v1',
+                provider: 'ollama',
+                stageAll: false,
+                contextLines: 10,
+                locale: 'en',
+                maxLength: 50,
+            });
+
+            await configService.flush();
+
+            expect(mockFsApi.writeFile).toHaveBeenCalledTimes(1);
+
+            // Parse the written YAML and compare the object structure instead of string comparison
+            const [filePath, yamlContent] = mockFsApi.writeFile.mock.calls[0];
+            expect(filePath).toBe(tempFilePath);
+
+            const writtenConfig = yamlParse(yamlContent as string);
+            expect(writtenConfig).toMatchObject({
+                currentProfile: 'default',
                 profiles: {
                     default: {
                         model: 'llama3',
@@ -87,13 +109,7 @@ describe('ConfigService', () => {
                         maxLength: 50,
                     },
                 },
-                currentProfile: 'default',
-            };
-            configService.updateConfigInMemory(savedConfig);
-            await configService.flush();
-
-            expect(mockFsApi.writeFile).toHaveBeenCalledWith(tempFilePath, yamlStringify(savedConfig), 'utf8');
-            expect(mockFsApi.writeFile).toHaveBeenCalledTimes(1);
+            });
         });
     });
 

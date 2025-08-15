@@ -6,6 +6,7 @@ export const configKeys = [
     'baseUrl',
     'contextLines',
     'exclude',
+    'globalIgnore',
     'locale',
     'maxLength',
     'model',
@@ -39,6 +40,7 @@ export const profileConfigSchema = z.object({
 
 export const configSchema = z.object({
     currentProfile: z.string().default('default'),
+    globalIgnore: z.array(z.string().min(1)).optional(),
     profiles: z.record(z.string().min(1), profileConfigSchema),
 });
 

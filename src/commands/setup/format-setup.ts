@@ -6,7 +6,7 @@ import { ClackPromptService } from '../../services/clack-prompt.service';
  */
 export async function setupCommitFormat(
     promptUI: ClackPromptService,
-    currentConfig?: ProfileConfig,
+    currentConfig?: Partial<ProfileConfig>,
 ): Promise<'conventional' | 'simple' | null> {
     const type = await promptUI.select({
         message: 'Select commit message format',

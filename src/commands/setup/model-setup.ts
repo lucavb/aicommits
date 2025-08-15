@@ -35,7 +35,7 @@ export function getBaseUrlMessage(provider: ProviderName): string {
 /**
  * Get the initial value for the base URL field
  */
-export function getBaseUrlInitialValue(provider: ProviderName, currentConfig?: ProfileConfig): string {
+export function getBaseUrlInitialValue(provider: ProviderName, currentConfig?: Partial<ProfileConfig>): string {
     if (currentConfig?.baseUrl) {
         return currentConfig.baseUrl;
     }
@@ -45,7 +45,11 @@ export function getBaseUrlInitialValue(provider: ProviderName, currentConfig?: P
 /**
  * Setup the base URL, API key, and model
  */
-export async function setupModel(promptUI: ClackPromptService, provider: ProviderName, currentConfig?: ProfileConfig) {
+export async function setupModel(
+    promptUI: ClackPromptService,
+    provider: ProviderName,
+    currentConfig?: Partial<ProfileConfig>,
+) {
     // 1. Get base URL
     const baseUrl = await promptUI.text({
         message: getBaseUrlMessage(provider),
