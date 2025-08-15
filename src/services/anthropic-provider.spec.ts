@@ -1,5 +1,6 @@
 import { AnthropicProvider } from './anthropic-provider';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import Anthropic from '@anthropic-ai/sdk';
 
 // Define types for mock streams
 type MockAnthropicChunk =
@@ -49,22 +50,23 @@ describe('AnthropicProvider', () => {
     describe('generateCompletion', () => {
         it('should return a completion response', async () => {
             const mockResponse = {
+                content: [{ type: 'text' as const, text: 'This is a test response.', citations: [] }],
                 id: 'test-id',
                 model: 'claude-3-opus-20240229',
-                type: 'message' as const,
                 role: 'assistant' as const,
-                content: [{ type: 'text' as const, text: 'This is a test response.', citations: [] }],
                 stop_reason: 'end_turn' as const,
                 stop_sequence: null,
+                type: 'message' as const,
                 usage: {
-                    input_tokens: 10,
-                    output_tokens: 20,
+                    cache_creation: null,
                     cache_creation_input_tokens: 0,
                     cache_read_input_tokens: 0,
+                    input_tokens: 10,
+                    output_tokens: 20,
                     server_tool_use: { web_search_requests: 0 },
                     service_tier: 'standard' as const,
                 },
-            };
+            } as const satisfies Awaited<ReturnType<InstanceType<typeof Anthropic>['messages']['create']>>;
             vi.spyOn(mockAnthropic.messages, 'create').mockResolvedValue(mockResponse);
 
             const result = await provider.generateCompletion({
