@@ -13,6 +13,7 @@ import { agentStreamingReviewAndRevise, handleCommitSplitting } from './aicommit
 import { trimLines } from '../utils/string';
 import { container } from '../utils/di';
 import { CLI_ARGUMENTS } from '../services/config.service';
+import { createPullRequest } from './pr';
 
 export const aiCommitsAgent = async ({
     container,
@@ -194,6 +195,22 @@ const handleSplitMode = async (
     }
 };
 
+// PR subcommand
+const prCommand = new Command('pr')
+    .description('Create a GitHub Pull Request with AI-generated content')
+    .addOption(new Option('--base <base>', 'Base branch for the PR (defaults to main/master)'))
+    .addOption(new Option('--head <head>', 'Head branch for the PR (defaults to current branch)'))
+    .addOption(new Option('--draft', 'Create a draft PR').default(false))
+    .action(async (options) => {
+        container.bind(CLI_ARGUMENTS).toConstantValue(options);
+        await createPullRequest({
+            container,
+            base: options.base,
+            head: options.head,
+            draft: options.draft,
+        });
+    });
+
 export const agentCommand = new Command('agent')
     .description('Enable AI agent mode for autonomous repository analysis')
     .addOption(new Option('--api-key <apiKey>', 'API key for the AI provider'))
@@ -208,6 +225,7 @@ export const agentCommand = new Command('agent')
         ).default(false),
     )
     .addOption(new Option('--stage-all', 'Stage all modified files before generating commit'))
+    .addCommand(prCommand)
     .action(async (options) => {
         container.bind(CLI_ARGUMENTS).toConstantValue(options);
         await aiCommitsAgent({

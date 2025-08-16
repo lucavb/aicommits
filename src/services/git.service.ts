@@ -7,6 +7,13 @@ import { ConfigService } from './config.service';
 
 export const SIMPLE_GIT = Symbol.for('SIMPLE_GIT');
 
+export interface BranchStatus {
+    ahead: number;
+    behind: number;
+    upToDate: boolean;
+    hasRemote: boolean;
+}
+
 @Injectable()
 export class GitService {
     private readonly defaultIgnorePatterns = [
@@ -406,5 +413,200 @@ export class GitService {
         }
 
         return patch;
+    }
+
+    /**
+     * Get the current branch name
+     */
+    async getCurrentBranch(): Promise<string> {
+        try {
+            const branch = await this.git.revparse(['--abbrev-ref', 'HEAD']);
+            return branch.trim();
+        } catch {
+            throw new KnownError('Failed to get current branch');
+        }
+    }
+
+    /**
+     * Get the default branch (main or master)
+     */
+    async getDefaultBranch(): Promise<string> {
+        try {
+            // First try to get the default branch from remote
+            const remotes = await this.git.getRemotes(true);
+            if (remotes.length > 0) {
+                const originRemote = remotes.find(remote => remote.name === 'origin') || remotes[0];
+                if (originRemote) {
+                    try {
+                        // Try to get the default branch from remote HEAD
+                        const remoteHead = await this.git.raw(['symbolic-ref', `refs/remotes/${originRemote.name}/HEAD`]);
+                        const defaultBranch = remoteHead.trim().split('/').pop();
+                        if (defaultBranch) {
+                            return defaultBranch;
+                        }
+                    } catch {
+                        // Fall through to local detection
+                    }
+                }
+            }
+
+            // Fallback: check if main or master exists locally
+            const branches = await this.git.branchLocal();
+            if (branches.all.includes('main')) {
+                return 'main';
+            }
+            if (branches.all.includes('master')) {
+                return 'master';
+            }
+
+            // Final fallback: return the first branch or current branch
+            return branches.current || branches.all[0] || 'main';
+        } catch {
+            throw new KnownError('Failed to determine default branch');
+        }
+    }
+
+    /**
+     * Get branch tracking status (ahead/behind remote)
+     */
+    async getBranchTrackingStatus(branch: string): Promise<BranchStatus> {
+        try {
+            // Check if branch exists
+            const branches = await this.git.branchLocal();
+            if (!branches.all.includes(branch)) {
+                throw new KnownError(`Branch '${branch}' does not exist`);
+            }
+
+            // Get tracking branch info
+            const trackingBranch = await this.git.raw(['rev-parse', '--abbrev-ref', `${branch}@{upstream}`]).catch(() => null);
+            
+            if (!trackingBranch) {
+                return {
+                    ahead: 0,
+                    behind: 0,
+                    upToDate: true,
+                    hasRemote: false,
+                };
+            }
+
+            // Get ahead/behind counts
+            const revList = await this.git.raw(['rev-list', '--left-right', '--count', `${branch}...${trackingBranch.trim()}`]);
+            const [ahead, behind] = revList.trim().split('\t').map(Number);
+
+            return {
+                ahead: ahead || 0,
+                behind: behind || 0,
+                upToDate: ahead === 0 && behind === 0,
+                hasRemote: true,
+            };
+        } catch (error) {
+            if (error instanceof KnownError) {
+                throw error;
+            }
+            throw new KnownError(`Failed to get branch tracking status: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Fetch from remote repository
+     */
+    async fetchFromRemote(): Promise<void> {
+        try {
+            await this.git.fetch();
+        } catch {
+            throw new KnownError('Failed to fetch from remote');
+        }
+    }
+
+    /**
+     * Get commit hash for a branch or reference
+     */
+    async getCommitHash(ref: string): Promise<string> {
+        try {
+            const hash = await this.git.revparse([ref]);
+            return hash.trim();
+        } catch {
+            throw new KnownError(`Failed to get commit hash for '${ref}'`);
+        }
+    }
+
+    /**
+     * Validate that a branch exists (locally or remotely)
+     */
+    async validateBranchExists(branchName: string): Promise<void> {
+        try {
+            // Check local branches first
+            const localBranches = await this.git.branchLocal();
+            if (localBranches.all.includes(branchName)) {
+                return;
+            }
+
+            // Check remote branches
+            const remoteBranches = await this.git.branch(['-r']);
+            const remoteNames = remoteBranches.all.map(branch => branch.replace(/^origin\//, ''));
+            if (remoteNames.includes(branchName)) {
+                return;
+            }
+
+            // Check if it's a remote reference like origin/branch
+            if (remoteBranches.all.includes(`origin/${branchName}`)) {
+                return;
+            }
+
+            throw new KnownError(
+                `Branch '${branchName}' does not exist locally or remotely.\n` +
+                `Available branches:\n` +
+                `  Local: ${localBranches.all.join(', ')}\n` +
+                `  Remote: ${remoteNames.join(', ')}`
+            );
+        } catch (error) {
+            if (error instanceof KnownError) {
+                throw error;
+            }
+            throw new KnownError(`Failed to validate branch '${branchName}': ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
+    /**
+     * Get diff between two branches
+     */
+    async getBranchDiff(base: string, head: string): Promise<{ files: string[]; diff: string }> {
+        try {
+            // Validate that both branches exist
+            const branches = await this.git.branchLocal();
+            const allBranches = [...branches.all];
+            
+            // Also check remote branches
+            const remoteBranches = await this.git.branch(['-r']);
+            const remoteNames = remoteBranches.all.map(branch => branch.replace(/^origin\//, ''));
+            allBranches.push(...remoteNames);
+
+            if (!allBranches.includes(base) && !allBranches.includes(`origin/${base}`)) {
+                throw new KnownError(`Base branch '${base}' does not exist`);
+            }
+            if (!allBranches.includes(head) && !allBranches.includes(`origin/${head}`)) {
+                throw new KnownError(`Head branch '${head}' does not exist`);
+            }
+
+            // Get files changed between branches
+            const files = await this.git.diff([`${base}...${head}`, '--name-only']);
+            if (!files) {
+                return { files: [], diff: '' };
+            }
+
+            // Get the actual diff
+            const filesToExclude = await this.getFilesToExclude();
+            const diff = await this.git.diff([`${base}...${head}`, '--diff-algorithm=minimal', ...filesToExclude]);
+
+            return {
+                files: files.split('\n').filter(Boolean),
+                diff: diff || '',
+            };
+        } catch (error) {
+            if (error instanceof KnownError) {
+                throw error;
+            }
+            throw new KnownError(`Failed to get branch diff: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
     }
 }
