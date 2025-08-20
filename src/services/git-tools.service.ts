@@ -209,32 +209,52 @@ export class GitToolsService {
             }),
 
             getFileContent: tool({
-                description: 'Get the content of a specific file.',
+                description: 'Get the content of a specific file starting from a specific line.',
                 inputSchema: z.object({
                     filePath: z.string().describe('Path to the file to read (relative to git root)'),
-                    maxLines: z.number().optional().describe('Maximum number of lines to return'),
+                    startLine: z.number().optional().describe('Starting line number (1-based, default: 1)'),
+                    lineCount: z
+                        .number()
+                        .optional()
+                        .describe('Number of lines to read from starting line (default: 100, max: 300)'),
                 }),
-                execute: async ({ filePath, maxLines }) => {
-                    onToolCall(`Reading file contents: ${filePath}`);
+                execute: async ({ filePath, startLine, lineCount }) => {
+                    const startLineValue = startLine ?? 1;
+                    const lineCountValue = Math.min(lineCount ?? 100, 300); // Cap at 300 lines
 
-                    const maxLinesValue = maxLines ?? 100;
+                    onToolCall(
+                        `Reading file contents: ${filePath} (lines ${startLineValue}-${startLineValue + lineCountValue - 1})`,
+                    );
+
                     try {
                         const gitRoot = await this.gitService.assertGitRepo();
                         const fullPath = join(gitRoot, filePath);
 
                         const content = await readFile(fullPath, 'utf-8');
-                        const lines = content.split('\n');
-                        const isTruncated = lines.length > maxLinesValue;
-                        const finalContent = isTruncated ? lines.slice(0, maxLinesValue).join('\n') : content;
+                        const allLines = content.split('\n');
+                        const totalLines = allLines.length;
+
+                        // Convert to 0-based indexing and validate bounds
+                        const startIndex = Math.max(0, startLineValue - 1);
+                        const endIndex = Math.min(totalLines, startIndex + lineCountValue);
+
+                        const selectedLines = allLines.slice(startIndex, endIndex);
+                        const finalContent = selectedLines.join('\n');
+                        const actualLinesReturned = selectedLines.length;
+
+                        const isTruncated = endIndex < totalLines || startIndex > 0;
+                        const actualEndLine = startIndex + actualLinesReturned;
 
                         return {
                             success: true,
                             filePath,
                             content: finalContent,
-                            totalLines: lines.length,
-                            displayedLines: isTruncated ? maxLinesValue : lines.length,
+                            totalLines,
+                            startLine: startLineValue,
+                            endLine: actualEndLine,
+                            requestedLines: lineCountValue,
+                            returnedLines: actualLinesReturned,
                             isTruncated,
-                            maxLines: maxLinesValue,
                         };
                     } catch (error) {
                         return {
