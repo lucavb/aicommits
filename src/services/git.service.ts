@@ -16,9 +16,7 @@ export class GitService {
     ];
 
     constructor(
-        @Optional()
-        @Inject(SIMPLE_GIT)
-        private readonly git: SimpleGit = simpleGit(),
+        @Optional() @Inject(SIMPLE_GIT) private readonly git: SimpleGit = simpleGit(),
         private readonly configService: ConfigService,
     ) {}
 
