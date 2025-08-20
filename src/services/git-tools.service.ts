@@ -274,6 +274,34 @@ export class GitToolsService {
                     }
                 },
             }),
+
+            getFileCommitHistory: tool({
+                description: 'Get the last N commit messages that affected a specific file to understand commit patterns and context.',
+                inputSchema: z.object({
+                    filePath: z.string().describe('Path to the file to get commit history for (relative to git root)'),
+                    count: z.number().optional().describe('Number of recent commits to retrieve (default: 10)'),
+                }),
+                execute: async ({ filePath, count = 10 }) => {
+                    onToolCall(`Getting commit history for file: ${filePath}`);
+
+                    try {
+                        const commits = await this.gitService.getFileCommitHistory(filePath, count);
+                        
+                        return {
+                            success: true,
+                            filePath,
+                            commits,
+                            count: commits.length,
+                        };
+                    } catch (error) {
+                        return {
+                            success: false,
+                            error: `Error getting commit history for file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                            filePath,
+                        };
+                    }
+                },
+            }),
         } as const;
     }
 }

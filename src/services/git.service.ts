@@ -136,6 +136,20 @@ export class GitService {
         }
     }
 
+    async getFileCommitHistory(filePath: string, count: number): Promise<Array<{ hash: string; message: string; author: string; date: string }>> {
+        try {
+            const log = await this.git.log({ maxCount: count, file: filePath });
+            return log.all.map((commit) => ({
+                hash: commit.hash.substring(0, 7),
+                message: commit.message,
+                author: commit.author_name || 'Unknown',
+                date: commit.date,
+            }));
+        } catch {
+            throw new KnownError(`Failed to get commit history for file: ${filePath}`);
+        }
+    }
+
     async getStatus(): Promise<string> {
         try {
             const status = await this.git.status();
