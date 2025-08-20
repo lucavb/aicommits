@@ -9,6 +9,7 @@ export const configKeys = [
     'globalIgnore',
     'locale',
     'maxLength',
+    'maxToolCalls',
     'model',
     'provider',
     'type',
@@ -27,6 +28,7 @@ export const profileConfigSchema = z.object({
         .default('en')
         .refine((str: string): str is LanguageCode => iso6391.validate(str)),
     maxLength: z.coerce.number().int().positive().default(50),
+    maxToolCalls: z.coerce.number().int().positive().default(25),
     model: z.string().min(1),
     provider: providerNameSchema.default('openai'),
     stageAll: z.boolean().or(

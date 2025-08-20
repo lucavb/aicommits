@@ -22,14 +22,17 @@ export class AIAgentService {
     ) {}
 
     async generateCommitWithAgent({ onToolCall }: { onToolCall?: (msg: string) => void }): Promise<AgentResult> {
-        const maxToolCalls = 25;
+        const config = this.configService.getConfig();
+        const maxToolCalls = config.maxToolCalls;
         let currentToolCallCount = 0;
-        
-        const toolCallWrapper = onToolCall ? (message: string) => {
-            currentToolCallCount++;
-            const formattedMessage = `${message} (${currentToolCallCount}/${maxToolCalls})`;
-            onToolCall(formattedMessage);
-        } : undefined;
+
+        const toolCallWrapper = onToolCall
+            ? (message: string) => {
+                  currentToolCallCount++;
+                  const formattedMessage = `${message} (${currentToolCallCount}/${maxToolCalls})`;
+                  onToolCall(formattedMessage);
+              }
+            : undefined;
 
         const tools = this.createAllTools(toolCallWrapper);
 
@@ -73,14 +76,17 @@ export class AIAgentService {
         onToolCall?: (msg: string) => void;
         userRevisionPrompt: string;
     }): Promise<AgentResult> {
-        const maxToolCalls = 25;
+        const config = this.configService.getConfig();
+        const maxToolCalls = config.maxToolCalls;
         let currentToolCallCount = 0;
-        
-        const toolCallWrapper = onToolCall ? (message: string) => {
-            currentToolCallCount++;
-            const formattedMessage = `${message} (${currentToolCallCount}/${maxToolCalls})`;
-            onToolCall(formattedMessage);
-        } : undefined;
+
+        const toolCallWrapper = onToolCall
+            ? (message: string) => {
+                  currentToolCallCount++;
+                  const formattedMessage = `${message} (${currentToolCallCount}/${maxToolCalls})`;
+                  onToolCall(formattedMessage);
+              }
+            : undefined;
 
         const tools = this.createAllTools(toolCallWrapper);
 

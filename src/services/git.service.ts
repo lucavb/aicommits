@@ -136,7 +136,10 @@ export class GitService {
         }
     }
 
-    async getFileCommitHistory(filePath: string, count: number): Promise<Array<{ hash: string; message: string; author: string; date: string }>> {
+    async getFileCommitHistory(
+        filePath: string,
+        count: number,
+    ): Promise<{ hash: string; message: string; author: string; date: string }[]> {
         try {
             const log = await this.git.log({ maxCount: count, file: filePath });
             return log.all.map((commit) => ({
