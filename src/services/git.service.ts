@@ -7,6 +7,12 @@ import { ConfigService } from './config.service';
 
 export const SIMPLE_GIT = Symbol.for('SIMPLE_GIT');
 
+type GitIntegration = Pick<SimpleGit, 'add' | 'commit' | 'revparse' | 'diff' | 'log' | 'status' | 'reset'>;
+type ConfigIntegration = Pick<
+    ConfigService,
+    'readConfig' | 'getGlobalIgnorePatterns' | 'setGlobalIgnorePatterns' | 'flush'
+>;
+
 @Injectable()
 export class GitService {
     private readonly defaultIgnorePatterns = [
@@ -16,8 +22,8 @@ export class GitService {
     ];
 
     constructor(
-        @Optional() @Inject(SIMPLE_GIT) private readonly git: SimpleGit = simpleGit(),
-        private readonly configService: ConfigService,
+        @Optional() @Inject(SIMPLE_GIT) private readonly git: GitIntegration = simpleGit(),
+        @Inject(ConfigService) private readonly configService: ConfigIntegration,
     ) {}
 
     async stageAllFiles(): Promise<void> {
