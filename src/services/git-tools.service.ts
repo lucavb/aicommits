@@ -5,6 +5,7 @@ import { readdir, readFile, stat } from 'fs/promises';
 import { join } from 'path';
 
 import { tool } from 'ai';
+import { Change } from 'parse-diff';
 
 @Injectable()
 export class GitToolsService {
@@ -29,18 +30,50 @@ export class GitToolsService {
                         if (type === 'staged') {
                             const staged = await this.gitService.getStagedDiff([], contextLinesValue);
                             if (!staged) {
-                                return 'No staged changes found.';
+                                return {
+                                    success: true,
+                                    type: 'staged',
+                                    hasChanges: false,
+                                    files: [],
+                                    diff: '',
+                                    contextLines: contextLinesValue,
+                                };
                             }
-                            return `Staged files:\n${staged.files.join('\n')}\n\nDiff:\n${staged.diff}`;
+                            return {
+                                success: true,
+                                type: 'staged',
+                                hasChanges: true,
+                                files: staged.files,
+                                diff: staged.diff,
+                                contextLines: contextLinesValue,
+                            };
                         } else {
                             const diff = await this.gitService.getWorkingDiff(contextLinesValue);
                             if (!diff) {
-                                return 'No unstaged changes found.';
+                                return {
+                                    success: true,
+                                    type: 'working',
+                                    hasChanges: false,
+                                    files: [],
+                                    diff: '',
+                                    contextLines: contextLinesValue,
+                                };
                             }
-                            return `Working directory diff:\n${diff}`;
+                            return {
+                                success: true,
+                                type: 'working',
+                                hasChanges: true,
+                                files: [],
+                                diff,
+                                contextLines: contextLinesValue,
+                            };
                         }
                     } catch (error) {
-                        return `Error getting diff: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                        return {
+                            success: false,
+                            error: `Error getting diff: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                            type,
+                        };
                     }
                 },
             }),
@@ -61,7 +94,7 @@ export class GitToolsService {
                         const fullPath = join(gitRoot, directoryValue);
 
                         const items = await readdir(fullPath);
-                        const result: string[] = [];
+                        const files: { name: string; type: 'file' | 'directory' }[] = [];
 
                         for (const item of items) {
                             if (!includeHiddenValue && item.startsWith('.')) {
@@ -70,13 +103,23 @@ export class GitToolsService {
 
                             const itemPath = join(fullPath, item);
                             const stats = await stat(itemPath);
-                            const type = stats.isDirectory() ? 'dir' : 'file';
-                            result.push(`${type}: ${item}`);
+                            const type = stats.isDirectory() ? 'directory' : 'file';
+                            files.push({ name: item, type });
                         }
 
-                        return result.length > 0 ? result.join('\n') : 'Directory is empty.';
+                        return {
+                            success: true,
+                            directory: directoryValue,
+                            includeHidden: includeHiddenValue,
+                            files,
+                            count: files.length,
+                        };
                     } catch (error) {
-                        return `Error listing files: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                        return {
+                            success: false,
+                            error: `Error listing files: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                            directory: directoryValue,
+                        };
                     }
                 },
             }),
@@ -89,11 +132,24 @@ export class GitToolsService {
                     try {
                         const staged = await this.gitService.getStagedDiff([], 0);
                         if (!staged) {
-                            return 'No files are currently staged.';
+                            return {
+                                success: true,
+                                hasStaged: false,
+                                files: [],
+                                count: 0,
+                            };
                         }
-                        return `Staged files (${staged.files.length}):\n${staged.files.join('\n')}`;
+                        return {
+                            success: true,
+                            hasStaged: true,
+                            files: staged.files,
+                            count: staged.files.length,
+                        };
                     } catch (error) {
-                        return `Error getting staged files: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                        return {
+                            success: false,
+                            error: `Error getting staged files: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                        };
                     }
                 },
             }),
@@ -108,9 +164,19 @@ export class GitToolsService {
 
                     try {
                         await this.gitService.stageFiles(files);
-                        return `Successfully staged ${files.length} file(s): ${files.join(', ')}`;
+                        return {
+                            success: true,
+                            operation: 'stage',
+                            files,
+                            count: files.length,
+                        };
                     } catch (error) {
-                        return `Error staging files: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                        return {
+                            success: false,
+                            error: `Error staging files: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                            operation: 'stage',
+                            files,
+                        };
                     }
                 },
             }),
@@ -125,9 +191,19 @@ export class GitToolsService {
 
                     try {
                         await this.gitService.unstageFiles(files);
-                        return `Successfully unstaged ${files.length} file(s): ${files.join(', ')}`;
+                        return {
+                            success: true,
+                            operation: 'unstage',
+                            files,
+                            count: files.length,
+                        };
                     } catch (error) {
-                        return `Error unstaging files: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                        return {
+                            success: false,
+                            error: `Error unstaging files: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                            operation: 'unstage',
+                            files,
+                        };
                     }
                 },
             }),
@@ -148,15 +224,24 @@ export class GitToolsService {
 
                         const content = await readFile(fullPath, 'utf-8');
                         const lines = content.split('\n');
+                        const isTruncated = lines.length > maxLinesValue;
+                        const finalContent = isTruncated ? lines.slice(0, maxLinesValue).join('\n') : content;
 
-                        if (lines.length <= maxLinesValue) {
-                            return content;
-                        }
-
-                        const truncatedContent = lines.slice(0, maxLinesValue).join('\n');
-                        return `${truncatedContent}\n\n... (truncated, showing first ${maxLinesValue} lines of ${lines.length} total lines)`;
+                        return {
+                            success: true,
+                            filePath,
+                            content: finalContent,
+                            totalLines: lines.length,
+                            displayedLines: isTruncated ? maxLinesValue : lines.length,
+                            isTruncated,
+                            maxLines: maxLinesValue,
+                        };
                     } catch (error) {
-                        return `Error reading file: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                        return {
+                            success: false,
+                            error: `Error reading file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                            filePath,
+                        };
                     }
                 },
             }),
@@ -171,9 +256,34 @@ export class GitToolsService {
 
                     const countValue = count ?? 5;
                     try {
-                        return this.gitService.getCommitHistory(countValue);
+                        const historyString = await this.gitService.getCommitHistory(countValue);
+                        const commits = historyString
+                            .split('\n')
+                            .filter(Boolean)
+                            .map((line) => {
+                                const match = line.match(/^([a-f0-9]+) - (.+) \((.+)\)$/);
+                                if (match) {
+                                    return {
+                                        hash: match[1],
+                                        message: match[2],
+                                        author: match[3],
+                                    };
+                                }
+                                return { hash: '', message: line, author: '' };
+                            });
+
+                        return {
+                            success: true,
+                            commits,
+                            count: commits.length,
+                            requestedCount: countValue,
+                        };
                     } catch (error) {
-                        return `Error getting commit history: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                        return {
+                            success: false,
+                            error: `Error getting commit history: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                            requestedCount: countValue,
+                        };
                     }
                 },
             }),
@@ -185,9 +295,57 @@ export class GitToolsService {
                     onToolCall('Checking git repository status');
 
                     try {
-                        return this.gitService.getStatus();
+                        const status = await this.gitService.getStatus();
+                        if (status === 'Working tree clean') {
+                            return {
+                                success: true,
+                                isClean: true,
+                                staged: [],
+                                modified: [],
+                                untracked: [],
+                                totalChanges: 0,
+                            };
+                        }
+
+                        // Parse the status string to extract structured data
+                        const lines = status.split('\n');
+                        const staged: string[] = [];
+                        const modified: string[] = [];
+                        const untracked: string[] = [];
+
+                        let currentSection = '';
+                        for (const line of lines) {
+                            if (line.startsWith('Staged files')) {
+                                currentSection = 'staged';
+                            } else if (line.startsWith('Modified files')) {
+                                currentSection = 'modified';
+                            } else if (line.startsWith('Untracked files')) {
+                                currentSection = 'untracked';
+                            } else if (line.startsWith('  ')) {
+                                const fileName = line.trim();
+                                if (currentSection === 'staged') {
+                                    staged.push(fileName);
+                                } else if (currentSection === 'modified') {
+                                    modified.push(fileName);
+                                } else if (currentSection === 'untracked') {
+                                    untracked.push(fileName);
+                                }
+                            }
+                        }
+
+                        return {
+                            success: true,
+                            isClean: false,
+                            staged,
+                            modified,
+                            untracked,
+                            totalChanges: staged.length + modified.length + untracked.length,
+                        };
                     } catch (error) {
-                        return `Error getting git status: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                        return {
+                            success: false,
+                            error: `Error getting git status: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                        };
                     }
                 },
             }),
@@ -201,36 +359,46 @@ export class GitToolsService {
                     try {
                         const hunks = await this.gitService.getWorkingChangesAsHunks();
                         if (hunks.length === 0) {
-                            return 'No working directory changes found.';
+                            return {
+                                success: true,
+                                hasChanges: false,
+                                hunks: [],
+                                totalHunks: 0,
+                                affectedFiles: [],
+                                totalFiles: 0,
+                            };
                         }
 
-                        const result = hunks
-                            .map(
-                                (hunk) =>
-                                    `Hunk ID: ${hunk.hunkId}\n` +
-                                    `File: ${hunk.file}\n` +
-                                    `Summary: ${hunk.summary}\n` +
-                                    `Lines: ${hunk.oldStart}-${hunk.oldStart + hunk.chunk.oldLines} → ${hunk.newStart}-${hunk.newStart + hunk.chunk.newLines}\n` +
-                                    `Changes: +${hunk.linesAdded} -${hunk.linesRemoved}\n` +
-                                    `Changes detail:\n${hunk.chunk.changes
-                                        .map((c) => {
-                                            let prefix: string;
-                                            if (c.type === 'add') {
-                                                prefix = '+';
-                                            } else if (c.type === 'del') {
-                                                prefix = '-';
-                                            } else {
-                                                prefix = ' ';
-                                            }
-                                            return `${prefix}${c.content}`;
-                                        })
-                                        .join('\n')}\n`,
-                            )
-                            .join('\n---\n');
+                        const affectedFiles = [...new Set(hunks.map((h) => h.file))];
 
-                        return `Found ${hunks.length} hunks in ${new Set(hunks.map((h) => h.file)).size} files:\n\n${result}`;
+                        return {
+                            success: true,
+                            hasChanges: true,
+                            hunks: hunks.map((hunk) => ({
+                                hunkId: hunk.hunkId,
+                                file: hunk.file,
+                                summary: hunk.summary,
+                                oldStart: hunk.oldStart,
+                                newStart: hunk.newStart,
+                                oldLines: hunk.chunk.oldLines,
+                                newLines: hunk.chunk.newLines,
+                                linesAdded: hunk.linesAdded,
+                                linesRemoved: hunk.linesRemoved,
+                                changes: hunk.chunk.changes.map((c) => ({
+                                    type: c.type,
+                                    content: c.content,
+                                    lineNumber: GitToolsService.getLineNumberFromChange(c),
+                                })),
+                            })),
+                            totalHunks: hunks.length,
+                            affectedFiles,
+                            totalFiles: affectedFiles.length,
+                        };
                     } catch (error) {
-                        return `Error getting working changes as hunks: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                        return {
+                            success: false,
+                            error: `Error getting working changes as hunks: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                        };
                     }
                 },
             }),
@@ -250,14 +418,17 @@ export class GitToolsService {
 
                         // Filter to only the requested hunks
                         const selectedHunks = allHunks.filter((hunk) => hunkIds.includes(hunk.hunkId));
+                        const missingIds = hunkIds.filter((id) => !selectedHunks.some((h) => h.hunkId === id));
+                        const affectedFiles = [...new Set(selectedHunks.map((h) => h.file))];
 
                         if (selectedHunks.length === 0) {
-                            return 'No matching hunks found for the provided IDs.';
-                        }
-
-                        if (selectedHunks.length !== hunkIds.length) {
-                            const missing = hunkIds.filter((id) => !selectedHunks.some((h) => h.hunkId === id));
-                            return `Warning: Could not find hunks with IDs: ${missing.join(', ')}. Found ${selectedHunks.length} of ${hunkIds.length} requested hunks.`;
+                            return {
+                                success: false,
+                                error: 'No matching hunks found for the provided IDs',
+                                requestedIds: hunkIds,
+                                foundIds: [],
+                                missingIds: hunkIds,
+                            };
                         }
 
                         // Stage the selected hunks
@@ -268,15 +439,31 @@ export class GitToolsService {
                             })),
                         );
 
-                        return `Successfully staged ${selectedHunks.length} hunk(s) from ${new Set(selectedHunks.map((h) => h.file)).size} file(s)`;
+                        return {
+                            success: true,
+                            operation: 'stageHunks',
+                            requestedIds: hunkIds,
+                            stagedIds: selectedHunks.map((h) => h.hunkId),
+                            missingIds,
+                            stagedHunks: selectedHunks.length,
+                            affectedFiles,
+                            totalFiles: affectedFiles.length,
+                            hasWarnings: missingIds.length > 0,
+                        };
                     } catch (error) {
-                        return `Error staging hunks: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                        return {
+                            success: false,
+                            error: `Error staging hunks: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                            operation: 'stageHunks',
+                            requestedIds: hunkIds,
+                        };
                     }
                 },
             }),
 
             getFileCommitHistory: tool({
-                description: 'Get the last N commit messages that affected a specific file to understand commit patterns and context.',
+                description:
+                    'Get the last N commit messages that affected a specific file to understand commit patterns and context.',
                 inputSchema: z.object({
                     filePath: z.string().describe('Path to the file to get commit history for (relative to git root)'),
                     count: z.number().optional().describe('Number of recent commits to retrieve (default: 10)'),
@@ -286,7 +473,7 @@ export class GitToolsService {
 
                     try {
                         const commits = await this.gitService.getFileCommitHistory(filePath, count);
-                        
+
                         return {
                             success: true,
                             filePath,
@@ -303,5 +490,21 @@ export class GitToolsService {
                 },
             }),
         } as const;
+    }
+
+    private static getLineNumberFromChange(change: Change) {
+        if (change.type === 'add' && 'ln2' in change && typeof change.ln2 === 'number') {
+            return change.ln2;
+        }
+        if (change.type === 'del' && 'ln' in change && typeof change.ln === 'number') {
+            return change.ln;
+        }
+        if ('ln2' in change) {
+            return change.ln2;
+        }
+        if ('ln' in change) {
+            return change.ln;
+        }
+        return 0;
     }
 }
