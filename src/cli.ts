@@ -6,11 +6,13 @@ import { versionCommand } from './commands/version';
 import { configCommand } from './commands/config';
 import { setupCommand } from './commands/setup';
 import { prepareCommitMsgCommand } from './commands/prepare-commit-msg';
+import { ignoreCommand } from './commands/ignore';
 import { container } from './utils/di';
 import { CLI_ARGUMENTS } from './services/config.service';
 
 program.addCommand(agentCommand);
 program.addCommand(configCommand);
+program.addCommand(ignoreCommand);
 program.addCommand(prepareCommitMsgCommand);
 program.addCommand(setupCommand);
 program.addCommand(versionCommand);

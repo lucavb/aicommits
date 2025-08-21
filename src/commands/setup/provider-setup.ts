@@ -6,7 +6,7 @@ import { ClackPromptService } from '../../services/clack-prompt.service';
  */
 export async function setupProvider(
     promptUI: ClackPromptService,
-    currentConfig?: ProfileConfig,
+    currentConfig?: Partial<ProfileConfig>,
 ): Promise<ProviderName | null> {
     const provider = await promptUI.select({
         message: 'Select your AI provider',

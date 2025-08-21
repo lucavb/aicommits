@@ -103,6 +103,16 @@ async function handleAgentMode(
     gitService: GitService,
     promptUI: ClackPromptService,
 ): Promise<void> {
+    // Check if we have staged changes
+    const hasStagedChanges = await gitService.hasStagedChanges();
+    if (!hasStagedChanges) {
+        throw new KnownError(
+            trimLines(`
+                No staged changes found. Stage your changes manually, or automatically stage all changes with the \`--stage-all\` flag.
+            `),
+        );
+    }
+
     const analyzeSpinner = promptUI.spinner();
     analyzeSpinner.start('AI agent is analyzing the repository...');
 
@@ -189,6 +199,12 @@ export const agentCommand = new Command('agent')
     .addOption(new Option('--api-key <apiKey>', 'API key for the AI provider'))
     .addOption(new Option('--base-url <baseUrl>', 'Base URL for the AI provider API'))
     .addOption(new Option('--exclude <exclude>', 'Glob patterns to exclude files from commit analysis'))
+    .addOption(
+        new Option(
+            '--max-tool-calls <maxToolCalls>',
+            'Maximum number of tool calls allowed for the AI agent',
+        ).argParser(parseInt),
+    )
     .addOption(new Option('--model <model>', 'AI model to use for generating commit messages'))
     .addOption(new Option('--profile <profile>', 'Configuration profile to use').default('default'))
     .addOption(

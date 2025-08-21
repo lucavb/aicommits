@@ -3,15 +3,27 @@ import simpleGit from 'simple-git';
 import parseDiff from 'parse-diff';
 import { Inject, Injectable, Optional } from '../utils/inversify';
 import { KnownError } from '../utils/error';
+import { ConfigService } from './config.service';
 
 export const SIMPLE_GIT = Symbol.for('SIMPLE_GIT');
 
+type GitIntegration = Pick<SimpleGit, 'add' | 'commit' | 'revparse' | 'diff' | 'log' | 'status' | 'reset'>;
+type ConfigIntegration = Pick<
+    ConfigService,
+    'readConfig' | 'getGlobalIgnorePatterns' | 'setGlobalIgnorePatterns' | 'flush'
+>;
+
 @Injectable()
 export class GitService {
+    private readonly defaultIgnorePatterns = [
+        'package-lock.json',
+        'pnpm-lock.yaml',
+        '*.lock', // yarn.lock, Cargo.lock, Gemfile.lock, Pipfile.lock, etc.
+    ];
+
     constructor(
-        @Optional()
-        @Inject(SIMPLE_GIT)
-        private readonly git: SimpleGit = simpleGit(),
+        @Optional() @Inject(SIMPLE_GIT) private readonly git: GitIntegration = simpleGit(),
+        @Inject(ConfigService) private readonly configService: ConfigIntegration,
     ) {}
 
     async stageAllFiles(): Promise<void> {
@@ -43,18 +55,30 @@ export class GitService {
         return `:(exclude)${path}`;
     }
 
-    private filesToExclude: string[] = [
-        'package-lock.json',
-        'pnpm-lock.yaml',
-        '*.lock', // yarn.lock, Cargo.lock, Gemfile.lock, Pipfile.lock, etc.
-    ].map(this.excludeFromDiff);
+    private async getFilesToExclude(): Promise<string[]> {
+        await this.configService.readConfig();
+
+        let globalIgnore = this.configService.getGlobalIgnorePatterns();
+
+        // Migration: if globalIgnore is not configured, initialize it with defaults
+        if (globalIgnore.length === 0) {
+            console.log('ℹ️  Global ignore patterns not configured. Adding default patterns to config...');
+            globalIgnore = this.defaultIgnorePatterns;
+            this.configService.setGlobalIgnorePatterns(globalIgnore);
+            await this.configService.flush();
+            console.log('✅ Default ignore patterns added to globalIgnore config');
+        }
+
+        return globalIgnore.map(this.excludeFromDiff);
+    }
 
     async getStagedDiff(
         excludeFiles: string[] = [],
         contextLines: number,
     ): Promise<{ files: string[]; diff: string } | undefined> {
         const diffCached = ['--cached', '--diff-algorithm=minimal'] as const;
-        const excludeArgs = [...this.filesToExclude, ...excludeFiles.map(this.excludeFromDiff)] as const;
+        const filesToExclude = await this.getFilesToExclude();
+        const excludeArgs = [...filesToExclude, ...excludeFiles.map(this.excludeFromDiff)] as const;
 
         try {
             const files = await this.git.diff([...diffCached, '--name-only', ...excludeArgs]);
@@ -78,7 +102,8 @@ export class GitService {
     }
 
     async getWorkingDiff(contextLines: number): Promise<string | undefined> {
-        const excludeArgs = [...this.filesToExclude] as const;
+        const filesToExclude = await this.getFilesToExclude();
+        const excludeArgs = [...filesToExclude] as const;
 
         try {
             const diff = await this.git.diff([`-U${contextLines}`, ...excludeArgs]);
@@ -112,6 +137,23 @@ export class GitService {
                 .join('\n');
         } catch {
             throw new KnownError('Failed to get commit history');
+        }
+    }
+
+    async getFileCommitHistory(
+        filePath: string,
+        count: number,
+    ): Promise<{ hash: string; message: string; author: string; date: string }[]> {
+        try {
+            const log = await this.git.log({ maxCount: count, file: filePath });
+            return log.all.map((commit) => ({
+                hash: commit.hash.substring(0, 7),
+                message: commit.message,
+                author: commit.author_name || 'Unknown',
+                date: commit.date,
+            }));
+        } catch {
+            throw new KnownError(`Failed to get commit history for file: ${filePath}`);
         }
     }
 
@@ -349,41 +391,5 @@ export class GitService {
                 `Failed to stage selected hunks: ${error instanceof Error ? error.message : 'Unknown error'}`,
             );
         }
-    }
-
-    private createFilePatchFromChunks(file: string, chunks: parseDiff.Chunk[]): string {
-        // Use relative path format as expected by git apply
-        const gitPath = file.startsWith('./') ? file.slice(2) : file;
-
-        let patch = `diff --git a/${gitPath} b/${gitPath}\n`;
-        patch += 'index 0000000..1111111 100644\n';
-        patch += `--- a/${gitPath}\n`;
-        patch += `+++ b/${gitPath}\n`;
-        for (const chunk of chunks) {
-            // Create the hunk header
-            const oldCount = chunk.oldLines;
-            const newCount = chunk.newLines;
-            patch += `@@ -${chunk.oldStart},${oldCount} +${chunk.newStart},${newCount} @@\n`;
-
-            // Add all the changes in this chunk
-            for (const change of chunk.changes) {
-                // Clean content to avoid trailing whitespace issues
-                const cleanContent = change.content.replace(/\s+$/, '');
-
-                switch (change.type) {
-                    case 'add':
-                        patch += `+${cleanContent}\n`;
-                        break;
-                    case 'del':
-                        patch += `-${cleanContent}\n`;
-                        break;
-                    case 'normal':
-                        patch += ` ${cleanContent}\n`;
-                        break;
-                }
-            }
-        }
-
-        return patch;
     }
 }

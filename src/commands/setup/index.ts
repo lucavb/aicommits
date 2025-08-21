@@ -19,7 +19,7 @@ export const setupCommand = new Command('setup')
         promptUI.note(`You are configuring the "${profile}" profile.`);
 
         await configService.readConfig();
-        const currentConfig = configService.getProfile(profile);
+        const currentConfig = configService.getRawProfile(profile);
 
         // 1. Setup provider
         const provider = await setupProvider(promptUI, currentConfig);

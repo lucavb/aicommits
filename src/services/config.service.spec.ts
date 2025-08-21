@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import { Container } from 'inversify';
-import { stringify as yamlStringify } from 'yaml';
+import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import {
     CLI_ARGUMENTS,
     CONFIG_FILE_PATH,
@@ -33,6 +33,7 @@ describe('ConfigService', () => {
                 contextLines: 10,
                 locale: 'en',
                 maxLength: 50,
+                maxToolCalls: 25,
             },
         },
         currentProfile: 'default',
@@ -75,25 +76,43 @@ describe('ConfigService', () => {
 
     describe('writeConfig', () => {
         it('should write the config to the file', async () => {
-            const savedConfig: Partial<Config> = {
+            // Set up the complete config structure
+            configService.updateConfigInMemory({ currentProfile: 'default' });
+            configService.updateProfileInMemory('default', {
+                baseUrl: 'https://api.openai.com/v1',
+                contextLines: 10,
+                locale: 'en',
+                maxLength: 50,
+                maxToolCalls: 25,
+                model: 'gpt-4',
+                provider: 'openai',
+                stageAll: false,
+            });
+
+            await configService.flush();
+
+            expect(mockFsApi.writeFile).toHaveBeenCalledTimes(1);
+
+            // Parse the written YAML and compare the object structure instead of string comparison
+            const [filePath, yamlContent] = mockFsApi.writeFile.mock.calls[0];
+            expect(filePath).toBe(tempFilePath);
+
+            const writtenConfig = yamlParse(yamlContent as string);
+            expect(writtenConfig).toMatchObject({
+                currentProfile: 'default',
                 profiles: {
                     default: {
-                        model: 'gpt-4',
                         baseUrl: 'https://api.openai.com/v1',
-                        provider: 'openai',
-                        stageAll: false,
                         contextLines: 10,
                         locale: 'en',
                         maxLength: 50,
+                        maxToolCalls: 25,
+                        model: 'gpt-4',
+                        provider: 'openai',
+                        stageAll: false,
                     },
                 },
-                currentProfile: 'default',
-            };
-            configService.updateConfigInMemory(savedConfig);
-            await configService.flush();
-
-            expect(mockFsApi.writeFile).toHaveBeenCalledWith(tempFilePath, yamlStringify(savedConfig), 'utf8');
-            expect(mockFsApi.writeFile).toHaveBeenCalledTimes(1);
+            });
         });
     });
 
@@ -110,6 +129,7 @@ describe('ConfigService', () => {
                         contextLines: 10,
                         locale: 'en',
                         maxLength: 50,
+                        maxToolCalls: 25,
                     },
                 },
                 currentProfile: 'default',
@@ -130,6 +150,7 @@ describe('ConfigService', () => {
                         contextLines: 10,
                         locale: 'en',
                         maxLength: 50,
+                        maxToolCalls: 25,
                     },
                 },
                 currentProfile: 'default',

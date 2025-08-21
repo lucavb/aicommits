@@ -22,7 +22,19 @@ export class AIAgentService {
     ) {}
 
     async generateCommitWithAgent({ onToolCall }: { onToolCall?: (msg: string) => void }): Promise<AgentResult> {
-        const tools = this.createAllTools(onToolCall);
+        const config = this.configService.getConfig();
+        const maxToolCalls = config.maxToolCalls;
+        let currentToolCallCount = 0;
+
+        const toolCallWrapper = onToolCall
+            ? (message: string) => {
+                  currentToolCallCount++;
+                  const formattedMessage = `${message} (${currentToolCallCount}/${maxToolCalls})`;
+                  onToolCall(formattedMessage);
+              }
+            : undefined;
+
+        const tools = this.createAllTools(toolCallWrapper);
 
         const systemPrompt = this.promptService.createAgentSystemPrompt();
         const userPrompt = this.promptService.createAgentUserPrompt();
@@ -42,7 +54,7 @@ export class AIAgentService {
                         content: userPrompt,
                     },
                 ],
-                stopWhen: stepCountIs(25),
+                stopWhen: stepCountIs(maxToolCalls),
             });
 
             return this.extractCommitFromResult(result);
@@ -64,7 +76,19 @@ export class AIAgentService {
         onToolCall?: (msg: string) => void;
         userRevisionPrompt: string;
     }): Promise<AgentResult> {
-        const tools = this.createAllTools(onToolCall);
+        const config = this.configService.getConfig();
+        const maxToolCalls = config.maxToolCalls;
+        let currentToolCallCount = 0;
+
+        const toolCallWrapper = onToolCall
+            ? (message: string) => {
+                  currentToolCallCount++;
+                  const formattedMessage = `${message} (${currentToolCallCount}/${maxToolCalls})`;
+                  onToolCall(formattedMessage);
+              }
+            : undefined;
+
+        const tools = this.createAllTools(toolCallWrapper);
 
         const systemPrompt = this.promptService.createAgentSystemPrompt();
         const userPrompt = this.promptService.createAgentRevisionPrompt(
@@ -88,7 +112,7 @@ export class AIAgentService {
                         content: userPrompt,
                     },
                 ],
-                stopWhen: stepCountIs(25),
+                stopWhen: stepCountIs(maxToolCalls),
             });
 
             return this.extractCommitFromResult(result);

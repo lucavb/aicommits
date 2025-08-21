@@ -34,7 +34,7 @@ export const detectLocale = (): LanguageCode => {
  */
 export async function setupLanguage(
     promptUI: ClackPromptService,
-    currentConfig?: ProfileConfig,
+    currentConfig?: Partial<ProfileConfig>,
 ): Promise<LanguageCode | null> {
     const detectedLocale = detectLocale();
     const locale = await promptUI.text({
