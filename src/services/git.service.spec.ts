@@ -24,11 +24,9 @@ class MockSimpleGit {
 describe('GitService', () => {
     let gitService: GitService;
     let mockGit: MockSimpleGit;
-    let _mockConfigService: MockConfigService;
 
     beforeEach(() => {
         mockGit = new MockSimpleGit();
-        _mockConfigService = new MockConfigService();
 
         const container = new Container({ defaultScope: 'Singleton' });
         container.bind(ConfigService).to(MockConfigService as unknown as typeof ConfigService);
