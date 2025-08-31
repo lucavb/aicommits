@@ -52,5 +52,57 @@ describe('PromptService', () => {
             expect(prompt).toContain('Choose a type from the type-to-description JSON');
             expect(prompt).toContain('<type>(<optional scope>): <commit message>');
         });
+
+        it('should use recent commits for style when 5 or more commits provided', () => {
+            const recentCommits = [
+                'feat: add new feature',
+                'fix: resolve bug in component',
+                'docs: update README',
+                'refactor: improve code structure',
+                'test: add unit tests',
+            ];
+
+            const prompt = promptService.generateCommitMessagePrompt('en', 50, 'conventional', recentCommits);
+
+            expect(prompt).toContain('Match the style and format of the recent commit messages below');
+            expect(prompt).toContain('Recent commit messages:');
+            expect(prompt).toContain('1. feat: add new feature');
+            expect(prompt).toContain('2. fix: resolve bug in component');
+            expect(prompt).toContain('5. test: add unit tests');
+            expect(prompt).toContain('Generate a commit message that follows the same style');
+
+            // Should not contain conventional commit type instructions when using recent commits
+            expect(prompt).not.toContain('Choose a type from the type-to-description JSON');
+            expect(prompt).not.toContain('<type>(<optional scope>): <commit message>');
+        });
+
+        it('should fallback to type-based format when fewer than 5 recent commits', () => {
+            const recentCommits = ['feat: add feature', 'fix: bug fix'];
+
+            const prompt = promptService.generateCommitMessagePrompt('en', 50, 'conventional', recentCommits);
+
+            // Should use conventional format since we have < 5 commits
+            expect(prompt).toContain('Choose a type from the type-to-description JSON');
+            expect(prompt).toContain('<type>(<optional scope>): <commit message>');
+            expect(prompt).not.toContain('Recent commit messages:');
+        });
+
+        it('should fallback to type-based format when no recent commits provided', () => {
+            const prompt = promptService.generateCommitMessagePrompt('en', 50, 'conventional', []);
+
+            // Should use conventional format since we have no commits
+            expect(prompt).toContain('Choose a type from the type-to-description JSON');
+            expect(prompt).toContain('<type>(<optional scope>): <commit message>');
+            expect(prompt).not.toContain('Recent commit messages:');
+        });
+
+        it('should fallback to type-based format when recent commits is undefined', () => {
+            const prompt = promptService.generateCommitMessagePrompt('en', 50, 'conventional');
+
+            // Should use conventional format since recentCommits is undefined
+            expect(prompt).toContain('Choose a type from the type-to-description JSON');
+            expect(prompt).toContain('<type>(<optional scope>): <commit message>');
+            expect(prompt).not.toContain('Recent commit messages:');
+        });
     });
 });

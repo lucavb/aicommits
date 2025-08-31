@@ -3,6 +3,7 @@ import { isString } from '../utils/typeguards';
 import { ConfigService } from './config.service';
 import { PromptService } from './prompt.service';
 import { AIProviderFactory } from './ai-provider.factory';
+import { GitService } from './git.service';
 
 const sanitizeMessage = (message: string) =>
     message
@@ -18,10 +19,14 @@ export class AICommitMessageService {
         @Inject(AIProviderFactory) private readonly aiProviderFactory: AIProviderFactory,
         @Inject(ConfigService) private readonly configService: ConfigService,
         @Inject(PromptService) private readonly promptService: PromptService,
+        @Inject(GitService) private readonly gitService: GitService,
     ) {}
 
     async generateCommitMessage({ diff }: { diff: string }): Promise<{ commitMessages: string[]; bodies: string[] }> {
         const { locale, maxLength, type, model } = this.configService.getConfig();
+
+        // Fetch recent commits to potentially infer style
+        const recentCommits = await this.gitService.getRecentCommitMessages(5);
 
         const [commitMessageCompletion, commitBodyCompletion] = await Promise.all([
             this.aiProviderFactory.createProvider().generateCompletion({
@@ -32,7 +37,12 @@ export class AICommitMessageService {
                     },
                     {
                         role: 'user',
-                        content: this.promptService.generateCommitMessagePrompt(locale, maxLength, type ?? ''),
+                        content: this.promptService.generateCommitMessagePrompt(
+                            locale,
+                            maxLength,
+                            type ?? '',
+                            recentCommits,
+                        ),
                     },
                     { role: 'user', content: diff },
                 ],
@@ -73,6 +83,9 @@ export class AICommitMessageService {
     }): Promise<void> {
         const { locale, maxLength, type, model } = this.configService.getConfig();
 
+        // Fetch recent commits to potentially infer style
+        const recentCommits = await this.gitService.getRecentCommitMessages(5);
+
         let commitMessage = '';
         let body = '';
 
@@ -95,7 +108,12 @@ export class AICommitMessageService {
                     },
                     {
                         role: 'user',
-                        content: this.promptService.generateCommitMessagePrompt(locale, maxLength, type ?? ''),
+                        content: this.promptService.generateCommitMessagePrompt(
+                            locale,
+                            maxLength,
+                            type ?? '',
+                            recentCommits,
+                        ),
                     },
                     { role: 'user', content: diff },
                 ],
@@ -142,6 +160,9 @@ export class AICommitMessageService {
     }): Promise<{ commitMessages: string[]; bodies: string[] }> {
         const { locale, maxLength, type, model } = this.configService.getConfig();
 
+        // Fetch recent commits to potentially infer style
+        const recentCommits = await this.gitService.getRecentCommitMessages(5);
+
         const [commitMessageCompletion, commitBodyCompletion] = await Promise.all([
             this.aiProviderFactory.createProvider().generateCompletion({
                 messages: [
@@ -151,7 +172,12 @@ export class AICommitMessageService {
                     },
                     {
                         role: 'user',
-                        content: this.promptService.generateCommitMessagePrompt(locale, maxLength, type ?? ''),
+                        content: this.promptService.generateCommitMessagePrompt(
+                            locale,
+                            maxLength,
+                            type ?? '',
+                            recentCommits,
+                        ),
                     },
                     {
                         role: 'user',
@@ -203,6 +229,9 @@ export class AICommitMessageService {
     }): Promise<void> {
         const { locale, maxLength, type, model } = this.configService.getConfig();
 
+        // Fetch recent commits to potentially infer style
+        const recentCommits = await this.gitService.getRecentCommitMessages(5);
+
         let commitMessage = '';
         let body = '';
 
@@ -224,7 +253,12 @@ export class AICommitMessageService {
                     },
                     {
                         role: 'user',
-                        content: this.promptService.generateCommitMessagePrompt(locale, maxLength, type ?? ''),
+                        content: this.promptService.generateCommitMessagePrompt(
+                            locale,
+                            maxLength,
+                            type ?? '',
+                            recentCommits,
+                        ),
                     },
                     {
                         role: 'user',
