@@ -25,7 +25,6 @@ export class AICommitMessageService {
     async generateCommitMessage({ diff }: { diff: string }): Promise<{ commitMessages: string[]; bodies: string[] }> {
         const { locale, maxLength, type, model } = this.configService.getConfig();
 
-        // Fetch recent commits to potentially infer style
         const recentCommits = await this.gitService.getRecentCommitMessages(5);
 
         const [commitMessageCompletion, commitBodyCompletion] = await Promise.all([
@@ -83,13 +82,11 @@ export class AICommitMessageService {
     }): Promise<void> {
         const { locale, maxLength, type, model } = this.configService.getConfig();
 
-        // Fetch recent commits to potentially infer style
         const recentCommits = await this.gitService.getRecentCommitMessages(5);
 
         let commitMessage = '';
         let body = '';
 
-        // Create promise to track both streams completion
         const streamingComplete = new Promise<void>((resolve) => {
             let messagesCompleted = 0;
             const checkComplete = () => {
@@ -99,7 +96,6 @@ export class AICommitMessageService {
                 }
             };
 
-            // Stream commit message
             this.aiProviderFactory.createProvider().streamCompletion({
                 messages: [
                     {
@@ -127,7 +123,6 @@ export class AICommitMessageService {
                 },
             });
 
-            // Stream body
             this.aiProviderFactory.createProvider().streamCompletion({
                 messages: [
                     { role: 'system', content: this.promptService.generateSummaryPrompt(locale) },
@@ -144,10 +139,8 @@ export class AICommitMessageService {
             });
         });
 
-        // Wait for both streams to complete
         await streamingComplete;
 
-        // Call the completion callback with final results
         onComplete(commitMessage, body);
     }
 
@@ -160,7 +153,6 @@ export class AICommitMessageService {
     }): Promise<{ commitMessages: string[]; bodies: string[] }> {
         const { locale, maxLength, type, model } = this.configService.getConfig();
 
-        // Fetch recent commits to potentially infer style
         const recentCommits = await this.gitService.getRecentCommitMessages(5);
 
         const [commitMessageCompletion, commitBodyCompletion] = await Promise.all([
@@ -229,7 +221,6 @@ export class AICommitMessageService {
     }): Promise<void> {
         const { locale, maxLength, type, model } = this.configService.getConfig();
 
-        // Fetch recent commits to potentially infer style
         const recentCommits = await this.gitService.getRecentCommitMessages(5);
 
         let commitMessage = '';
@@ -244,7 +235,6 @@ export class AICommitMessageService {
                 }
             };
 
-            // Stream commit message
             this.aiProviderFactory.createProvider().streamCompletion({
                 messages: [
                     {
@@ -275,7 +265,6 @@ export class AICommitMessageService {
                 },
             });
 
-            // Stream body
             this.aiProviderFactory.createProvider().streamCompletion({
                 messages: [
                     {
@@ -298,10 +287,8 @@ export class AICommitMessageService {
             });
         });
 
-        // Wait for both streams to complete
         await streamingComplete;
 
-        // Call the completion callback with final results
         onComplete(commitMessage, body);
     }
 }

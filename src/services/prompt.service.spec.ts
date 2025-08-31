@@ -71,7 +71,6 @@ describe('PromptService', () => {
             expect(prompt).toContain('5. test: add unit tests');
             expect(prompt).toContain('Generate a commit message that follows the same style');
 
-            // Should not contain conventional commit type instructions when using recent commits
             expect(prompt).not.toContain('Choose a type from the type-to-description JSON');
             expect(prompt).not.toContain('<type>(<optional scope>): <commit message>');
         });
@@ -81,7 +80,6 @@ describe('PromptService', () => {
 
             const prompt = promptService.generateCommitMessagePrompt('en', 50, 'conventional', recentCommits);
 
-            // Should use conventional format since we have < 5 commits
             expect(prompt).toContain('Choose a type from the type-to-description JSON');
             expect(prompt).toContain('<type>(<optional scope>): <commit message>');
             expect(prompt).not.toContain('Recent commit messages:');
@@ -90,7 +88,6 @@ describe('PromptService', () => {
         it('should fallback to type-based format when no recent commits provided', () => {
             const prompt = promptService.generateCommitMessagePrompt('en', 50, 'conventional', []);
 
-            // Should use conventional format since we have no commits
             expect(prompt).toContain('Choose a type from the type-to-description JSON');
             expect(prompt).toContain('<type>(<optional scope>): <commit message>');
             expect(prompt).not.toContain('Recent commit messages:');
@@ -99,7 +96,6 @@ describe('PromptService', () => {
         it('should fallback to type-based format when recent commits is undefined', () => {
             const prompt = promptService.generateCommitMessagePrompt('en', 50, 'conventional');
 
-            // Should use conventional format since recentCommits is undefined
             expect(prompt).toContain('Choose a type from the type-to-description JSON');
             expect(prompt).toContain('<type>(<optional scope>): <commit message>');
             expect(prompt).not.toContain('Recent commit messages:');

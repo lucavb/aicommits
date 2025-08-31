@@ -81,7 +81,6 @@ export class PromptService {
             'Return only the commit message, with no extra commentary or formatting.',
         ];
 
-        // If we have recent commits (5 or more), use them to infer style instead of explicit type
         if (recentCommits && recentCommits.length >= 5) {
             const recentCommitsText = recentCommits.map((msg, idx) => `${idx + 1}. ${msg}`).join('\n');
             return [
@@ -98,7 +97,6 @@ export class PromptService {
                 .join('\n');
         }
 
-        // Fallback to explicit type-based formatting
         return [...baseInstructions, commitTypes[type], specifyCommitFormat(type)]
             .filter((entry) => !!entry)
             .join('\n');

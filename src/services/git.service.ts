@@ -101,7 +101,6 @@ export class GitService {
             const log = await this.git.log(['--oneline', `-n${count}`, '--pretty=format:%s']);
             return log.all.map((commit) => commit.message).filter(Boolean);
         } catch {
-            // If we can't get commit history (e.g., new repo), return empty array
             return [];
         }
     }

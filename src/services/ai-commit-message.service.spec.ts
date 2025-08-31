@@ -51,7 +51,6 @@ describe('AICommitMessageService', () => {
     let aiProviderFactory: MockAIProviderFactory;
 
     beforeEach(() => {
-        // Create shared mock instances
         aiProvider = new MockAIProvider();
         aiProviderFactory = new MockAIProviderFactory();
         aiProviderFactory.createProvider.mockReturnValue(aiProvider);
@@ -193,9 +192,7 @@ describe('AICommitMessageService', () => {
             const onBodyUpdate = vi.fn();
             const onComplete = vi.fn();
 
-            // Mock streaming completion to immediately call callbacks
             aiProvider.streamCompletion.mockImplementation((params) => {
-                // Simulate streaming by immediately calling the callbacks
                 setTimeout(() => {
                     params.onMessageDelta?.('Streaming content');
                     params.onComplete?.('Final content');
@@ -203,7 +200,6 @@ describe('AICommitMessageService', () => {
                 return Promise.resolve();
             });
 
-            // Start streaming
             await service.generateStreamingCommitMessage({
                 diff,
                 onMessageUpdate,
@@ -211,7 +207,6 @@ describe('AICommitMessageService', () => {
                 onComplete,
             });
 
-            // Verify that streaming was called correctly
             expect(aiProvider.streamCompletion).toHaveBeenCalledTimes(2); // Once for message, once for body
             expect(gitService.getRecentCommitMessages).toHaveBeenCalledWith(5);
             expect(promptService.generateCommitMessagePrompt).toHaveBeenCalledWith('en', 50, 'feat', [
@@ -240,9 +235,7 @@ describe('AICommitMessageService', () => {
             const onBodyUpdate = vi.fn();
             const onComplete = vi.fn();
 
-            // Mock streaming completion to immediately call callbacks
             aiProvider.streamCompletion.mockImplementation((params) => {
-                // Simulate streaming by immediately calling the callbacks
                 setTimeout(() => {
                     params.onMessageDelta?.('Streaming content');
                     params.onComplete?.('Final content');
@@ -250,7 +243,6 @@ describe('AICommitMessageService', () => {
                 return Promise.resolve();
             });
 
-            // Start streaming
             await service.reviseStreamingCommitMessage({
                 diff,
                 userPrompt,
@@ -259,7 +251,6 @@ describe('AICommitMessageService', () => {
                 onComplete,
             });
 
-            // Verify that streaming was called correctly
             expect(aiProvider.streamCompletion).toHaveBeenCalledTimes(2); // Once for message, once for body
             expect(gitService.getRecentCommitMessages).toHaveBeenCalledWith(5);
             expect(promptService.generateCommitMessagePrompt).toHaveBeenCalledWith('en', 50, 'feat', [
@@ -268,7 +259,6 @@ describe('AICommitMessageService', () => {
             ]);
             expect(promptService.generateSummaryPrompt).toHaveBeenCalledWith('en');
 
-            // Verify the user prompt was included in the provider call
             expect(aiProvider.streamCompletion).toHaveBeenCalledWith(
                 expect.objectContaining({
                     messages: expect.arrayContaining([
@@ -279,7 +269,6 @@ describe('AICommitMessageService', () => {
                 }),
             );
 
-            // Verify streaming callbacks were called
             expect(onMessageUpdate).toHaveBeenCalled();
             expect(onBodyUpdate).toHaveBeenCalled();
             expect(onComplete).toHaveBeenCalled();
