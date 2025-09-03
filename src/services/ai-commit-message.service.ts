@@ -3,6 +3,7 @@ import { isString } from '../utils/typeguards';
 import { ConfigService } from './config.service';
 import { PromptService } from './prompt.service';
 import { AIProviderFactory } from './ai-provider.factory';
+import { GitService } from './git.service';
 
 const sanitizeMessage = (message: string) =>
     message
@@ -18,10 +19,13 @@ export class AICommitMessageService {
         @Inject(AIProviderFactory) private readonly aiProviderFactory: AIProviderFactory,
         @Inject(ConfigService) private readonly configService: ConfigService,
         @Inject(PromptService) private readonly promptService: PromptService,
+        @Inject(GitService) private readonly gitService: GitService,
     ) {}
 
     async generateCommitMessage({ diff }: { diff: string }): Promise<{ commitMessages: string[]; bodies: string[] }> {
         const { locale, maxLength, type, model } = this.configService.getConfig();
+
+        const recentCommits = await this.gitService.getRecentCommitMessages(5);
 
         const [commitMessageCompletion, commitBodyCompletion] = await Promise.all([
             this.aiProviderFactory.createProvider().generateCompletion({
@@ -32,7 +36,12 @@ export class AICommitMessageService {
                     },
                     {
                         role: 'user',
-                        content: this.promptService.generateCommitMessagePrompt(locale, maxLength, type ?? ''),
+                        content: this.promptService.generateCommitMessagePrompt(
+                            locale,
+                            maxLength,
+                            type ?? '',
+                            recentCommits,
+                        ),
                     },
                     { role: 'user', content: diff },
                 ],
@@ -73,10 +82,11 @@ export class AICommitMessageService {
     }): Promise<void> {
         const { locale, maxLength, type, model } = this.configService.getConfig();
 
+        const recentCommits = await this.gitService.getRecentCommitMessages(5);
+
         let commitMessage = '';
         let body = '';
 
-        // Create promise to track both streams completion
         const streamingComplete = new Promise<void>((resolve) => {
             let messagesCompleted = 0;
             const checkComplete = () => {
@@ -86,7 +96,6 @@ export class AICommitMessageService {
                 }
             };
 
-            // Stream commit message
             this.aiProviderFactory.createProvider().streamCompletion({
                 messages: [
                     {
@@ -95,7 +104,12 @@ export class AICommitMessageService {
                     },
                     {
                         role: 'user',
-                        content: this.promptService.generateCommitMessagePrompt(locale, maxLength, type ?? ''),
+                        content: this.promptService.generateCommitMessagePrompt(
+                            locale,
+                            maxLength,
+                            type ?? '',
+                            recentCommits,
+                        ),
                     },
                     { role: 'user', content: diff },
                 ],
@@ -109,7 +123,6 @@ export class AICommitMessageService {
                 },
             });
 
-            // Stream body
             this.aiProviderFactory.createProvider().streamCompletion({
                 messages: [
                     { role: 'system', content: this.promptService.generateSummaryPrompt(locale) },
@@ -126,10 +139,8 @@ export class AICommitMessageService {
             });
         });
 
-        // Wait for both streams to complete
         await streamingComplete;
 
-        // Call the completion callback with final results
         onComplete(commitMessage, body);
     }
 
@@ -142,6 +153,8 @@ export class AICommitMessageService {
     }): Promise<{ commitMessages: string[]; bodies: string[] }> {
         const { locale, maxLength, type, model } = this.configService.getConfig();
 
+        const recentCommits = await this.gitService.getRecentCommitMessages(5);
+
         const [commitMessageCompletion, commitBodyCompletion] = await Promise.all([
             this.aiProviderFactory.createProvider().generateCompletion({
                 messages: [
@@ -151,7 +164,12 @@ export class AICommitMessageService {
                     },
                     {
                         role: 'user',
-                        content: this.promptService.generateCommitMessagePrompt(locale, maxLength, type ?? ''),
+                        content: this.promptService.generateCommitMessagePrompt(
+                            locale,
+                            maxLength,
+                            type ?? '',
+                            recentCommits,
+                        ),
                     },
                     {
                         role: 'user',
@@ -203,6 +221,8 @@ export class AICommitMessageService {
     }): Promise<void> {
         const { locale, maxLength, type, model } = this.configService.getConfig();
 
+        const recentCommits = await this.gitService.getRecentCommitMessages(5);
+
         let commitMessage = '';
         let body = '';
 
@@ -215,7 +235,6 @@ export class AICommitMessageService {
                 }
             };
 
-            // Stream commit message
             this.aiProviderFactory.createProvider().streamCompletion({
                 messages: [
                     {
@@ -224,7 +243,12 @@ export class AICommitMessageService {
                     },
                     {
                         role: 'user',
-                        content: this.promptService.generateCommitMessagePrompt(locale, maxLength, type ?? ''),
+                        content: this.promptService.generateCommitMessagePrompt(
+                            locale,
+                            maxLength,
+                            type ?? '',
+                            recentCommits,
+                        ),
                     },
                     {
                         role: 'user',
@@ -241,7 +265,6 @@ export class AICommitMessageService {
                 },
             });
 
-            // Stream body
             this.aiProviderFactory.createProvider().streamCompletion({
                 messages: [
                     {
@@ -264,10 +287,8 @@ export class AICommitMessageService {
             });
         });
 
-        // Wait for both streams to complete
         await streamingComplete;
 
-        // Call the completion callback with final results
         onComplete(commitMessage, body);
     }
 }

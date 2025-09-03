@@ -95,4 +95,13 @@ export class GitService {
     getDetectedMessage(files: unknown[]): string {
         return `Detected ${files.length.toLocaleString()} staged file${files.length > 1 ? 's' : ''}`;
     }
+
+    async getRecentCommitMessages(count: number = 5): Promise<string[]> {
+        try {
+            const logs = await this.git.log({ maxCount: count, '--no-merges': null });
+            return logs.all.map((commit) => commit.message).filter(Boolean);
+        } catch {
+            return [];
+        }
+    }
 }

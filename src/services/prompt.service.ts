@@ -68,8 +68,8 @@ export class PromptService {
             .join('\n');
     }
 
-    generateCommitMessagePrompt(locale: string, maxLength: number, type: CommitType) {
-        return [
+    generateCommitMessagePrompt(locale: string, maxLength: number, type: CommitType, recentCommits?: string[]) {
+        const baseInstructions = [
             `Message language: ${locale}`,
             `Commit message must be a maximum of ${maxLength} characters.`,
             'Write a clear, concise, and descriptive commit message in the imperative mood (e.g., "Add feature", "Fix bug").',
@@ -79,9 +79,25 @@ export class PromptService {
             'Do not include file names, code snippets, or restate the diff. Do not include unnecessary words or phrases.',
             'Avoid generic messages like "update code" or "fix issue".',
             'Return only the commit message, with no extra commentary or formatting.',
-            commitTypes[type],
-            specifyCommitFormat(type),
-        ]
+        ];
+
+        if (recentCommits && recentCommits.length >= 5) {
+            const recentCommitsText = recentCommits.map((msg, idx) => `${idx + 1}. ${msg}`).join('\n');
+            return [
+                ...baseInstructions,
+                'IMPORTANT: Match the style and format of the recent commit messages below.',
+                'Analyze the pattern, structure, and conventions used in these recent commits and follow the same style:',
+                '',
+                'Recent commit messages:',
+                recentCommitsText,
+                '',
+                'Generate a commit message that follows the same style, format, and conventions as these recent commits.',
+            ]
+                .filter((entry) => !!entry)
+                .join('\n');
+        }
+
+        return [...baseInstructions, commitTypes[type], specifyCommitFormat(type)]
             .filter((entry) => !!entry)
             .join('\n');
     }
