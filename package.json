@@ -75,7 +75,7 @@
         "reflect-metadata": "0.2.2",
         "simple-git": "3.28.0",
         "yaml": "2.8.1",
-        "zod": "3.25.76"
+        "zod": "4.1.11"
     },
     "devDependencies": {
         "@commitlint/cli": "20.1.0",
