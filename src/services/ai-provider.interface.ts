@@ -1,3 +1,5 @@
+export type ReasoningEffort = 'low' | 'medium' | 'high';
+
 export interface AIProvider {
     listModels(): Promise<string[]>;
     generateCompletion(params: {
@@ -5,6 +7,7 @@ export interface AIProvider {
         model: string;
         temperature?: number;
         n?: number;
+        reasoningEffort?: ReasoningEffort;
     }): Promise<{ choices: { message: { content: string } }[] }>;
 
     streamCompletion(params: {
@@ -13,6 +16,7 @@ export interface AIProvider {
         onComplete: (finalContent: string) => void;
         onMessageDelta: (content: string) => void;
         temperature?: number;
+        reasoningEffort?: ReasoningEffort;
     }): Promise<void>;
 }
 
