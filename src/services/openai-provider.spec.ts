@@ -81,6 +81,39 @@ describe('OpenAIProvider', () => {
             });
         });
 
+        it('should omit temperature for GPT-5 models that do not support custom values', async () => {
+            const mockCompletion = {
+                created: 0,
+                id: 'test-id-5',
+                model: 'gpt-5-nano',
+                object: 'chat.completion',
+                choices: [
+                    {
+                        finish_reason: 'stop',
+                        index: 0,
+                        logprobs: null,
+                        message: { content: 'ok', role: 'assistant', refusal: null },
+                    },
+                ],
+            } as const satisfies ChatCompletion;
+            vi.spyOn(mockOpenAI.chat.completions, 'create').mockResolvedValue(mockCompletion);
+
+            await provider.generateCompletion({
+                messages: [{ role: 'user', content: 'Hello' }],
+                model: 'gpt-5-nano',
+                temperature: 0.7,
+            });
+
+            expect(mockOpenAI.chat.completions.create).toHaveBeenCalledWith({
+                frequency_penalty: 0,
+                messages: [{ role: 'user', content: 'Hello' }],
+                model: 'gpt-5-nano',
+                n: 1,
+                presence_penalty: 0,
+                top_p: 1,
+            });
+        });
+
         it('should throw an error if generating completion fails', async () => {
             vi.spyOn(mockOpenAI.chat.completions, 'create').mockRejectedValue(
                 new Error('Failed to generate completion'),
@@ -146,6 +179,44 @@ describe('OpenAIProvider', () => {
             // Verify onComplete was called once with the full content
             expect(onComplete).toHaveBeenCalledTimes(1);
             expect(onComplete).toHaveBeenCalledWith('Hello world!');
+        });
+
+        it('should omit temperature for GPT-5 models during streaming', async () => {
+            const mockChunks = [
+                { choices: [{ delta: { content: 'A' } }] },
+                { choices: [{ delta: { content: 'B' } }] },
+            ];
+            const mockStream = {
+                async *[Symbol.asyncIterator]() {
+                    for (const chunk of mockChunks) {
+                        yield chunk as ChatCompletionChunk;
+                    }
+                },
+            } as unknown as Stream<ChatCompletionChunk>;
+
+            vi.spyOn(mockOpenAI.chat.completions, 'create').mockResolvedValue(mockStream);
+
+            const onMessageDelta = vi.fn();
+            const onComplete = vi.fn();
+
+            await provider.streamCompletion({
+                messages: [{ role: 'user', content: 'Hi' }],
+                model: 'gpt-5-nano',
+                temperature: 0.7,
+                onMessageDelta,
+                onComplete,
+            });
+
+            expect(mockOpenAI.chat.completions.create).toHaveBeenCalledWith({
+                frequency_penalty: 0,
+                messages: [{ role: 'user', content: 'Hi' }],
+                model: 'gpt-5-nano',
+                presence_penalty: 0,
+                top_p: 1,
+                stream: true,
+            });
+
+            expect(onComplete).toHaveBeenCalledWith('AB');
         });
 
         it('should handle chunks with no content', async () => {

@@ -7,6 +7,18 @@ type OpenAIWithSpecificFunctions = {
     models: { list: InstanceType<typeof OpenAI>['models']['list'] };
 };
 
+// Some models (reasoning / next-gen) do not support custom temperature or top_p values.
+// This list can be expanded easily as new models appear.
+function modelSupportsCustomTemperature(modelId: string): boolean {
+    const unsupportedModels = [
+        /^gpt-5/i,  // All GPT-5 series
+        /^o1/i,     // o1 reasoning models
+        /^o3/i,     // o3-mini and similar o-series reasoning models
+    ];
+
+    return !unsupportedModels.some((pattern) => pattern.test(modelId));
+}
+
 @Injectable()
 export class OpenAIProvider implements AIProvider {
     constructor(@Inject(OpenAI) private readonly openai: OpenAIWithSpecificFunctions) {}
@@ -51,7 +63,10 @@ export class OpenAIProvider implements AIProvider {
             model: params.model,
             n: params.n ?? 1,
             presence_penalty: 0,
-            temperature: params.temperature ?? 0.7,
+            // Only include temperature for models that support custom values (GPT-5* rejects non-default)
+            ...( modelSupportsCustomTemperature(params.model)
+                ? { temperature: params.temperature ?? 0.7 }
+                : {} ),
             top_p: 1,
         });
 
@@ -73,7 +88,10 @@ export class OpenAIProvider implements AIProvider {
             model: params.model,
             presence_penalty: 0,
             stream: true,
-            temperature: params.temperature ?? 0.7,
+            // Only include temperature for models that support custom values (GPT-5* rejects non-default)
+            ...( modelSupportsCustomTemperature(params.model)
+                ? { temperature: params.temperature ?? 0.7 }
+                : {} ),
             top_p: 1,
         });
 
