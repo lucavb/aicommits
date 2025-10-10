@@ -1,4 +1,4 @@
-import { AIProvider } from './ai-provider.interface';
+import { AIProvider, ReasoningEffort } from './ai-provider.interface';
 import Anthropic from '@anthropic-ai/sdk';
 import { Inject, Injectable } from '../utils/inversify';
 
@@ -29,6 +29,7 @@ export class AnthropicProvider implements AIProvider {
         model: string;
         temperature?: number;
         n?: number;
+        reasoningEffort?: ReasoningEffort;
     }): Promise<{ choices: { message: { content: string } }[] }> {
         const response = await this.anthropic.messages.create({
             model: params.model,
@@ -60,6 +61,7 @@ export class AnthropicProvider implements AIProvider {
         temperature?: number;
         onMessageDelta: (content: string) => void;
         onComplete: (finalContent: string) => void;
+        reasoningEffort?: ReasoningEffort;
     }): Promise<void> {
         const stream = await this.anthropic.messages.create({
             model: params.model,

@@ -1,10 +1,32 @@
 import OpenAI from 'openai';
 import { Inject, Injectable } from '../utils/inversify';
-import { AIProvider } from './ai-provider.interface';
+import { AIProvider, ReasoningEffort } from './ai-provider.interface';
 
 type OpenAIWithSpecificFunctions = {
     chat: { completions: { create: InstanceType<typeof OpenAI>['chat']['completions']['create'] } };
     models: { list: InstanceType<typeof OpenAI>['models']['list'] };
+};
+
+const isReasoningModel = (model: string): boolean => {
+    const modelLower = model.toLowerCase();
+    return modelLower.startsWith('o1') || modelLower.startsWith('o3');
+};
+
+const prepareMessagesForReasoningModel = (
+    messages: { role: string; content: string }[],
+): { role: 'user' | 'assistant'; content: string }[] => {
+    return messages.map((msg) => {
+        if (msg.role === 'system') {
+            return {
+                role: 'user' as const,
+                content: `System instructions: ${msg.content}`,
+            };
+        }
+        return {
+            role: msg.role === 'user' ? ('user' as const) : ('assistant' as const),
+            content: msg.content,
+        };
+    });
 };
 
 @Injectable()
@@ -24,7 +46,8 @@ export class OpenAIProvider implements AIProvider {
         return models.data
             .filter((m) => {
                 const id = m.id.toLowerCase();
-                return (
+                const isReasoningModel = id.startsWith('o1') || id.startsWith('o3');
+                const isGPTModel =
                     id.includes('gpt') &&
                     !id.includes('dall-e') &&
                     !id.includes('audio') &&
@@ -32,9 +55,8 @@ export class OpenAIProvider implements AIProvider {
                     !id.includes('transcribe') &&
                     !id.includes('search') &&
                     !id.includes('realtime') &&
-                    !id.includes('image') &&
-                    !id.includes('preview')
-                );
+                    !id.includes('image');
+                return isReasoningModel || isGPTModel;
             })
             .map((m) => m.id);
     }
@@ -44,16 +66,33 @@ export class OpenAIProvider implements AIProvider {
         model: string;
         temperature?: number;
         n?: number;
+        reasoningEffort?: ReasoningEffort;
     }) {
-        const completion = await this.openai.chat.completions.create({
-            frequency_penalty: 0,
-            messages: params.messages,
+        const isReasoning = isReasoningModel(params.model);
+        const messages = isReasoning ? prepareMessagesForReasoningModel(params.messages) : params.messages;
+
+        const baseParams = {
+            messages,
             model: params.model,
             n: params.n ?? 1,
-            presence_penalty: 0,
-            temperature: params.temperature ?? 0.7,
-            top_p: 1,
-        });
+        };
+
+        const completionParams = isReasoning
+            ? {
+                  ...baseParams,
+                  ...(params.reasoningEffort ? { reasoning_effort: params.reasoningEffort } : {}),
+              }
+            : {
+                  ...baseParams,
+                  frequency_penalty: 0,
+                  presence_penalty: 0,
+                  temperature: params.temperature ?? 0.7,
+                  top_p: 1,
+              };
+
+        const completion = (await this.openai.chat.completions.create(
+            completionParams as Parameters<typeof this.openai.chat.completions.create>[0],
+        )) as Awaited<ReturnType<typeof this.openai.chat.completions.create>> & { choices: { message: { content: string | null } }[] };
 
         return {
             choices: completion.choices.map((choice) => ({ message: { content: choice.message.content ?? '' } })),
@@ -66,16 +105,35 @@ export class OpenAIProvider implements AIProvider {
         temperature?: number;
         onMessageDelta: (content: string) => void;
         onComplete: (finalContent: string) => void;
+        reasoningEffort?: ReasoningEffort;
     }): Promise<void> {
-        const stream = await this.openai.chat.completions.create({
-            frequency_penalty: 0,
-            messages: params.messages as { role: 'system' | 'user' | 'assistant'; content: string }[],
+        const isReasoning = isReasoningModel(params.model);
+        const messages = isReasoning
+            ? prepareMessagesForReasoningModel(params.messages)
+            : (params.messages as { role: 'system' | 'user' | 'assistant'; content: string }[]);
+
+        const baseParams = {
+            messages,
             model: params.model,
-            presence_penalty: 0,
-            stream: true,
-            temperature: params.temperature ?? 0.7,
-            top_p: 1,
-        });
+            stream: true as const,
+        };
+
+        const streamParams = isReasoning
+            ? {
+                  ...baseParams,
+                  ...(params.reasoningEffort ? { reasoning_effort: params.reasoningEffort } : {}),
+              }
+            : {
+                  ...baseParams,
+                  frequency_penalty: 0,
+                  presence_penalty: 0,
+                  temperature: params.temperature ?? 0.7,
+                  top_p: 1,
+              };
+
+        const stream = (await this.openai.chat.completions.create(
+            streamParams as Parameters<typeof this.openai.chat.completions.create>[0],
+        )) as AsyncIterable<{ choices: { delta?: { content?: string } }[] }>;
 
         let fullContent = '';
 

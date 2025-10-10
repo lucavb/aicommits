@@ -1,4 +1,4 @@
-import { AIProvider } from './ai-provider.interface';
+import { AIProvider, ReasoningEffort } from './ai-provider.interface';
 import { Ollama } from 'ollama';
 import { Inject, Injectable } from '../utils/inversify';
 
@@ -20,10 +20,12 @@ export class OllamaProvider implements AIProvider {
         messages,
         model,
         temperature = 0.7,
+        reasoningEffort: _reasoningEffort,
     }: {
         messages: { role: string; content: string }[];
         model: string;
         temperature?: number;
+        reasoningEffort?: ReasoningEffort;
     }): Promise<{ choices: { message: { content: string } }[] }> {
         const response = await this.ollama.chat({
             model,
@@ -48,6 +50,7 @@ export class OllamaProvider implements AIProvider {
         temperature?: number;
         onMessageDelta: (content: string) => void;
         onComplete: (finalContent: string) => void;
+        reasoningEffort?: ReasoningEffort;
     }): Promise<void> {
         let fullContent = '';
 

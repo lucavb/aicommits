@@ -23,7 +23,7 @@ export class AICommitMessageService {
     ) {}
 
     async generateCommitMessage({ diff }: { diff: string }): Promise<{ commitMessages: string[]; bodies: string[] }> {
-        const { locale, maxLength, type, model } = this.configService.getConfig();
+        const { locale, maxLength, type, model, reasoningEffort } = this.configService.getConfig();
 
         const recentCommits = await this.gitService.getRecentCommitMessages(5);
 
@@ -47,6 +47,7 @@ export class AICommitMessageService {
                 ],
                 model,
                 n: 1,
+                reasoningEffort,
             }),
             this.aiProviderFactory.createProvider().generateCompletion({
                 messages: [
@@ -55,6 +56,7 @@ export class AICommitMessageService {
                 ],
                 model,
                 n: 1,
+                reasoningEffort,
             }),
         ]);
 
@@ -80,7 +82,7 @@ export class AICommitMessageService {
         onBodyUpdate?: (content: string) => void;
         onComplete: (commitMessage: string, body: string) => void;
     }): Promise<void> {
-        const { locale, maxLength, type, model } = this.configService.getConfig();
+        const { locale, maxLength, type, model, reasoningEffort } = this.configService.getConfig();
 
         const recentCommits = await this.gitService.getRecentCommitMessages(5);
 
@@ -114,6 +116,7 @@ export class AICommitMessageService {
                     { role: 'user', content: diff },
                 ],
                 model,
+                reasoningEffort,
                 onMessageDelta: (content) => {
                     onMessageUpdate(content);
                 },
@@ -129,6 +132,7 @@ export class AICommitMessageService {
                     { role: 'user', content: diff },
                 ],
                 model,
+                reasoningEffort,
                 onMessageDelta: (content) => {
                     onBodyUpdate?.(content);
                 },
@@ -151,7 +155,7 @@ export class AICommitMessageService {
         diff: string;
         userPrompt: string;
     }): Promise<{ commitMessages: string[]; bodies: string[] }> {
-        const { locale, maxLength, type, model } = this.configService.getConfig();
+        const { locale, maxLength, type, model, reasoningEffort } = this.configService.getConfig();
 
         const recentCommits = await this.gitService.getRecentCommitMessages(5);
 
@@ -178,6 +182,7 @@ export class AICommitMessageService {
                 ],
                 model,
                 n: 1,
+                reasoningEffort,
             }),
             this.aiProviderFactory.createProvider().generateCompletion({
                 messages: [
@@ -192,6 +197,7 @@ export class AICommitMessageService {
                 ],
                 model,
                 n: 1,
+                reasoningEffort,
             }),
         ]);
 
@@ -219,7 +225,7 @@ export class AICommitMessageService {
         onBodyUpdate: (content: string) => void;
         onComplete: (commitMessage: string, body: string) => void;
     }): Promise<void> {
-        const { locale, maxLength, type, model } = this.configService.getConfig();
+        const { locale, maxLength, type, model, reasoningEffort } = this.configService.getConfig();
 
         const recentCommits = await this.gitService.getRecentCommitMessages(5);
 
@@ -256,6 +262,7 @@ export class AICommitMessageService {
                     },
                 ],
                 model,
+                reasoningEffort,
                 onMessageDelta: (content) => {
                     onMessageUpdate(content);
                 },
@@ -277,6 +284,7 @@ export class AICommitMessageService {
                     },
                 ],
                 model,
+                reasoningEffort,
                 onMessageDelta: (content) => {
                     onBodyUpdate(content);
                 },
