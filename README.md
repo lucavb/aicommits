@@ -52,9 +52,9 @@ feat: Add user authentication and update login flow
     ```
 
     This will guide you through:
-    - Selecting your AI provider (OpenAI or Anthropic)
-    - Configuring the API base URL
-    - Setting up your API key
+    - Selecting your AI provider (OpenAI, Anthropic, or Amazon Bedrock)
+    - Configuring the API base URL (OpenAI/Anthropic only)
+    - Setting up your API key (OpenAI/Anthropic only)
     - Choosing the model to use
 
     You can also set up different profiles for different projects or environments:
@@ -72,6 +72,37 @@ feat: Add user authentication and update login flow
     > 3. Using any API key (Ollama ignores it)
     >
     > Native Ollama support will be restored once it's available in AI SDK v5.
+
+### AWS Bedrock Setup
+
+For AWS Bedrock, you'll need to configure AWS credentials via environment variables before running setup:
+
+**Option 1: Direct Credentials**
+
+```sh
+export AWS_ACCESS_KEY_ID=your-access-key-id
+export AWS_SECRET_ACCESS_KEY=your-secret-access-key
+export AWS_REGION=us-east-1
+```
+
+**Option 2: AWS SSO**
+
+```sh
+export AWS_PROFILE=your-profile-name
+aws sso login
+```
+
+Then run setup:
+
+```sh
+aicommits setup
+```
+
+**Important Requirements:**
+
+- Your IAM user/role needs the `AmazonBedrockFullAccess` policy
+- Model access must be requested in the AWS Console: [Model Access Guide](https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html)
+- Available models include: Claude 3.5, Llama 3, Amazon Titan, and more
 
 ### Upgrading
 

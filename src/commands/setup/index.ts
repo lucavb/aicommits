@@ -30,12 +30,25 @@ export const setupCommand = new Command('setup')
         configService.updateProfileInMemory(profile, { provider });
 
         // 2. Setup model
-        const { baseUrl, apiKey, model } = await setupModel(promptUI, provider, currentConfig);
-        if (!baseUrl || !model) {
+        const modelSetupResult = await setupModel(promptUI, provider, currentConfig);
+        if (!modelSetupResult.model) {
             promptUI.outro('Setup cancelled');
             process.exit(0);
         }
-        configService.updateProfileInMemory(profile, { baseUrl, apiKey, model });
+
+        if (provider === 'bedrock') {
+            configService.updateProfileInMemory(profile, { model: modelSetupResult.model });
+        } else {
+            if (!('baseUrl' in modelSetupResult) || !modelSetupResult.baseUrl || !modelSetupResult.model) {
+                promptUI.outro('Setup cancelled');
+                process.exit(0);
+            }
+            configService.updateProfileInMemory(profile, {
+                baseUrl: modelSetupResult.baseUrl,
+                apiKey: modelSetupResult.apiKey,
+                model: modelSetupResult.model,
+            });
+        }
 
         // 3. Setup commit message format
         const commitFormat = await setupCommitFormat(promptUI, currentConfig);

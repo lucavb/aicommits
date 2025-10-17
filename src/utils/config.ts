@@ -14,11 +14,9 @@ export const configKeys = [
     'type',
 ] as const;
 
-export const providerNameSchema = z.enum(['openai', 'anthropic']);
+export const providerNameSchema = z.enum(['openai', 'anthropic', 'bedrock']);
 
-export const profileConfigSchema = z.object({
-    apiKey: z.string().min(1).optional(),
-    baseUrl: z.string().url(),
+const baseProfileConfigSchema = z.object({
     contextLines: z.coerce.number().positive().default(10),
     exclude: z.array(z.string().min(1)).optional(),
     locale: z
@@ -27,8 +25,6 @@ export const profileConfigSchema = z.object({
         .default('en')
         .refine((str: string): str is LanguageCode => iso6391.validate(str)),
     maxLength: z.coerce.number().int().positive().default(50),
-    model: z.string().min(1),
-    provider: providerNameSchema.default('openai'),
     stageAll: z.boolean().or(
         z
             .string()
@@ -37,6 +33,31 @@ export const profileConfigSchema = z.object({
     ),
     type: z.enum(['conventional', ''] as const).optional(),
 });
+
+const openAIProfileConfigSchema = baseProfileConfigSchema.extend({
+    provider: z.literal('openai'),
+    baseUrl: z.string().url(),
+    apiKey: z.string().min(1).optional(),
+    model: z.string().min(1),
+});
+
+const anthropicProfileConfigSchema = baseProfileConfigSchema.extend({
+    provider: z.literal('anthropic'),
+    baseUrl: z.string().url(),
+    apiKey: z.string().min(1).optional(),
+    model: z.string().min(1),
+});
+
+const bedrockProfileConfigSchema = baseProfileConfigSchema.extend({
+    provider: z.literal('bedrock'),
+    model: z.string().min(1),
+});
+
+export const profileConfigSchema = z.discriminatedUnion('provider', [
+    openAIProfileConfigSchema,
+    anthropicProfileConfigSchema,
+    bedrockProfileConfigSchema,
+]);
 
 export const configSchema = z.object({
     currentProfile: z.string().default('default'),

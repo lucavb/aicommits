@@ -55,12 +55,17 @@ export const aiCommits = async ({
         const config = currentProfile;
 
         // Display provider and model information
+        const endpointInfo =
+            config.provider === 'bedrock'
+                ? 'Endpoint: AWS Bedrock'
+                : `Endpoint: ${yellow('baseUrl' in config ? config.baseUrl : 'N/A')}`;
+
         promptUI.note(
             trimLines(`
              Profile: ${yellow(profile)}
              Provider: ${yellow(config.provider)}
              Model: ${yellow(config.model)}
-             Endpoint: ${yellow(config.baseUrl)}
+             ${endpointInfo}
             `),
         );
 
