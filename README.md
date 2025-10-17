@@ -52,8 +52,8 @@ feat: Add user authentication and update login flow
     ```
 
     This will guide you through:
-    - Selecting your AI provider (OpenAI, Anthropic, or Amazon Bedrock)
-    - Configuring the API base URL (OpenAI/Anthropic only)
+    - Selecting your AI provider (OpenAI, Anthropic, Amazon Bedrock, or Ollama)
+    - Configuring the API base URL (OpenAI/Anthropic/Ollama only)
     - Setting up your API key (OpenAI/Anthropic only)
     - Choosing the model to use
 
@@ -65,13 +65,21 @@ feat: Add user authentication and update login flow
 
     > **Note**: For OpenAI, you'll need an API key from [OpenAI's platform](https://platform.openai.com/account/api-keys). Make sure you have an account and billing set up.
 
-    > **Ollama Users**: Direct Ollama support is temporarily unavailable in the latest version due to the migration to Vercel AI SDK v5. As a workaround, you can use Ollama's OpenAI-compatible API by:
-    >
-    > 1. Starting Ollama with: `OLLAMA_ORIGINS="*" ollama serve`
-    > 2. Setting up aicommits with provider "OpenAI" and base URL `http://localhost:11434/v1`
-    > 3. Using any API key (Ollama ignores it)
-    >
-    > Native Ollama support will be restored once it's available in AI SDK v5.
+### Ollama Setup
+
+For Ollama, make sure Ollama is running locally before setup:
+
+```sh
+ollama serve
+```
+
+Then run setup and select "Ollama" as your provider:
+
+```sh
+aicommits setup
+```
+
+The default base URL is `http://localhost:11434/api`. The setup will fetch and display available models from your local Ollama instance.
 
 ### AWS Bedrock Setup
 
@@ -345,22 +353,11 @@ We've completely migrated from custom AI provider implementations to the officia
 - **Improved Reliability**: Uses battle-tested provider implementations
 - **Future-Proof**: Automatic access to new AI SDK features and provider updates
 - **Simplified Codebase**: Removed ~400+ lines of custom provider wrapper code
+- **Native Ollama Support**: Now supported via the community provider `ollama-ai-provider-v2`
 
-**⚠️ Breaking Changes:**
+**🔄 Recent Updates:**
 
-- **Ollama**: Temporarily removed native support (use OpenAI-compatible mode as workaround)
-- **Configuration**: Users with Ollama configs will need to run `aicommits setup` to reconfigure
-
-**🔄 For Ollama Users:**
-
-1. Start Ollama: `OLLAMA_ORIGINS="*" ollama serve`
-2. Run: `aicommits setup`
-3. Choose "OpenAI (compatible)" as provider
-4. Set base URL: `http://localhost:11434/v1`
-5. Use any API key (ignored by Ollama)
-6. Select your local model name
-
-Native Ollama support will return once the AI SDK v5 adds official support.
+- **Ollama**: Native support has been restored using AI SDK v5's community provider integration
 
 ## Maintainers
 

@@ -14,7 +14,7 @@ export const configKeys = [
     'type',
 ] as const;
 
-export const providerNameSchema = z.enum(['openai', 'anthropic', 'bedrock']);
+export const providerNameSchema = z.enum(['openai', 'anthropic', 'bedrock', 'ollama']);
 
 const baseProfileConfigSchema = z.object({
     contextLines: z.coerce.number().positive().default(10),
@@ -53,10 +53,17 @@ const bedrockProfileConfigSchema = baseProfileConfigSchema.extend({
     model: z.string().min(1),
 });
 
+const ollamaProfileConfigSchema = baseProfileConfigSchema.extend({
+    provider: z.literal('ollama'),
+    baseUrl: z.string().url().optional(),
+    model: z.string().min(1),
+});
+
 export const profileConfigSchema = z.discriminatedUnion('provider', [
     openAIProfileConfigSchema,
     anthropicProfileConfigSchema,
     bedrockProfileConfigSchema,
+    ollamaProfileConfigSchema,
 ]);
 
 export const configSchema = z.object({

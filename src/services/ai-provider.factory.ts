@@ -5,6 +5,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
 import { fromNodeProviderChain } from '@aws-sdk/credential-providers';
+import { createOllama } from 'ollama-ai-provider-v2';
 
 @Injectable()
 export class AIProviderFactory {
@@ -49,6 +50,12 @@ export class AIProviderFactory {
                             `Original error: ${error instanceof Error ? error.message : String(error)}`,
                     );
                 }
+            }
+            case 'ollama': {
+                const ollamaProvider = createOllama({
+                    ...(config.baseUrl && { baseURL: config.baseUrl }),
+                });
+                return ollamaProvider(config.model);
             }
             default: {
                 const exhaustiveCheck: never = config;

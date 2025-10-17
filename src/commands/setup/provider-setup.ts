@@ -14,6 +14,7 @@ export async function setupProvider(
             { value: 'openai', label: 'OpenAI (compatible)' },
             { value: 'anthropic', label: 'Anthropic' },
             { value: 'bedrock', label: 'Amazon Bedrock (AWS)' },
+            { value: 'ollama', label: 'Ollama' },
         ],
         initialValue: currentConfig?.provider ?? 'openai',
     });
@@ -27,7 +28,7 @@ export async function setupProvider(
     }
 
     const trimmedProvider = provider.trim();
-    if (!['openai', 'anthropic', 'bedrock'].includes(trimmedProvider)) {
+    if (!['openai', 'anthropic', 'bedrock', 'ollama'].includes(trimmedProvider)) {
         throw new Error(`Invalid provider value: "${provider}"`);
     }
 
