@@ -11,6 +11,7 @@ export const configKeys = [
     'maxLength',
     'model',
     'provider',
+    'reasoningEffort',
     'type',
 ] as const;
 
@@ -29,6 +30,7 @@ export const profileConfigSchema = z.object({
     maxLength: z.coerce.number().int().positive().default(50),
     model: z.string().min(1),
     provider: providerNameSchema.default('openai'),
+    reasoningEffort: z.enum(['low', 'medium', 'high']).optional(),
     stageAll: z.boolean().or(
         z
             .string()
