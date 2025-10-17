@@ -63,7 +63,9 @@ export class OllamaProvider implements AIProvider {
             // Extract just the new content by removing what we've already seen
             const newContent = content.substring(fullContent.length);
             fullContent = content;
-            params.onMessageDelta(newContent);
+            if (newContent.trim()) {
+                params.onMessageDelta(newContent);
+            }
         }
 
         params.onComplete(fullContent);

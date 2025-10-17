@@ -101,7 +101,6 @@ export const aiCommits = async ({
         await aiCommitMessageService.generateStreamingCommitMessage({
             diff: staged.diff,
             onMessageUpdate: (content) => {
-                // Update spinner message with the growing message content
                 messageBuffer += content;
                 const previewContent =
                     messageBuffer.length > 50 ? messageBuffer.substring(0, 47) + '...' : messageBuffer;

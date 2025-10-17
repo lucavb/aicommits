@@ -83,7 +83,9 @@ export class OpenAIProvider implements AIProvider {
             const content = chunk.choices[0]?.delta?.content || '';
             if (content) {
                 fullContent += content;
-                params.onMessageDelta(content);
+                if (content.trim()) {
+                    params.onMessageDelta(content);
+                }
             }
         }
 

@@ -80,8 +80,12 @@ export class AnthropicProvider implements AIProvider {
         for await (const chunk of stream) {
             if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
                 const content = chunk.delta.text || '';
-                fullContent += content;
-                params.onMessageDelta(content);
+                if (content) {
+                    fullContent += content;
+                    if (content.trim()) {
+                        params.onMessageDelta(content);
+                    }
+                }
             }
         }
 

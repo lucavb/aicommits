@@ -208,11 +208,10 @@ describe('OllamaProvider', () => {
                 onComplete,
             });
 
-            // Should emit for the first Hello and the ! (update count to match implementation)
-            expect(onMessageDelta).toHaveBeenCalledTimes(3); // Updated to match actual behavior
+            // Should emit only for non-whitespace chunks (filters empty deltas)
+            expect(onMessageDelta).toHaveBeenCalledTimes(2);
             expect(onMessageDelta).toHaveBeenNthCalledWith(1, 'Hello');
-            expect(onMessageDelta).toHaveBeenNthCalledWith(2, ''); // Empty delta for identical content
-            expect(onMessageDelta).toHaveBeenNthCalledWith(3, '!');
+            expect(onMessageDelta).toHaveBeenNthCalledWith(2, '!');
 
             expect(onComplete).toHaveBeenCalledWith('Hello!');
         });
