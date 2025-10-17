@@ -112,7 +112,9 @@ export class AICommitMessageService {
 
                 for await (const textPart of textStream) {
                     commitMessage += textPart;
-                    onMessageUpdate(textPart);
+                    if (textPart.trim()) {
+                        onMessageUpdate(textPart);
+                    }
                 }
 
                 commitMessage = sanitizeMessage(commitMessage);
@@ -129,7 +131,9 @@ export class AICommitMessageService {
 
                 for await (const textPart of textStream) {
                     body += textPart;
-                    onBodyUpdate?.(textPart);
+                    if (textPart.trim()) {
+                        onBodyUpdate?.(textPart);
+                    }
                 }
 
                 body = body.trim();
@@ -199,7 +203,9 @@ export class AICommitMessageService {
 
                 for await (const textPart of textStream) {
                     commitMessage += textPart;
-                    onMessageUpdate(textPart);
+                    if (textPart.trim()) {
+                        onMessageUpdate(textPart);
+                    }
                 }
 
                 commitMessage = sanitizeMessage(commitMessage);
@@ -221,7 +227,9 @@ export class AICommitMessageService {
 
                 for await (const textPart of textStream) {
                     body += textPart;
-                    onBodyUpdate(textPart);
+                    if (textPart.trim()) {
+                        onBodyUpdate(textPart);
+                    }
                 }
 
                 body = body.trim();
