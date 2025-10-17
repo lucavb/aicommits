@@ -36,14 +36,14 @@ const baseProfileConfigSchema = z.object({
 
 const openAIProfileConfigSchema = baseProfileConfigSchema.extend({
     provider: z.literal('openai'),
-    baseUrl: z.string().url(),
+    baseUrl: z.url(),
     apiKey: z.string().min(1).optional(),
     model: z.string().min(1),
 });
 
 const anthropicProfileConfigSchema = baseProfileConfigSchema.extend({
     provider: z.literal('anthropic'),
-    baseUrl: z.string().url(),
+    baseUrl: z.url(),
     apiKey: z.string().min(1).optional(),
     model: z.string().min(1),
 });
@@ -55,7 +55,7 @@ const bedrockProfileConfigSchema = baseProfileConfigSchema.extend({
 
 const ollamaProfileConfigSchema = baseProfileConfigSchema.extend({
     provider: z.literal('ollama'),
-    baseUrl: z.string().url().optional(),
+    baseUrl: z.url().optional(),
     model: z.string().min(1),
 });
 
