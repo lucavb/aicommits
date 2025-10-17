@@ -28,7 +28,7 @@ This is an AI-powered git commit message generator. Follow these guidelines when
 - Use `npm run dev` to run the CLI in development mode
 - Use `npm run dev:setup` to test the setup flow
 - Use `npm run dev:stage-all` to test staging all files
-- Always run `npm run type-check` before committing to ensure type safety
+- Always run `npm run cq:type-check` before committing to ensure type safety
 
 ## Architecture
 - Organize services in `src/services/` following dependency injection patterns

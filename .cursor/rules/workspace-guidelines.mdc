@@ -6,8 +6,8 @@ description: High-level workspace guidelines for aicommits
 
 - **Language & Tooling**
   - Use TypeScript for all code
-  - Enforce ESLint and Prettier: `npm run eslint`, `npm run prettier:fix`
-  - Run type checks: `npm run type-check`
+  - Enforce ESLint and Prettier: `npm run cq:eslint`, `npm run cq:prettier:fix`
+  - Run type checks: `npm run cq:type-check`
 
 - **Testing**
   - Use Vitest: `npm test`, `npm run test:watch`, `npm run test:coverage`
