@@ -61,7 +61,7 @@
         "prepare": "husky"
     },
     "dependencies": {
-        "@ai-sdk/amazon-bedrock": "3.0.41",
+        "@ai-sdk/amazon-bedrock": "3.0.43",
         "@ai-sdk/anthropic": "2.0.31",
         "@ai-sdk/openai": "2.0.52",
         "@aws-sdk/client-bedrock": "3.911.0",
