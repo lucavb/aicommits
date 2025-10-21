@@ -47,6 +47,10 @@ export const setupCommand = new Command('setup')
                 baseUrl: modelSetupResult.baseUrl,
                 apiKey: modelSetupResult.apiKey,
                 model: modelSetupResult.model,
+                ...('useResponsesApi' in modelSetupResult &&
+                    modelSetupResult.useResponsesApi !== undefined && {
+                        useResponsesApi: modelSetupResult.useResponsesApi,
+                    }),
             });
         }
 

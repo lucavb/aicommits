@@ -20,7 +20,9 @@ export class AIProviderFactory {
                     apiKey: config.apiKey,
                     ...(config.baseUrl && { baseURL: config.baseUrl }),
                 });
-                return openaiProvider.chat(config.model);
+                return config.useResponsesApi === true
+                    ? openaiProvider.responses(config.model)
+                    : openaiProvider.chat(config.model);
             }
             case 'anthropic': {
                 const anthropicProvider = createAnthropic({

@@ -39,6 +39,7 @@ const openAIProfileConfigSchema = baseProfileConfigSchema.extend({
     baseUrl: z.url(),
     model: z.string().min(1),
     provider: z.literal('openai'),
+    useResponsesApi: z.boolean().optional(),
 });
 
 const anthropicProfileConfigSchema = baseProfileConfigSchema.extend({

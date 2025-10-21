@@ -141,7 +141,27 @@ async function setupOpenAIModel(
         return { baseUrl: baseUrl.trim(), apiKey, model: null };
     }
 
-    return { baseUrl: baseUrl.trim(), apiKey, model: selectedModel };
+    // 4. Ask about using the responses API
+    promptUI.note(
+        'The /responses API is a newer endpoint. If unsure, you can opt out now and configure this later using: aicommits config set useResponsesApi true',
+    );
+
+    const useResponsesApi = await promptUI.confirm({
+        message: 'Do you want to use the newer /responses API endpoint?',
+        initialValue:
+            currentConfig && 'useResponsesApi' in currentConfig ? (currentConfig.useResponsesApi ?? false) : false,
+    });
+
+    if (useResponsesApi === null || promptUI.isCancel(useResponsesApi)) {
+        return { apiKey, baseUrl: baseUrl.trim(), model: selectedModel };
+    }
+
+    return {
+        apiKey,
+        baseUrl: baseUrl.trim(),
+        model: selectedModel,
+        useResponsesApi,
+    };
 }
 
 export const openaiHandler: ProviderModelHandler = {

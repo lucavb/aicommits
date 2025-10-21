@@ -10,6 +10,7 @@ export interface ModelSetupResult {
     baseUrl?: string;
     apiKey?: string;
     model: string | null;
+    useResponsesApi?: boolean;
 }
 
 export interface ProviderModelHandler {
