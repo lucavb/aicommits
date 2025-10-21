@@ -14,7 +14,7 @@ export const configKeys = [
     'type',
 ] as const;
 
-export const providerNameSchema = z.enum(['openai', 'anthropic', 'bedrock', 'ollama']);
+export const providerNameSchema = z.enum(['openai', 'anthropic', 'bedrock', 'ollama', 'openrouter']);
 
 const baseProfileConfigSchema = z.object({
     contextLines: z.coerce.number().positive().default(10),
@@ -35,35 +35,43 @@ const baseProfileConfigSchema = z.object({
 });
 
 const openAIProfileConfigSchema = baseProfileConfigSchema.extend({
-    provider: z.literal('openai'),
-    baseUrl: z.url(),
     apiKey: z.string().min(1).optional(),
+    baseUrl: z.url(),
     model: z.string().min(1),
+    provider: z.literal('openai'),
 });
 
 const anthropicProfileConfigSchema = baseProfileConfigSchema.extend({
-    provider: z.literal('anthropic'),
-    baseUrl: z.url(),
     apiKey: z.string().min(1).optional(),
+    baseUrl: z.url(),
     model: z.string().min(1),
+    provider: z.literal('anthropic'),
 });
 
 const bedrockProfileConfigSchema = baseProfileConfigSchema.extend({
-    provider: z.literal('bedrock'),
     model: z.string().min(1),
+    provider: z.literal('bedrock'),
 });
 
 const ollamaProfileConfigSchema = baseProfileConfigSchema.extend({
-    provider: z.literal('ollama'),
     baseUrl: z.url().optional(),
     model: z.string().min(1),
+    provider: z.literal('ollama'),
+});
+
+const openRouterProfileConfigSchema = baseProfileConfigSchema.extend({
+    apiKey: z.string().min(1).optional(),
+    baseUrl: z.url(),
+    model: z.string().min(1),
+    provider: z.literal('openrouter'),
 });
 
 export const profileConfigSchema = z.discriminatedUnion('provider', [
-    openAIProfileConfigSchema,
     anthropicProfileConfigSchema,
     bedrockProfileConfigSchema,
     ollamaProfileConfigSchema,
+    openAIProfileConfigSchema,
+    openRouterProfileConfigSchema,
 ]);
 
 export const configSchema = z.object({

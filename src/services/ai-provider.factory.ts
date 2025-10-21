@@ -57,6 +57,13 @@ export class AIProviderFactory {
                 });
                 return ollamaProvider(config.model);
             }
+            case 'openrouter': {
+                const openrouterProvider = createOpenAI({
+                    apiKey: config.apiKey,
+                    baseURL: config.baseUrl,
+                });
+                return openrouterProvider.chat(config.model);
+            }
             default: {
                 const exhaustiveCheck: never = config;
                 throw new Error(`Unknown provider: ${JSON.stringify(exhaustiveCheck)}`);

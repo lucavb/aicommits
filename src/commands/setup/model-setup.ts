@@ -5,12 +5,14 @@ import { openaiHandler } from './providers/openai';
 import { anthropicHandler } from './providers/anthropic';
 import { bedrockHandler } from './providers/bedrock';
 import { ollamaHandler } from './providers/ollama';
+import { openrouterHandler } from './providers/openrouter';
 
 const handlers = {
     anthropic: anthropicHandler,
     bedrock: bedrockHandler,
     ollama: ollamaHandler,
     openai: openaiHandler,
+    openrouter: openrouterHandler,
 } as const satisfies Record<ProviderName, ProviderModelHandler>;
 
 export async function setupModel(
