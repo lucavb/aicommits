@@ -36,6 +36,7 @@
         },
         {
             matchDatasources: ['npm'],
+            matchUpdateTypes: ['minor', 'patch'],
             vulnerabilityAlerts: {
                 enabled: true,
             },
