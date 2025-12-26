@@ -15,9 +15,8 @@ const isActiveProfile = (
 };
 
 async function fetchBedrockModels(): Promise<ModelChoice[]> {
-    const { BedrockClient, ListFoundationModelsCommand, ListInferenceProfilesCommand } = await import(
-        '@aws-sdk/client-bedrock'
-    );
+    const { BedrockClient, ListFoundationModelsCommand, ListInferenceProfilesCommand } =
+        await import('@aws-sdk/client-bedrock');
     const client = new BedrockClient();
 
     const [modelsResponse, profilesResponse] = await Promise.all([
