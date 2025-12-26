@@ -43,6 +43,7 @@
             matchCurrentAge: '0 days',
             automerge: true,
             addLabels: ['security-update'],
+            semanticCommitType: 'chore',
         },
     ],
     timezone: 'Europe/Berlin',
