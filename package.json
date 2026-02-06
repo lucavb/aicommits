@@ -62,7 +62,7 @@
     },
     "dependencies": {
         "@ai-sdk/amazon-bedrock": "4.0.48",
-        "@ai-sdk/anthropic": "3.0.2",
+        "@ai-sdk/anthropic": "3.0.36",
         "@ai-sdk/openai": "3.0.2",
         "@aws-sdk/client-bedrock": "3.958.0",
         "@aws-sdk/credential-providers": "3.958.0",
