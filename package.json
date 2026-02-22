@@ -66,7 +66,7 @@
         "@ai-sdk/openai": "3.0.30",
         "@aws-sdk/client-bedrock": "3.994.0",
         "@aws-sdk/credential-providers": "3.994.0",
-        "@clack/prompts": "0.11.0",
+        "@clack/prompts": "1.0.1",
         "@commander-js/extra-typings": "14.0.0",
         "ai": "6.0.94",
         "commander": "14.0.3",
