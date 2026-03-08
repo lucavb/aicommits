@@ -86,7 +86,7 @@
         "@commitlint/config-conventional": "20.4.3",
         "@commitlint/types": "20.4.3",
         "@eslint/js": "9.39.3",
-        "@rollup/plugin-commonjs": "29.0.1",
+        "@rollup/plugin-commonjs": "29.0.2",
         "@rollup/plugin-json": "6.1.0",
         "@rollup/plugin-node-resolve": "16.0.3",
         "@rollup/plugin-terser": "0.4.4",
