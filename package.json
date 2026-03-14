@@ -82,9 +82,9 @@
         "zod": "4.3.6"
     },
     "devDependencies": {
-        "@commitlint/cli": "20.4.3",
-        "@commitlint/config-conventional": "20.4.3",
-        "@commitlint/types": "20.4.3",
+        "@commitlint/cli": "20.4.4",
+        "@commitlint/config-conventional": "20.4.4",
+        "@commitlint/types": "20.4.4",
         "@eslint/js": "9.39.4",
         "@rollup/plugin-commonjs": "29.0.2",
         "@rollup/plugin-json": "6.1.0",
