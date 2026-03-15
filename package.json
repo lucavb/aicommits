@@ -96,7 +96,7 @@
         "@semantic-release/npm": "13.1.5",
         "@semantic-release/release-notes-generator": "14.1.0",
         "@types/node": "24.12.0",
-        "@vitest/coverage-v8": "4.0.18",
+        "@vitest/coverage-v8": "4.1.0",
         "eslint": "9.39.4",
         "husky": "9.1.7",
         "prettier": "3.8.1",
@@ -107,6 +107,6 @@
         "tsx": "4.21.0",
         "typescript": "5.9.3",
         "typescript-eslint": "8.57.0",
-        "vitest": "4.0.18"
+        "vitest": "4.1.0"
     }
 }
