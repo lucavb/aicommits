@@ -1,7 +1,7 @@
 import { Argument, Command, Option } from '@commander-js/extra-typings';
 import { configKeys } from '../utils/config';
-import { container } from '../utils/di';
-import { ConfigService } from '../services/config.service';
+import { runWithContainer } from '../utils/di';
+import { ConfigSetHandler } from '../handlers/config-set.handler';
 
 const configSetCommand = new Command('set')
     .description('Set a configuration property')
@@ -9,11 +9,9 @@ const configSetCommand = new Command('set')
     .addArgument(new Argument('name').choices(configKeys))
     .argument('<value>', 'Value of the configuration property')
     .action(async (name, value, { profile }) => {
-        const configService = container.get(ConfigService);
-        await configService.readConfig();
-        configService.updateProfileInMemory(profile, { [name]: value });
-        await configService.flush();
-        console.log(`Configuration property "${name}" set to "${value}" in profile "${profile}".`);
+        await runWithContainer({ cliArguments: { profile } }, (container) =>
+            container.get(ConfigSetHandler).run({ name, value, profile }),
+        );
     });
 
 export const configCommand = new Command('config')

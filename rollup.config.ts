@@ -16,6 +16,15 @@ export default {
         format: 'esm',
         sourcemap: true,
     },
-    plugins: [resolve(), commonjs(), typescript(), json(), terser()],
+    plugins: [
+        resolve(),
+        commonjs(),
+        typescript(),
+        json(),
+        // Inversify resolves class-based bindings by identity, but its metadata/error
+        // reporting also relies on constructor.name; minifiers renaming classes breaks
+        // DI resolution at runtime, so class/function names must be preserved.
+        terser({ keep_classnames: true, keep_fnames: true }),
+    ],
     external: Object.keys(packageJson.dependencies),
 } satisfies RollupOptions;

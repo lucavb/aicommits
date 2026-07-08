@@ -1,6 +1,5 @@
 import type { SimpleGit } from 'simple-git';
-import simpleGit from 'simple-git';
-import { Inject, Injectable, Optional } from '../utils/inversify';
+import { Inject, Injectable } from '../utils/inversify';
 import { KnownError } from '../utils/error';
 import { ConfigService } from './config.service';
 
@@ -15,10 +14,8 @@ export class GitService {
     ];
 
     constructor(
-        @Optional()
-        @Inject(SIMPLE_GIT)
-        private readonly git: SimpleGit = simpleGit(),
-        private readonly configService: ConfigService,
+        @Inject(SIMPLE_GIT) private readonly git: SimpleGit,
+        @Inject(ConfigService) private readonly configService: ConfigService,
     ) {}
 
     async stageAllFiles(): Promise<void> {

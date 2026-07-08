@@ -1,16 +1,10 @@
 import { promises as fs } from 'fs';
-import { Container } from 'inversify';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
-import {
-    CLI_ARGUMENTS,
-    CONFIG_FILE_PATH,
-    ConfigService,
-    FILE_SYSTEM_PROMISE_API,
-    ENVIRONMENT_VARIABLES,
-} from './config.service';
+import { ConfigService, type CliArguments } from './config.service';
 import { Injectable } from '../utils/inversify';
+import { buildContainer } from '../utils/di';
 import { Config, ProfileConfig } from '../utils/config';
-import { parseEnvironment } from '../utils/env';
+import { parseEnvironment, type Environment } from '../utils/env';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 @Injectable()
@@ -18,6 +12,20 @@ class MockFsApi implements Partial<typeof fs> {
     readFile = vi.fn();
     writeFile = vi.fn();
 }
+
+const createConfigService = (
+    options: { cliArguments?: CliArguments; configFilePath?: string; environment?: Environment } = {},
+) => {
+    const fsApi = new MockFsApi();
+    const container = buildContainer({
+        cliArguments: options.cliArguments ?? {},
+        configFilePath: options.configFilePath,
+        environment: options.environment ?? parseEnvironment({}),
+        fileSystem: fsApi,
+    });
+
+    return { configService: container.get(ConfigService), fsApi };
+};
 
 describe('ConfigService', () => {
     let configService: ConfigService;
@@ -42,16 +50,10 @@ describe('ConfigService', () => {
     beforeEach(() => {
         tempFilePath = '/tmp/no-being-written.yaml';
 
-        const container = new Container({ defaultScope: 'Singleton' });
-
-        container.bind(CLI_ARGUMENTS).toConstantValue(mockCliArguments);
-        container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
-        container.bind(ConfigService).toSelf();
-        container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
-        container.bind(ENVIRONMENT_VARIABLES).toConstantValue(parseEnvironment({}));
-
-        configService = container.get(ConfigService);
-        mockFsApi = container.get(FILE_SYSTEM_PROMISE_API);
+        ({ configService, fsApi: mockFsApi } = createConfigService({
+            cliArguments: mockCliArguments,
+            configFilePath: tempFilePath,
+        }));
     });
 
     afterEach(async () => {
@@ -160,28 +162,23 @@ describe('ConfigService', () => {
     describe('getCurrentProfile', () => {
         it('should return CLI profile when provided (highest precedence)', () => {
             // CLI argument should have highest precedence
-            const container = new Container({ defaultScope: 'Singleton' });
-            container.bind(CLI_ARGUMENTS).toConstantValue({ profile: 'cli-profile' });
-            container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
-            container.bind(ConfigService).toSelf();
-            container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
-            container.bind(ENVIRONMENT_VARIABLES).toConstantValue(parseEnvironment({ AIC_PROFILE: 'env-profile' }));
+            const { configService: configServiceWithCli } = createConfigService({
+                cliArguments: { profile: 'cli-profile' },
+                configFilePath: tempFilePath,
+                environment: parseEnvironment({ AIC_PROFILE: 'env-profile' }),
+            });
 
-            const configServiceWithCli = container.get(ConfigService);
             configServiceWithCli.updateConfigInMemory({ currentProfile: 'config-profile' });
             expect(configServiceWithCli.getCurrentProfile()).toBe('cli-profile');
         });
 
         it('should return AIC_PROFILE environment variable when CLI profile not provided', () => {
             // Create config service without CLI profile argument
-            const container = new Container({ defaultScope: 'Singleton' });
-            container.bind(CLI_ARGUMENTS).toConstantValue({});
-            container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
-            container.bind(ConfigService).toSelf();
-            container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
-            container.bind(ENVIRONMENT_VARIABLES).toConstantValue(parseEnvironment({ AIC_PROFILE: 'env-profile' }));
+            const { configService: configServiceWithoutCli } = createConfigService({
+                configFilePath: tempFilePath,
+                environment: parseEnvironment({ AIC_PROFILE: 'env-profile' }),
+            });
 
-            const configServiceWithoutCli = container.get(ConfigService);
             configServiceWithoutCli.updateConfigInMemory({ currentProfile: 'config-profile' });
             expect(configServiceWithoutCli.getCurrentProfile()).toBe('env-profile');
         });
@@ -192,31 +189,21 @@ describe('ConfigService', () => {
             const fileContents = yamlStringify(configWithCurrentProfile);
 
             // Create config service without CLI profile argument or env var
-            const container = new Container({ defaultScope: 'Singleton' });
-            container.bind(CLI_ARGUMENTS).toConstantValue({});
-            container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
-            container.bind(ConfigService).toSelf();
-            container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
-            container.bind(ENVIRONMENT_VARIABLES).toConstantValue(parseEnvironment({}));
+            const { configService: configServiceWithoutCli, fsApi } = createConfigService({
+                configFilePath: tempFilePath,
+            });
+            fsApi.readFile.mockResolvedValue(fileContents);
 
-            const mockFs = container.get<MockFsApi>(FILE_SYSTEM_PROMISE_API);
-            mockFs.readFile.mockResolvedValue(fileContents);
-
-            const configServiceWithoutCli = container.get(ConfigService);
             await configServiceWithoutCli.readConfig();
             expect(configServiceWithoutCli.getCurrentProfile()).toBe('config-profile');
         });
 
         it('should return default when no profile is specified anywhere', () => {
             // Create config service without any profile configuration
-            const container = new Container({ defaultScope: 'Singleton' });
-            container.bind(CLI_ARGUMENTS).toConstantValue({});
-            container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
-            container.bind(ConfigService).toSelf();
-            container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
-            container.bind(ENVIRONMENT_VARIABLES).toConstantValue(parseEnvironment({}));
+            const { configService: configServiceWithoutCli } = createConfigService({
+                configFilePath: tempFilePath,
+            });
 
-            const configServiceWithoutCli = container.get(ConfigService);
             expect(configServiceWithoutCli.getCurrentProfile()).toBe('default');
         });
 
@@ -226,17 +213,12 @@ describe('ConfigService', () => {
             const fileContents = yamlStringify(configWithCurrentProfile);
 
             // Create config service without CLI profile argument
-            const container = new Container({ defaultScope: 'Singleton' });
-            container.bind(CLI_ARGUMENTS).toConstantValue({});
-            container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
-            container.bind(ConfigService).toSelf();
-            container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
-            container.bind(ENVIRONMENT_VARIABLES).toConstantValue(parseEnvironment({ AIC_PROFILE: '' }));
+            const { configService: configServiceWithoutCli, fsApi } = createConfigService({
+                configFilePath: tempFilePath,
+                environment: parseEnvironment({ AIC_PROFILE: '' }),
+            });
+            fsApi.readFile.mockResolvedValue(fileContents);
 
-            const mockFs = container.get<MockFsApi>(FILE_SYSTEM_PROMISE_API);
-            mockFs.readFile.mockResolvedValue(fileContents);
-
-            const configServiceWithoutCli = container.get(ConfigService);
             await configServiceWithoutCli.readConfig();
             // Empty string should fallback to config currentProfile
             expect(configServiceWithoutCli.getCurrentProfile()).toBe('config-profile');
@@ -245,18 +227,11 @@ describe('ConfigService', () => {
 
     describe('api key resolution', () => {
         it('should resolve api key from profile env var when yaml has no key', () => {
-            const container = new Container({ defaultScope: 'Singleton' });
-            container.bind(CLI_ARGUMENTS).toConstantValue({});
-            container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
-            container.bind(ConfigService).toSelf();
-            container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
-            container.bind(ENVIRONMENT_VARIABLES).toConstantValue(
-                parseEnvironment({
-                    AIC_API_KEY_WORK: 'sk-from-env',
-                }),
-            );
+            const { configService: service } = createConfigService({
+                configFilePath: tempFilePath,
+                environment: parseEnvironment({ AIC_API_KEY_WORK: 'sk-from-env' }),
+            });
 
-            const service = container.get(ConfigService);
             service.updateConfigInMemory({
                 currentProfile: 'work',
                 profiles: {
@@ -280,18 +255,11 @@ describe('ConfigService', () => {
         });
 
         it('should prefer yaml api key over env vars', () => {
-            const container = new Container({ defaultScope: 'Singleton' });
-            container.bind(CLI_ARGUMENTS).toConstantValue({});
-            container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
-            container.bind(ConfigService).toSelf();
-            container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
-            container.bind(ENVIRONMENT_VARIABLES).toConstantValue(
-                parseEnvironment({
-                    OPENAI_API_KEY: 'sk-from-env',
-                }),
-            );
+            const { configService: service } = createConfigService({
+                configFilePath: tempFilePath,
+                environment: parseEnvironment({ OPENAI_API_KEY: 'sk-from-env' }),
+            });
 
-            const service = container.get(ConfigService);
             service.updateConfigInMemory({
                 currentProfile: 'default',
                 profiles: {

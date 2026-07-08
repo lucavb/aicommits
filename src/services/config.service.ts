@@ -1,12 +1,12 @@
 import { join } from 'path';
 
-import { Config, ProfileConfig, profileConfigSchema, ProviderName } from '../utils/config';
+import { Config, ProfileConfig, profileConfigSchema, providerNameSchema, ProviderName } from '../utils/config';
 import type { promises as fs } from 'fs';
 import { isString } from '../utils/typeguards';
 import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
 import { shake } from 'radash';
 import { Inject, Injectable, Optional } from '../utils/inversify';
-import { type Environment, emptyEnvironment } from '../utils/env';
+import { type Environment } from '../utils/env';
 import { resolveApiKey, getApiKeySourceEnvVar } from '../utils/resolve-api-key';
 
 export const CLI_ARGUMENTS = Symbol.for('CLI_ARGUMENTS');
@@ -14,18 +14,24 @@ export const CONFIG_FILE_PATH = Symbol.for('CONFIG_FILE_PATH');
 export const FILE_SYSTEM_PROMISE_API = Symbol.for('FILE_SYSTEM_PROMISE_API');
 export const ENVIRONMENT_VARIABLES = Symbol.for('ENVIRONMENT_VARIABLES');
 
-type FileSystemApi = Pick<typeof fs, 'writeFile' | 'readFile'>;
-type CliArguments = {
+export type FileSystemApi = Pick<typeof fs, 'writeFile' | 'readFile'>;
+/**
+ * Raw, unvalidated values as they arrive from the CLI parser. `locale` and `type`
+ * are intentionally plain strings here (not the narrower `ProfileConfig` unions)
+ * because Commander cannot guarantee they're valid; `profileConfigSchema` performs
+ * the actual validation once these are merged into the profile config.
+ */
+export type CliArguments = {
     profile?: string;
     apiKey?: string;
     baseUrl?: string;
     contextLines?: number;
     exclude?: string[];
-    locale?: ProfileConfig['locale'];
+    locale?: string;
     maxLength?: number;
     model?: string;
     stageAll?: boolean;
-    type?: '' | 'conventional';
+    type?: string;
 };
 type ConfigValidationResult = { valid: true } | { valid: false; errors: unknown[] };
 
@@ -41,10 +47,10 @@ export class ConfigService {
     private inMemoryConfig: Partial<ConfigState> = {};
 
     constructor(
-        @Optional() @Inject(CLI_ARGUMENTS) private readonly cliArguments: CliArguments = {},
+        @Inject(CLI_ARGUMENTS) private readonly cliArguments: CliArguments,
         @Optional() @Inject(CONFIG_FILE_PATH) configFilePath: string | undefined,
-        @Optional() @Inject(FILE_SYSTEM_PROMISE_API) private readonly fs: FileSystemApi,
-        @Optional() @Inject(ENVIRONMENT_VARIABLES) private readonly env: Environment = emptyEnvironment,
+        @Inject(FILE_SYSTEM_PROMISE_API) private readonly fs: FileSystemApi,
+        @Inject(ENVIRONMENT_VARIABLES) private readonly env: Environment,
     ) {
         this.configFilePath = configFilePath ?? join(this.env.HOME || this.env.USERPROFILE || '.', '.aicommits.yaml');
     }
@@ -214,27 +220,33 @@ export class ConfigService {
         await this.fs.writeFile(this.configFilePath, yamlStr, 'utf8');
     }
 
-    private getRawConfig() {
+    /**
+     * Merges the on-disk profile with raw CLI overrides. The result is intentionally
+     * loosely typed (`Record<string, unknown>`) because it has not been validated yet;
+     * `getConfig()`/`validConfig()` run it through `profileConfigSchema` to do that.
+     */
+    private getRawConfig(): Record<string, unknown> {
         const currentProfile = this.getCurrentProfile();
         const profileConfig = this.inMemoryConfig.profiles?.[currentProfile] || {};
         const cliArgs = shake(this.cliArguments);
 
         const exclude = this.mergeExcludePatterns(profileConfig, cliArgs);
 
-        const merged = {
+        const merged: Record<string, unknown> = {
             ...profileConfig,
             ...cliArgs,
             exclude: exclude.length > 0 ? exclude : undefined,
-        } as const satisfies Partial<ProfileConfig>;
+        };
 
-        if (!merged.provider) {
+        const providerResult = providerNameSchema.safeParse(merged.provider);
+        if (!providerResult.success) {
             return merged;
         }
 
         const apiKey = resolveApiKey({
-            provider: merged.provider,
+            provider: providerResult.data,
             profile: currentProfile,
-            profileApiKey: 'apiKey' in merged ? merged.apiKey : undefined,
+            profileApiKey: isString(merged.apiKey) ? merged.apiKey : undefined,
             cliApiKey: this.cliArguments.apiKey,
             env: this.env,
         });
@@ -242,10 +254,10 @@ export class ConfigService {
         return {
             ...merged,
             ...(apiKey ? { apiKey } : {}),
-        } as const satisfies Partial<ProfileConfig>;
+        };
     }
 
-    private mergeExcludePatterns(profileConfig: Partial<ProfileConfig>, cliArgs: Partial<ProfileConfig>): string[] {
+    private mergeExcludePatterns(profileConfig: Partial<ProfileConfig>, cliArgs: CliArguments): string[] {
         return [...(profileConfig.exclude || []), ...(cliArgs.exclude || [])].filter(isString);
     }
 
