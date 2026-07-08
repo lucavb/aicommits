@@ -2,7 +2,7 @@ import { red } from 'kolorist';
 import { z } from 'zod';
 import { type ClackPromptService } from '../../../services/clack-prompt.service';
 import { type ProfileConfig } from '../../../utils/config';
-import { type ModelChoice, type ModelSetupResult, type ProviderModelHandler } from './types';
+import { type ModelChoice, type ModelSetupContext, type ModelSetupResult, type ProviderModelHandler } from './types';
 
 const ollamaModelSchema = z.object({
     name: z.string(),
@@ -46,6 +46,7 @@ async function fetchOllamaModels(baseUrl: string): Promise<ModelChoice[]> {
 
 async function setupOllamaModel(
     promptUI: ClackPromptService,
+    _context: ModelSetupContext,
     currentConfig?: Partial<ProfileConfig>,
 ): Promise<ModelSetupResult> {
     // 1. Get base URL

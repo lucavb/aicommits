@@ -1,11 +1,13 @@
 import { join } from 'path';
 
-import { Config, ProfileConfig, profileConfigSchema } from '../utils/config';
+import { Config, ProfileConfig, profileConfigSchema, ProviderName } from '../utils/config';
 import type { promises as fs } from 'fs';
 import { isString } from '../utils/typeguards';
 import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
 import { shake } from 'radash';
 import { Inject, Injectable, Optional } from '../utils/inversify';
+import { type Environment, emptyEnvironment } from '../utils/env';
+import { resolveApiKey, getApiKeySourceEnvVar } from '../utils/resolve-api-key';
 
 export const CLI_ARGUMENTS = Symbol.for('CLI_ARGUMENTS');
 export const CONFIG_FILE_PATH = Symbol.for('CONFIG_FILE_PATH');
@@ -13,11 +15,18 @@ export const FILE_SYSTEM_PROMISE_API = Symbol.for('FILE_SYSTEM_PROMISE_API');
 export const ENVIRONMENT_VARIABLES = Symbol.for('ENVIRONMENT_VARIABLES');
 
 type FileSystemApi = Pick<typeof fs, 'writeFile' | 'readFile'>;
-interface EnvironmentVariables {
-    HOME?: string;
-    USERPROFILE?: string;
-    AIC_PROFILE?: string;
-}
+type CliArguments = {
+    profile?: string;
+    apiKey?: string;
+    baseUrl?: string;
+    contextLines?: number;
+    exclude?: string[];
+    locale?: ProfileConfig['locale'];
+    maxLength?: number;
+    model?: string;
+    stageAll?: boolean;
+    type?: '' | 'conventional';
+};
 type ConfigValidationResult = { valid: true } | { valid: false; errors: unknown[] };
 
 interface ConfigState {
@@ -32,10 +41,10 @@ export class ConfigService {
     private inMemoryConfig: Partial<ConfigState> = {};
 
     constructor(
-        @Optional() @Inject(CLI_ARGUMENTS) private readonly cliArguments: Partial<Config> & { profile?: string } = {},
+        @Optional() @Inject(CLI_ARGUMENTS) private readonly cliArguments: CliArguments = {},
         @Optional() @Inject(CONFIG_FILE_PATH) configFilePath: string | undefined,
         @Optional() @Inject(FILE_SYSTEM_PROMISE_API) private readonly fs: FileSystemApi,
-        @Optional() @Inject(ENVIRONMENT_VARIABLES) private readonly env: EnvironmentVariables = {},
+        @Optional() @Inject(ENVIRONMENT_VARIABLES) private readonly env: Environment = emptyEnvironment,
     ) {
         this.configFilePath = configFilePath ?? join(this.env.HOME || this.env.USERPROFILE || '.', '.aicommits.yaml');
     }
@@ -133,6 +142,41 @@ export class ConfigService {
         return this.cliArguments.profile || this.env.AIC_PROFILE || this.inMemoryConfig.currentProfile || 'default';
     }
 
+    resolveApiKeyFor({
+        profile,
+        provider,
+        profileApiKey,
+    }: {
+        profile: string;
+        provider: ProviderName;
+        profileApiKey?: string;
+    }): string | undefined {
+        return resolveApiKey({
+            provider,
+            profile,
+            profileApiKey,
+            cliApiKey: this.cliArguments.apiKey,
+            env: this.env,
+        });
+    }
+
+    getApiKeySourceEnvVarFor({
+        profile,
+        provider,
+        profileApiKey,
+    }: {
+        profile: string;
+        provider: ProviderName;
+        profileApiKey?: string;
+    }): string | undefined {
+        return getApiKeySourceEnvVar({
+            provider,
+            profile,
+            profileApiKey,
+            env: this.env,
+        });
+    }
+
     getProfile(profileName: string): ProfileConfig | undefined {
         const profile = this.inMemoryConfig.profiles?.[profileName];
         if (!profile) {
@@ -177,10 +221,27 @@ export class ConfigService {
 
         const exclude = this.mergeExcludePatterns(profileConfig, cliArgs);
 
-        return {
+        const merged = {
             ...profileConfig,
             ...cliArgs,
             exclude: exclude.length > 0 ? exclude : undefined,
+        } as const satisfies Partial<ProfileConfig>;
+
+        if (!merged.provider) {
+            return merged;
+        }
+
+        const apiKey = resolveApiKey({
+            provider: merged.provider,
+            profile: currentProfile,
+            profileApiKey: 'apiKey' in merged ? merged.apiKey : undefined,
+            cliApiKey: this.cliArguments.apiKey,
+            env: this.env,
+        });
+
+        return {
+            ...merged,
+            ...(apiKey ? { apiKey } : {}),
         } as const satisfies Partial<ProfileConfig>;
     }
 

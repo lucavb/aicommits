@@ -1,6 +1,6 @@
 import { type ProfileConfig, ProviderName } from '../../utils/config';
 import { type ClackPromptService } from '../../services/clack-prompt.service';
-import { type ProviderModelHandler } from './providers/types';
+import { type ModelSetupContext, type ProviderModelHandler } from './providers/types';
 import { openaiHandler } from './providers/openai';
 import { anthropicHandler } from './providers/anthropic';
 import { bedrockHandler } from './providers/bedrock';
@@ -18,7 +18,8 @@ const handlers = {
 export async function setupModel(
     promptUI: ClackPromptService,
     provider: ProviderName,
+    context: ModelSetupContext,
     currentConfig?: Partial<ProfileConfig>,
 ) {
-    return handlers[provider].setup(promptUI, currentConfig);
+    return handlers[provider].setup(promptUI, context, currentConfig);
 }

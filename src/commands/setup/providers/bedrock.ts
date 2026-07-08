@@ -2,7 +2,7 @@ import { red } from 'kolorist';
 import { FoundationModelSummary, InferenceProfileSummary } from '@aws-sdk/client-bedrock';
 import { type ClackPromptService } from '../../../services/clack-prompt.service';
 import { type ProfileConfig } from '../../../utils/config';
-import { type ModelChoice, type ModelSetupResult, type ProviderModelHandler } from './types';
+import { type ModelChoice, type ModelSetupContext, type ModelSetupResult, type ProviderModelHandler } from './types';
 
 const hasModelId = (model: FoundationModelSummary): model is FoundationModelSummary & { modelId: string } => {
     return !!(model.modelId && model.outputModalities?.includes('TEXT'));
@@ -60,6 +60,7 @@ async function fetchBedrockModels(): Promise<ModelChoice[]> {
 
 async function setupBedrockModel(
     promptUI: ClackPromptService,
+    _context: ModelSetupContext,
     currentConfig?: Partial<ProfileConfig>,
 ): Promise<ModelSetupResult> {
     promptUI.note(

@@ -6,6 +6,8 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
 import { fromNodeProviderChain } from '@aws-sdk/credential-providers';
 import { createOllama } from 'ollama-ai-provider-v2';
+import { KnownError } from '../utils/error';
+import { getApiKeyEnvVarCandidates } from '../utils/resolve-api-key';
 
 @Injectable()
 export class AIProviderFactory {
@@ -13,6 +15,17 @@ export class AIProviderFactory {
 
     createModel(): LanguageModel {
         const config = this.configService.getConfig();
+
+        if (
+            (config.provider === 'openai' || config.provider === 'anthropic' || config.provider === 'openrouter') &&
+            !config.apiKey
+        ) {
+            const profile = this.configService.getCurrentProfile();
+            const envVarCandidates = getApiKeyEnvVarCandidates(config.provider, profile);
+            throw new KnownError(
+                `No API key found for profile "${profile}". Set one in your profile config, or export one of: ${envVarCandidates.join(', ')}.`,
+            );
+        }
 
         switch (config.provider) {
             case 'openai': {

@@ -240,9 +240,9 @@ aicommits config set <key>=<value>
 
 #### apiKey
 
-Required for OpenAI and Anthropic providers
+Required for OpenAI, Anthropic, and OpenRouter unless provided via environment variables (see below).
 
-The API key needed for your provider.
+The API key needed for your provider. You can store it in `~/.aicommits.yaml`, pass it with `--api-key`, or provide it through environment variables.
 
 #### baseUrl
 
@@ -319,6 +319,8 @@ aicommits config set type ""
 
 You can control some behavior via environment variables:
 
+#### Profile selection
+
 - **AIC_PROFILE**: Selects the active configuration profile when running the CLI.
     - **Precedence**: `--profile` flag > `AIC_PROFILE` env var > `currentProfile` in `~/.aicommits.yaml` > `default`.
     - **macOS/Linux**:
@@ -334,6 +336,39 @@ You can control some behavior via environment variables:
         set AIC_PROFILE=staging && aicommits
         ```
     - If `AIC_PROFILE` is an empty string or unset, the CLI falls back to the value from your config file's `currentProfile`, or `default` if not set.
+
+#### API keys
+
+API keys can be provided via environment variables instead of storing them in `~/.aicommits.yaml`. During setup, if a key is detected from the environment, the wizard skips the API key prompt and does **not** write the key to your config file.
+
+**Precedence** (highest to lowest):
+
+1. `--api-key` CLI flag
+2. `apiKey` in the active profile in `~/.aicommits.yaml`
+3. `AIC_API_KEY_<PROFILE>` (profile-scoped convention)
+4. Provider-standard env var (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`)
+5. `AIC_API_KEY` (generic fallback)
+
+**Profile-scoped convention:** The profile name is uppercased and non-alphanumeric characters become underscores.
+
+| Profile      | Environment variable     |
+| ------------ | ------------------------ |
+| `default`    | `AIC_API_KEY_DEFAULT`    |
+| `work`       | `AIC_API_KEY_WORK`       |
+| `my-project` | `AIC_API_KEY_MY_PROJECT` |
+
+**Examples:**
+
+```sh
+# Profile-scoped key for the "work" profile
+AIC_API_KEY_WORK=sk-... aicommits --profile work
+
+# Provider-standard fallback
+OPENAI_API_KEY=sk-... aicommits
+
+# Generic fallback for any profile/provider
+AIC_API_KEY=sk-... aicommits
+```
 
 ## How it works
 

@@ -2,7 +2,8 @@ import { red } from 'kolorist';
 import { z } from 'zod';
 import { type ClackPromptService } from '../../../services/clack-prompt.service';
 import { type ProfileConfig } from '../../../utils/config';
-import { type ModelChoice, type ModelSetupResult, type ProviderModelHandler } from './types';
+import { type ModelChoice, type ModelSetupContext, type ModelSetupResult, type ProviderModelHandler } from './types';
+import { collectApiKeyForSetup } from './api-key-setup';
 
 const anthropicModelSchema = z.object({
     id: z.string(),
@@ -49,6 +50,7 @@ async function fetchAnthropicModels(baseUrl: string, apiKey: string): Promise<Mo
 
 async function setupAnthropicModel(
     promptUI: ClackPromptService,
+    context: ModelSetupContext,
     currentConfig?: Partial<ProfileConfig>,
 ): Promise<ModelSetupResult> {
     // 1. Get base URL
@@ -74,28 +76,24 @@ async function setupAnthropicModel(
         return { baseUrl: undefined, apiKey: undefined, model: null };
     }
 
-    // 2. Get API key
-    const apiKeyInput = await promptUI.text({
-        message: 'Enter your Anthropic API key',
-        placeholder: 'Your API key',
-        initialValue: currentConfig && 'apiKey' in currentConfig ? currentConfig.apiKey : undefined,
-        validate: (value) => {
-            if (!value) {
-                return 'API key is required';
-            }
-            return undefined;
-        },
+    const currentApiKey = currentConfig && 'apiKey' in currentConfig ? currentConfig.apiKey : undefined;
+    const resolvedApiKey = context.resolveApiKey(currentApiKey);
+    const sourceEnvVar = context.getApiKeySourceEnvVar(currentApiKey);
+
+    const apiKeyResult = await collectApiKeyForSetup({
+        promptUI,
+        providerLabel: 'Anthropic',
+        currentApiKey,
+        resolvedApiKey,
+        sourceEnvVar,
     });
 
-    if (apiKeyInput === null) {
+    if (!apiKeyResult) {
         return { baseUrl, apiKey: undefined, model: null };
     }
 
-    if (typeof apiKeyInput !== 'string') {
-        throw new Error('API key is required');
-    }
-
-    const apiKey = apiKeyInput.trim();
+    const { apiKey, persistApiKey } = apiKeyResult;
+    const persistedApiKey = persistApiKey ? apiKey : undefined;
 
     // 3. Get model by fetching from API
     const s = promptUI.spinner();
@@ -107,13 +105,13 @@ async function setupAnthropicModel(
 
         if (modelChoices.length === 0) {
             s.stop(red('No Claude models found for your credentials.'));
-            return { baseUrl: baseUrl.trim(), apiKey, model: null };
+            return { baseUrl: baseUrl.trim(), apiKey: persistedApiKey, model: null };
         }
 
         s.stop('Models fetched.');
     } catch {
         s.stop(red('Failed to fetch models. Please check your base URL and API key.'));
-        return { baseUrl: baseUrl.trim(), apiKey, model: null };
+        return { baseUrl: baseUrl.trim(), apiKey: persistedApiKey, model: null };
     }
 
     const selectedModel = await promptUI.select({
@@ -126,10 +124,10 @@ async function setupAnthropicModel(
     });
 
     if (typeof selectedModel !== 'string') {
-        return { baseUrl: baseUrl.trim(), apiKey, model: null };
+        return { baseUrl: baseUrl.trim(), apiKey: persistedApiKey, model: null };
     }
 
-    return { baseUrl: baseUrl.trim(), apiKey, model: selectedModel };
+    return { baseUrl: baseUrl.trim(), apiKey: persistedApiKey, model: selectedModel };
 }
 
 export const anthropicHandler: ProviderModelHandler = {

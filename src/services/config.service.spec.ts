@@ -10,6 +10,7 @@ import {
 } from './config.service';
 import { Injectable } from '../utils/inversify';
 import { Config, ProfileConfig } from '../utils/config';
+import { parseEnvironment } from '../utils/env';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 @Injectable()
@@ -47,7 +48,7 @@ describe('ConfigService', () => {
         container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
         container.bind(ConfigService).toSelf();
         container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
-        container.bind(ENVIRONMENT_VARIABLES).toConstantValue({});
+        container.bind(ENVIRONMENT_VARIABLES).toConstantValue(parseEnvironment({}));
 
         configService = container.get(ConfigService);
         mockFsApi = container.get(FILE_SYSTEM_PROMISE_API);
@@ -164,7 +165,7 @@ describe('ConfigService', () => {
             container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
             container.bind(ConfigService).toSelf();
             container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
-            container.bind(ENVIRONMENT_VARIABLES).toConstantValue({ AIC_PROFILE: 'env-profile' });
+            container.bind(ENVIRONMENT_VARIABLES).toConstantValue(parseEnvironment({ AIC_PROFILE: 'env-profile' }));
 
             const configServiceWithCli = container.get(ConfigService);
             configServiceWithCli.updateConfigInMemory({ currentProfile: 'config-profile' });
@@ -178,7 +179,7 @@ describe('ConfigService', () => {
             container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
             container.bind(ConfigService).toSelf();
             container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
-            container.bind(ENVIRONMENT_VARIABLES).toConstantValue({ AIC_PROFILE: 'env-profile' });
+            container.bind(ENVIRONMENT_VARIABLES).toConstantValue(parseEnvironment({ AIC_PROFILE: 'env-profile' }));
 
             const configServiceWithoutCli = container.get(ConfigService);
             configServiceWithoutCli.updateConfigInMemory({ currentProfile: 'config-profile' });
@@ -196,7 +197,7 @@ describe('ConfigService', () => {
             container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
             container.bind(ConfigService).toSelf();
             container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
-            container.bind(ENVIRONMENT_VARIABLES).toConstantValue({});
+            container.bind(ENVIRONMENT_VARIABLES).toConstantValue(parseEnvironment({}));
 
             const mockFs = container.get<MockFsApi>(FILE_SYSTEM_PROMISE_API);
             mockFs.readFile.mockResolvedValue(fileContents);
@@ -213,7 +214,7 @@ describe('ConfigService', () => {
             container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
             container.bind(ConfigService).toSelf();
             container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
-            container.bind(ENVIRONMENT_VARIABLES).toConstantValue({});
+            container.bind(ENVIRONMENT_VARIABLES).toConstantValue(parseEnvironment({}));
 
             const configServiceWithoutCli = container.get(ConfigService);
             expect(configServiceWithoutCli.getCurrentProfile()).toBe('default');
@@ -230,7 +231,7 @@ describe('ConfigService', () => {
             container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
             container.bind(ConfigService).toSelf();
             container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
-            container.bind(ENVIRONMENT_VARIABLES).toConstantValue({ AIC_PROFILE: '' });
+            container.bind(ENVIRONMENT_VARIABLES).toConstantValue(parseEnvironment({ AIC_PROFILE: '' }));
 
             const mockFs = container.get<MockFsApi>(FILE_SYSTEM_PROMISE_API);
             mockFs.readFile.mockResolvedValue(fileContents);
@@ -239,6 +240,79 @@ describe('ConfigService', () => {
             await configServiceWithoutCli.readConfig();
             // Empty string should fallback to config currentProfile
             expect(configServiceWithoutCli.getCurrentProfile()).toBe('config-profile');
+        });
+    });
+
+    describe('api key resolution', () => {
+        it('should resolve api key from profile env var when yaml has no key', () => {
+            const container = new Container({ defaultScope: 'Singleton' });
+            container.bind(CLI_ARGUMENTS).toConstantValue({});
+            container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
+            container.bind(ConfigService).toSelf();
+            container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
+            container.bind(ENVIRONMENT_VARIABLES).toConstantValue(
+                parseEnvironment({
+                    AIC_API_KEY_WORK: 'sk-from-env',
+                }),
+            );
+
+            const service = container.get(ConfigService);
+            service.updateConfigInMemory({
+                currentProfile: 'work',
+                profiles: {
+                    work: {
+                        model: 'gpt-4',
+                        baseUrl: 'https://api.openai.com/v1',
+                        provider: 'openai',
+                        stageAll: false,
+                        contextLines: 10,
+                        locale: 'en',
+                        maxLength: 50,
+                    },
+                },
+            });
+
+            const config = service.getConfig();
+            expect(config.provider).toBe('openai');
+            if (config.provider === 'openai') {
+                expect(config.apiKey).toBe('sk-from-env');
+            }
+        });
+
+        it('should prefer yaml api key over env vars', () => {
+            const container = new Container({ defaultScope: 'Singleton' });
+            container.bind(CLI_ARGUMENTS).toConstantValue({});
+            container.bind(CONFIG_FILE_PATH).toConstantValue(tempFilePath);
+            container.bind(ConfigService).toSelf();
+            container.bind(FILE_SYSTEM_PROMISE_API).to(MockFsApi);
+            container.bind(ENVIRONMENT_VARIABLES).toConstantValue(
+                parseEnvironment({
+                    OPENAI_API_KEY: 'sk-from-env',
+                }),
+            );
+
+            const service = container.get(ConfigService);
+            service.updateConfigInMemory({
+                currentProfile: 'default',
+                profiles: {
+                    default: {
+                        model: 'gpt-4',
+                        baseUrl: 'https://api.openai.com/v1',
+                        provider: 'openai',
+                        apiKey: 'sk-from-yaml',
+                        stageAll: false,
+                        contextLines: 10,
+                        locale: 'en',
+                        maxLength: 50,
+                    },
+                },
+            });
+
+            const config = service.getConfig();
+            expect(config.provider).toBe('openai');
+            if (config.provider === 'openai') {
+                expect(config.apiKey).toBe('sk-from-yaml');
+            }
         });
     });
 });

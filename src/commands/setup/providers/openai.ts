@@ -2,7 +2,8 @@ import { red } from 'kolorist';
 import { z } from 'zod';
 import { type ClackPromptService } from '../../../services/clack-prompt.service';
 import { type ProfileConfig } from '../../../utils/config';
-import { type ModelChoice, type ModelSetupResult, type ProviderModelHandler } from './types';
+import { type ModelChoice, type ModelSetupContext, type ModelSetupResult, type ProviderModelHandler } from './types';
+import { collectApiKeyForSetup } from './api-key-setup';
 
 const openAIModelSchema = z.object({
     id: z.string(),
@@ -61,6 +62,7 @@ async function fetchOpenAIModels(baseUrl: string, apiKey: string): Promise<Model
 
 async function setupOpenAIModel(
     promptUI: ClackPromptService,
+    context: ModelSetupContext,
     currentConfig?: Partial<ProfileConfig>,
 ): Promise<ModelSetupResult> {
     // 1. Get base URL
@@ -86,28 +88,24 @@ async function setupOpenAIModel(
         return { baseUrl: undefined, apiKey: undefined, model: null };
     }
 
-    // 2. Get API key
-    const apiKeyInput = await promptUI.text({
-        message: 'Enter your OpenAI API key',
-        placeholder: 'Your API key',
-        initialValue: currentConfig && 'apiKey' in currentConfig ? currentConfig.apiKey : undefined,
-        validate: (value) => {
-            if (!value) {
-                return 'API key is required';
-            }
-            return undefined;
-        },
+    const currentApiKey = currentConfig && 'apiKey' in currentConfig ? currentConfig.apiKey : undefined;
+    const resolvedApiKey = context.resolveApiKey(currentApiKey);
+    const sourceEnvVar = context.getApiKeySourceEnvVar(currentApiKey);
+
+    const apiKeyResult = await collectApiKeyForSetup({
+        promptUI,
+        providerLabel: 'OpenAI',
+        currentApiKey,
+        resolvedApiKey,
+        sourceEnvVar,
     });
 
-    if (apiKeyInput === null) {
+    if (!apiKeyResult) {
         return { baseUrl, apiKey: undefined, model: null };
     }
 
-    if (typeof apiKeyInput !== 'string') {
-        throw new Error('API key is required');
-    }
-
-    const apiKey = apiKeyInput.trim();
+    const { apiKey, persistApiKey } = apiKeyResult;
+    const persistedApiKey = persistApiKey ? apiKey : undefined;
 
     // 3. Get model by fetching from API
     const s = promptUI.spinner();
@@ -119,13 +117,13 @@ async function setupOpenAIModel(
 
         if (modelChoices.length === 0) {
             s.stop(red('No GPT models found for your credentials.'));
-            return { baseUrl: baseUrl.trim(), apiKey, model: null };
+            return { baseUrl: baseUrl.trim(), apiKey: persistedApiKey, model: null };
         }
 
         s.stop('Models fetched.');
     } catch {
         s.stop(red('Failed to fetch models. Please check your base URL and API key.'));
-        return { baseUrl: baseUrl.trim(), apiKey, model: null };
+        return { baseUrl: baseUrl.trim(), apiKey: persistedApiKey, model: null };
     }
 
     const selectedModel = await promptUI.select({
@@ -138,7 +136,7 @@ async function setupOpenAIModel(
     });
 
     if (typeof selectedModel !== 'string') {
-        return { baseUrl: baseUrl.trim(), apiKey, model: null };
+        return { baseUrl: baseUrl.trim(), apiKey: persistedApiKey, model: null };
     }
 
     // 4. Ask about using the responses API
@@ -153,11 +151,11 @@ async function setupOpenAIModel(
     });
 
     if (useResponsesApi === null || promptUI.isCancel(useResponsesApi)) {
-        return { apiKey, baseUrl: baseUrl.trim(), model: selectedModel };
+        return { baseUrl: baseUrl.trim(), apiKey: persistedApiKey, model: selectedModel };
     }
 
     return {
-        apiKey,
+        apiKey: persistedApiKey,
         baseUrl: baseUrl.trim(),
         model: selectedModel,
         useResponsesApi,

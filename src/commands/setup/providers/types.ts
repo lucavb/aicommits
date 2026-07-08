@@ -13,6 +13,16 @@ export interface ModelSetupResult {
     useResponsesApi?: boolean;
 }
 
+export interface ModelSetupContext {
+    profile: string;
+    resolveApiKey: (profileApiKey?: string) => string | undefined;
+    getApiKeySourceEnvVar: (profileApiKey?: string) => string | undefined;
+}
+
 export interface ProviderModelHandler {
-    setup(promptUI: ClackPromptService, currentConfig?: Partial<ProfileConfig>): Promise<ModelSetupResult>;
+    setup(
+        promptUI: ClackPromptService,
+        context: ModelSetupContext,
+        currentConfig?: Partial<ProfileConfig>,
+    ): Promise<ModelSetupResult>;
 }

@@ -29,8 +29,24 @@ export const setupCommand = new Command('setup')
         }
         configService.updateProfileInMemory(profile, { provider });
 
+        const modelSetupContext = {
+            profile,
+            resolveApiKey: (profileApiKey?: string) =>
+                configService.resolveApiKeyFor({
+                    profile,
+                    provider,
+                    profileApiKey,
+                }),
+            getApiKeySourceEnvVar: (profileApiKey?: string) =>
+                configService.getApiKeySourceEnvVarFor({
+                    profile,
+                    provider,
+                    profileApiKey,
+                }),
+        };
+
         // 2. Setup model
-        const modelSetupResult = await setupModel(promptUI, provider, currentConfig);
+        const modelSetupResult = await setupModel(promptUI, provider, modelSetupContext, currentConfig);
         if (!modelSetupResult.model) {
             promptUI.outro('Setup cancelled');
             process.exit(0);
@@ -45,8 +61,8 @@ export const setupCommand = new Command('setup')
             }
             configService.updateProfileInMemory(profile, {
                 baseUrl: modelSetupResult.baseUrl,
-                apiKey: modelSetupResult.apiKey,
                 model: modelSetupResult.model,
+                ...(modelSetupResult.apiKey !== undefined && { apiKey: modelSetupResult.apiKey }),
                 ...('useResponsesApi' in modelSetupResult &&
                     modelSetupResult.useResponsesApi !== undefined && {
                         useResponsesApi: modelSetupResult.useResponsesApi,

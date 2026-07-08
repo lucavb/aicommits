@@ -7,6 +7,7 @@ import { ClackPromptService } from '../services/clack-prompt.service';
 import { AIProviderFactory } from '../services/ai-provider.factory';
 import { AITextGenerationService } from '../services/ai-text-generation.service';
 import { promises as fs } from 'fs';
+import { parseEnvironment } from './env';
 
 const container = new Container({ defaultScope: 'Singleton' });
 
@@ -19,9 +20,5 @@ container.bind(ClackPromptService).toSelf();
 container.bind(AIProviderFactory).toSelf();
 container.bind(AITextGenerationService).toSelf();
 container.bind(FILE_SYSTEM_PROMISE_API).toConstantValue(fs);
-container.bind(ENVIRONMENT_VARIABLES).toConstantValue({
-    HOME: process.env.HOME,
-    USERPROFILE: process.env.USERPROFILE,
-    AIC_PROFILE: process.env.AIC_PROFILE,
-});
+container.bind(ENVIRONMENT_VARIABLES).toConstantValue(parseEnvironment(process.env));
 export { container };

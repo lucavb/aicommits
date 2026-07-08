@@ -9,15 +9,7 @@ import { ClackPromptService } from '../services/clack-prompt.service';
 import { streamingReviewAndRevise } from './aicommits-utils';
 import { trimLines } from '../utils/string';
 
-export const aiCommits = async ({
-    container,
-    stageAll = false,
-    profile = 'default',
-}: {
-    container: Container;
-    stageAll?: boolean;
-    profile?: string;
-}) => {
+export const aiCommits = async ({ container, stageAll = false }: { container: Container; stageAll?: boolean }) => {
     const configService = container.get(ConfigService);
     const gitService = container.get(GitService);
     const aiCommitMessageService = container.get(AICommitMessageService);
@@ -39,6 +31,7 @@ export const aiCommits = async ({
             process.exit(1);
         }
 
+        const profile = configService.getCurrentProfile();
         const currentProfile = configService.getProfile(profile);
         if (!currentProfile) {
             const config = configService.getProfileNames();

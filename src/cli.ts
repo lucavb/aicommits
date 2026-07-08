@@ -29,7 +29,7 @@ program
     .addOption(new Option('--type <type>', 'Commit message format type (conventional or empty)'))
     .action(async (options) => {
         container.bind(CLI_ARGUMENTS).toConstantValue(options);
-        await aiCommits({ container, stageAll: options.stageAll, profile: options.profile });
+        await aiCommits({ container, stageAll: options.stageAll });
     });
 
 program.parse(process.argv);
