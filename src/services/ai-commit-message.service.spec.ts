@@ -93,6 +93,11 @@ describe('AICommitMessageService', () => {
             });
 
             expect(aiTextGenerationService.generateText).toHaveBeenCalledTimes(2);
+            const commitMessageCall = aiTextGenerationService.generateText.mock.calls[0][0];
+            expect(commitMessageCall.system).toEqual(expect.any(String));
+            expect(commitMessageCall.messages).not.toEqual(
+                expect.arrayContaining([expect.objectContaining({ role: 'system' })]),
+            );
             expect(result).toEqual({
                 commitMessage: mockCommitText,
                 body: mockBodyText,
@@ -168,6 +173,11 @@ describe('AICommitMessageService', () => {
 
             expect(onMessageUpdate).toHaveBeenCalledTimes(3);
             expect(onBodyUpdate).toHaveBeenCalledTimes(3);
+            const commitMessageCall = aiTextGenerationService.streamText.mock.calls[0][0];
+            expect(commitMessageCall.system).toEqual(expect.any(String));
+            expect(commitMessageCall.messages).not.toEqual(
+                expect.arrayContaining([expect.objectContaining({ role: 'system' })]),
+            );
             expect(onComplete).toHaveBeenCalledWith('feat: add feature', 'Added feature description');
         });
     });
@@ -211,6 +221,11 @@ describe('AICommitMessageService', () => {
 
             expect(onMessageUpdate).toHaveBeenCalledTimes(3);
             expect(onBodyUpdate).toHaveBeenCalledTimes(3);
+            const commitMessageCall = aiTextGenerationService.streamText.mock.calls[0][0];
+            expect(commitMessageCall.system).toEqual(expect.any(String));
+            expect(commitMessageCall.messages).not.toEqual(
+                expect.arrayContaining([expect.objectContaining({ role: 'system' })]),
+            );
             expect(onComplete).toHaveBeenCalledWith('fix: resolve issue', 'Fixed the issue');
         });
     });

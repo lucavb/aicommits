@@ -30,11 +30,8 @@ export class AICommitMessageService {
         const [commitMessageResult, commitBodyResult] = await Promise.all([
             this.aiTextGenerationService.generateText({
                 model,
+                system: this.promptService.getCommitMessageSystemPrompt(),
                 messages: [
-                    {
-                        role: 'system',
-                        content: this.promptService.getCommitMessageSystemPrompt(),
-                    },
                     {
                         role: 'user',
                         content: this.promptService.generateCommitMessagePrompt(
@@ -92,11 +89,8 @@ export class AICommitMessageService {
             (async () => {
                 const { textStream } = this.aiTextGenerationService.streamText({
                     model,
+                    system: this.promptService.getCommitMessageSystemPrompt(),
                     messages: [
-                        {
-                            role: 'system',
-                            content: this.promptService.getCommitMessageSystemPrompt(),
-                        },
                         {
                             role: 'user',
                             content: this.promptService.generateCommitMessagePrompt(
@@ -180,11 +174,8 @@ export class AICommitMessageService {
             (async () => {
                 const { textStream } = this.aiTextGenerationService.streamText({
                     model,
+                    system: this.promptService.getCommitMessageSystemPrompt(),
                     messages: [
-                        {
-                            role: 'system',
-                            content: this.promptService.getCommitMessageSystemPrompt(),
-                        },
                         {
                             role: 'user',
                             content: this.promptService.generateCommitMessagePrompt(
