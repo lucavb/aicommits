@@ -1,5 +1,5 @@
 import { Container } from 'inversify';
-import simpleGit, { type SimpleGit } from 'simple-git';
+import { simpleGit, type SimpleGit } from 'simple-git';
 import { promises as fs } from 'fs';
 import { AICommitMessageService } from '../services/ai-commit-message.service';
 import {
