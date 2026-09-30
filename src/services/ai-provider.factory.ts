@@ -63,6 +63,7 @@ export class AIProviderFactory {
                             'Note: Your IAM user/role needs the AmazonBedrockFullAccess policy.\n' +
                             'Model access must be requested: https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html\n\n' +
                             `Original error: ${error instanceof Error ? error.message : String(error)}`,
+                        { cause: error },
                     );
                 }
             }

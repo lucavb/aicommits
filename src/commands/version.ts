@@ -29,7 +29,7 @@ export const versionCommand = new Command('version')
         const { version, contributors } = loadAndParsePackageJson();
 
         // Format contributors from package.json
-        let authors = '';
+        let authors: string;
         if (Array.isArray(contributors)) {
             authors = contributors
                 .map((c) => {
