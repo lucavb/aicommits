@@ -81,7 +81,7 @@
         "radash": "12.1.1",
         "reflect-metadata": "0.2.2",
         "simple-git": "3.36.0",
-        "yaml": "2.9.0",
+        "yaml": "2.9.1",
         "zod": "4.4.3"
     },
     "devDependencies": {
