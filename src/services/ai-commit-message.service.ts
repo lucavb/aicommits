@@ -21,7 +21,15 @@ export class AICommitMessageService {
         @Inject(PromptService) private readonly promptService: PromptService,
     ) {}
 
-    async generateCommitMessage({ diff }: { diff: string }): Promise<{ commitMessage: string; body: string }> {
+    async generate({
+        diff,
+        revision,
+        onDelta,
+    }: {
+        diff: string;
+        revision?: string;
+        onDelta?: (delta: { part: string; stream: 'subject' | 'body' }) => void;
+    }): Promise<{ subject: string; body: string }> {
         const config = this.configService.getConfig();
         const { locale, maxLength, type } = config;
         const reasoningEffort = 'reasoningEffort' in config ? config.reasoningEffort : undefined;
@@ -29,219 +37,51 @@ export class AICommitMessageService {
 
         const recentCommits = await this.gitService.getRecentCommitMessages(5);
 
-        const [commitMessageResult, commitBodyResult] = await Promise.all([
-            this.aiTextGenerationService.generateText({
-                model,
-                ...(reasoningEffort ? { reasoning: reasoningEffort } : {}),
-                instructions: this.promptService.getCommitMessageSystemPrompt(),
-                messages: [
-                    {
-                        role: 'user',
-                        content: this.promptService.generateCommitMessagePrompt(
-                            locale,
-                            maxLength,
-                            type ?? '',
-                            recentCommits,
-                        ),
-                    },
-                    { role: 'user', content: diff },
-                ],
-            }),
-            this.aiTextGenerationService.generateText({
-                model,
-                ...(reasoningEffort ? { reasoning: reasoningEffort } : {}),
-                instructions: this.promptService.generateSummaryPrompt(locale),
-                messages: [{ role: 'user', content: diff }],
-            }),
+        const userContent = revision ? `${diff}\n\nUser revision prompt: ${revision}` : diff;
+
+        const consumeStream = async (stream: 'subject' | 'body', textStream: AsyncIterable<string>) => {
+            let text = '';
+            for await (const part of textStream) {
+                text += part;
+                if (onDelta && part.trim()) {
+                    onDelta({ part, stream });
+                }
+            }
+            return text;
+        };
+
+        const [rawSubject, rawBody] = await Promise.all([
+            (async () => {
+                const { textStream } = this.aiTextGenerationService.streamText({
+                    model,
+                    ...(reasoningEffort ? { reasoning: reasoningEffort } : {}),
+                    instructions: this.promptService.getCommitMessageSystemPrompt(),
+                    messages: [
+                        {
+                            role: 'user',
+                            content: this.promptService.generateCommitMessagePrompt(
+                                locale,
+                                maxLength,
+                                type ?? '',
+                                recentCommits,
+                            ),
+                        },
+                        { role: 'user', content: userContent },
+                    ],
+                });
+                return sanitizeMessage(await consumeStream('subject', textStream));
+            })(),
+            (async () => {
+                const { textStream } = this.aiTextGenerationService.streamText({
+                    model,
+                    ...(reasoningEffort ? { reasoning: reasoningEffort } : {}),
+                    instructions: this.promptService.generateSummaryPrompt(locale),
+                    messages: [{ role: 'user', content: userContent }],
+                });
+                return (await consumeStream('body', textStream)).trim();
+            })(),
         ]);
 
-        return {
-            commitMessage: sanitizeMessage(commitMessageResult.text),
-            body: commitBodyResult.text.trim(),
-        };
-    }
-
-    async generateStreamingCommitMessage({
-        diff,
-        onMessageUpdate,
-        onBodyUpdate,
-        onComplete,
-    }: {
-        diff: string;
-        onMessageUpdate: (content: string) => void;
-        onBodyUpdate?: (content: string) => void;
-        onComplete: (commitMessage: string, body: string) => void;
-    }): Promise<void> {
-        const config = this.configService.getConfig();
-        const { locale, maxLength, type } = config;
-        const reasoningEffort = 'reasoningEffort' in config ? config.reasoningEffort : undefined;
-        const model = this.aiProviderFactory.createModel();
-
-        const recentCommits = await this.gitService.getRecentCommitMessages(5);
-
-        let commitMessage = '';
-        let body = '';
-
-        const streamingComplete = new Promise<void>((resolve) => {
-            let messagesCompleted = 0;
-            const checkComplete = () => {
-                messagesCompleted++;
-                if (messagesCompleted === 2) {
-                    resolve();
-                }
-            };
-
-            // Stream commit message
-            (async () => {
-                const { textStream } = this.aiTextGenerationService.streamText({
-                    model,
-                    ...(reasoningEffort ? { reasoning: reasoningEffort } : {}),
-                    instructions: this.promptService.getCommitMessageSystemPrompt(),
-                    messages: [
-                        {
-                            role: 'user',
-                            content: this.promptService.generateCommitMessagePrompt(
-                                locale,
-                                maxLength,
-                                type ?? '',
-                                recentCommits,
-                            ),
-                        },
-                        { role: 'user', content: diff },
-                    ],
-                });
-
-                for await (const textPart of textStream) {
-                    commitMessage += textPart;
-                    if (textPart.trim()) {
-                        onMessageUpdate(textPart);
-                    }
-                }
-
-                commitMessage = sanitizeMessage(commitMessage);
-                checkComplete();
-            })();
-
-            // Stream body
-            (async () => {
-                const { textStream } = this.aiTextGenerationService.streamText({
-                    messages: [{ role: 'user', content: diff }],
-                    model,
-                    ...(reasoningEffort ? { reasoning: reasoningEffort } : {}),
-                    instructions: this.promptService.generateSummaryPrompt(locale),
-                });
-
-                for await (const textPart of textStream) {
-                    body += textPart;
-                    if (textPart.trim()) {
-                        onBodyUpdate?.(textPart);
-                    }
-                }
-
-                body = body.trim();
-                checkComplete();
-            })();
-        });
-
-        await streamingComplete;
-
-        onComplete(commitMessage, body);
-    }
-
-    async reviseStreamingCommitMessage({
-        diff,
-        userPrompt,
-        onMessageUpdate,
-        onBodyUpdate,
-        onComplete,
-    }: {
-        diff: string;
-        userPrompt: string;
-        onMessageUpdate: (content: string) => void;
-        onBodyUpdate: (content: string) => void;
-        onComplete: (commitMessage: string, body: string) => void;
-    }): Promise<void> {
-        const config = this.configService.getConfig();
-        const { locale, maxLength, type } = config;
-        const reasoningEffort = 'reasoningEffort' in config ? config.reasoningEffort : undefined;
-        const model = this.aiProviderFactory.createModel();
-
-        const recentCommits = await this.gitService.getRecentCommitMessages(5);
-
-        let commitMessage = '';
-        let body = '';
-
-        const streamingComplete = new Promise<void>((resolve) => {
-            let messagesCompleted = 0;
-            const checkComplete = () => {
-                messagesCompleted++;
-                if (messagesCompleted === 2) {
-                    resolve();
-                }
-            };
-
-            // Stream commit message
-            (async () => {
-                const { textStream } = this.aiTextGenerationService.streamText({
-                    model,
-                    ...(reasoningEffort ? { reasoning: reasoningEffort } : {}),
-                    instructions: this.promptService.getCommitMessageSystemPrompt(),
-                    messages: [
-                        {
-                            role: 'user',
-                            content: this.promptService.generateCommitMessagePrompt(
-                                locale,
-                                maxLength,
-                                type ?? '',
-                                recentCommits,
-                            ),
-                        },
-                        {
-                            role: 'user',
-                            content: `${diff}\n\nUser revision prompt: ${userPrompt}`,
-                        },
-                    ],
-                });
-
-                for await (const textPart of textStream) {
-                    commitMessage += textPart;
-                    if (textPart.trim()) {
-                        onMessageUpdate(textPart);
-                    }
-                }
-
-                commitMessage = sanitizeMessage(commitMessage);
-                checkComplete();
-            })();
-
-            // Stream body
-            (async () => {
-                const { textStream } = this.aiTextGenerationService.streamText({
-                    model,
-                    ...(reasoningEffort ? { reasoning: reasoningEffort } : {}),
-                    instructions: this.promptService.generateSummaryPrompt(locale),
-                    messages: [
-                        {
-                            role: 'user',
-                            content: `${diff}\n\nUser revision prompt: ${userPrompt}`,
-                        },
-                    ],
-                });
-
-                for await (const textPart of textStream) {
-                    body += textPart;
-                    if (textPart.trim()) {
-                        onBodyUpdate(textPart);
-                    }
-                }
-
-                body = body.trim();
-                checkComplete();
-            })();
-        });
-
-        await streamingComplete;
-
-        onComplete(commitMessage, body);
+        return { subject: rawSubject, body: rawBody };
     }
 }

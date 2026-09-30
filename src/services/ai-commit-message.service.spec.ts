@@ -41,6 +41,27 @@ class MockGitService implements Partial<GitService> {
     getRecentCommitMessages = vi.fn();
 }
 
+const textStreamFrom = (parts: string[]) => ({
+    textStream: {
+        async *[Symbol.asyncIterator]() {
+            for (const p of parts) {
+                yield p;
+            }
+        },
+    },
+});
+
+const throwingTextStream = (partsBeforeError: string[], error: Error) => ({
+    textStream: {
+        async *[Symbol.asyncIterator]() {
+            for (const p of partsBeforeError) {
+                yield p;
+            }
+            throw error;
+        },
+    },
+});
+
 describe('AICommitMessageService', () => {
     let aiProviderFactory: MockAIProviderFactory;
     let aiTextGenerationService: MockAITextGenerationService;
@@ -61,6 +82,7 @@ describe('AICommitMessageService', () => {
         mockModel = {}; // Mock LanguageModel
 
         aiProviderFactory.createModel.mockReturnValue(mockModel);
+        gitService.getRecentCommitMessages.mockResolvedValue(['abc123 initial commit']);
 
         configService.getConfig.mockReturnValue({
             locale: 'en',
@@ -79,273 +101,138 @@ describe('AICommitMessageService', () => {
         service = container.get(AICommitMessageService);
     });
 
-    describe('generateCommitMessage', () => {
-        it('should generate commit messages and bodies', async () => {
-            const mockCommitText = 'feat: add new feature';
-            const mockBodyText = 'Added feature description';
+    it('should return subject and body from two streamed responses', async () => {
+        aiTextGenerationService.streamText
+            .mockReturnValueOnce(textStreamFrom(['feat:', ' add', ' feature']))
+            .mockReturnValueOnce(textStreamFrom(['Added', ' feature', ' description']));
 
-            aiTextGenerationService.generateText
-                .mockResolvedValueOnce({ text: mockCommitText })
-                .mockResolvedValueOnce({ text: mockBodyText });
+        const result = await service.generate({ diff: 'test diff' });
 
-            const result = await service.generateCommitMessage({
-                diff: 'test diff',
-            });
+        expect(result).toEqual({ subject: 'feat: add feature', body: 'Added feature description' });
+        expect(aiTextGenerationService.streamText).toHaveBeenCalledTimes(2);
 
-            expect(aiTextGenerationService.generateText).toHaveBeenCalledTimes(2);
-            const commitMessageCall = aiTextGenerationService.generateText.mock.calls[0][0];
-            expect(commitMessageCall.instructions).toEqual(expect.any(String));
-            expect(commitMessageCall.messages).not.toEqual(
-                expect.arrayContaining([expect.objectContaining({ role: 'system' })]),
-            );
-            expect('reasoning' in commitMessageCall).toBe(false);
-            expect('reasoning' in aiTextGenerationService.generateText.mock.calls[1][0]).toBe(false);
-            expect(aiTextGenerationService.generateText.mock.calls[1][0].instructions).toEqual('generateSummaryPrompt');
-            expect(result).toEqual({
-                commitMessage: mockCommitText,
-                body: mockBodyText,
-            });
-        });
+        const subjectCall = aiTextGenerationService.streamText.mock.calls[0][0];
+        expect(subjectCall.instructions).toBe(
+            'You are a git commit message generator. Your task is to write clear, concise, and descriptive commit messages that follow best practices. Always use the imperative mood and focus on the intent and impact of the change. Do not include file names, code snippets, or unnecessary details. Never include explanations, commentary, or formatting outside the commit message itself.',
+        );
+        expect(subjectCall.messages).toEqual([
+            { role: 'user', content: 'generateCommitMessagePrompt' },
+            { role: 'user', content: 'test diff' },
+        ]);
+        expect(subjectCall.messages).not.toEqual(expect.arrayContaining([expect.objectContaining({ role: 'system' })]));
 
-        it('should pass reasoning effort to ai calls when configured', async () => {
-            configService.getConfig.mockReturnValue({
-                locale: 'en',
-                maxLength: 50,
-                type: 'conventional',
-                provider: 'openai',
-                model: 'gpt-5',
-                reasoningEffort: 'high',
-            });
-
-            const mockCommitText = 'feat: add new feature';
-            const mockBodyText = 'Added feature description';
-
-            aiTextGenerationService.generateText
-                .mockResolvedValueOnce({ text: mockCommitText })
-                .mockResolvedValueOnce({ text: mockBodyText });
-
-            await service.generateCommitMessage({
-                diff: 'test diff',
-            });
-
-            expect(aiTextGenerationService.generateText.mock.calls[0][0].reasoning).toBe('high');
-            expect(aiTextGenerationService.generateText.mock.calls[1][0].reasoning).toBe('high');
-        });
-
-        it('should handle empty responses', async () => {
-            aiTextGenerationService.generateText
-                .mockResolvedValueOnce({ text: '' })
-                .mockResolvedValueOnce({ text: '' });
-
-            const result = await service.generateCommitMessage({
-                diff: 'test diff',
-            });
-
-            expect(result).toEqual({
-                commitMessage: '',
-                body: '',
-            });
-        });
-
-        it('should sanitize commit messages', async () => {
-            const mockCommitText = 'feat: add new feature.\n\r';
-            const mockBodyText = 'Added feature description';
-
-            aiTextGenerationService.generateText
-                .mockResolvedValueOnce({ text: mockCommitText })
-                .mockResolvedValueOnce({ text: mockBodyText });
-
-            const result = await service.generateCommitMessage({
-                diff: 'test diff',
-            });
-
-            expect(result.commitMessage).toEqual('feat: add new feature');
-        });
+        const bodyCall = aiTextGenerationService.streamText.mock.calls[1][0];
+        expect(bodyCall.instructions).toBe('generateSummaryPrompt');
+        expect(bodyCall.messages).toEqual([{ role: 'user', content: 'test diff' }]);
     });
 
-    describe('generateStreamingCommitMessage', () => {
-        it('should stream commit messages and bodies', async () => {
-            const commitParts = ['feat:', ' add', ' feature'];
-            const bodyParts = ['Added', ' feature', ' description'];
-
-            const mockCommitStream = {
-                async *[Symbol.asyncIterator]() {
-                    for (const part of commitParts) {
-                        yield part;
-                    }
-                },
-            };
-
-            const mockBodyStream = {
-                async *[Symbol.asyncIterator]() {
-                    for (const part of bodyParts) {
-                        yield part;
-                    }
-                },
-            };
-
-            aiTextGenerationService.streamText
-                .mockReturnValueOnce({ textStream: mockCommitStream })
-                .mockReturnValueOnce({ textStream: mockBodyStream });
-
-            const onMessageUpdate = vi.fn();
-            const onBodyUpdate = vi.fn();
-            const onComplete = vi.fn();
-
-            await service.generateStreamingCommitMessage({
-                diff: 'test diff',
-                onMessageUpdate,
-                onBodyUpdate,
-                onComplete,
-            });
-
-            expect(onMessageUpdate).toHaveBeenCalledTimes(3);
-            expect(onBodyUpdate).toHaveBeenCalledTimes(3);
-            const commitMessageCall = aiTextGenerationService.streamText.mock.calls[0][0];
-            expect(commitMessageCall.instructions).toEqual(expect.any(String));
-            expect(commitMessageCall.messages).not.toEqual(
-                expect.arrayContaining([expect.objectContaining({ role: 'system' })]),
-            );
-            expect(aiTextGenerationService.streamText.mock.calls[1][0].instructions).toEqual('generateSummaryPrompt');
-            expect(onComplete).toHaveBeenCalledWith('feat: add feature', 'Added feature description');
+    it('should pass reasoning effort to both calls when configured', async () => {
+        configService.getConfig.mockReturnValue({
+            locale: 'en',
+            maxLength: 50,
+            type: 'conventional',
+            provider: 'openai',
+            model: 'gpt-5',
+            reasoningEffort: 'high',
         });
 
-        it('should pass reasoning effort to streaming ai calls when configured', async () => {
-            configService.getConfig.mockReturnValue({
-                locale: 'en',
-                maxLength: 50,
-                type: 'conventional',
-                provider: 'openai',
-                model: 'gpt-5',
-                reasoningEffort: 'high',
-            });
+        aiTextGenerationService.streamText
+            .mockReturnValueOnce(textStreamFrom(['feat: x']))
+            .mockReturnValueOnce(textStreamFrom(['body']));
 
-            const commitParts = ['feat:', ' add', ' feature'];
-            const bodyParts = ['Added', ' feature', ' description'];
+        await service.generate({ diff: 'test diff' });
 
-            const mockCommitStream = {
-                async *[Symbol.asyncIterator]() {
-                    for (const part of commitParts) {
-                        yield part;
-                    }
-                },
-            };
-
-            const mockBodyStream = {
-                async *[Symbol.asyncIterator]() {
-                    for (const part of bodyParts) {
-                        yield part;
-                    }
-                },
-            };
-
-            aiTextGenerationService.streamText
-                .mockReturnValueOnce({ textStream: mockCommitStream })
-                .mockReturnValueOnce({ textStream: mockBodyStream });
-
-            await service.generateStreamingCommitMessage({
-                diff: 'test diff',
-                onMessageUpdate: vi.fn(),
-                onBodyUpdate: vi.fn(),
-                onComplete: vi.fn(),
-            });
-
-            expect(aiTextGenerationService.streamText.mock.calls[0][0].reasoning).toBe('high');
-            expect(aiTextGenerationService.streamText.mock.calls[1][0].reasoning).toBe('high');
-        });
+        expect(aiTextGenerationService.streamText.mock.calls[0][0].reasoning).toBe('high');
+        expect(aiTextGenerationService.streamText.mock.calls[1][0].reasoning).toBe('high');
     });
 
-    describe('reviseStreamingCommitMessage', () => {
-        it('should stream revised commit messages', async () => {
-            const commitParts = ['fix:', ' resolve', ' issue'];
-            const bodyParts = ['Fixed', ' the', ' issue'];
+    it('should not set reasoning when reasoningEffort is absent', async () => {
+        aiTextGenerationService.streamText
+            .mockReturnValueOnce(textStreamFrom(['feat: x']))
+            .mockReturnValueOnce(textStreamFrom(['body']));
 
-            const mockCommitStream = {
-                async *[Symbol.asyncIterator]() {
-                    for (const part of commitParts) {
-                        yield part;
-                    }
-                },
-            };
+        await service.generate({ diff: 'test diff' });
 
-            const mockBodyStream = {
-                async *[Symbol.asyncIterator]() {
-                    for (const part of bodyParts) {
-                        yield part;
-                    }
-                },
-            };
+        expect('reasoning' in aiTextGenerationService.streamText.mock.calls[0][0]).toBe(false);
+        expect('reasoning' in aiTextGenerationService.streamText.mock.calls[1][0]).toBe(false);
+    });
 
-            aiTextGenerationService.streamText
-                .mockReturnValueOnce({ textStream: mockCommitStream })
-                .mockReturnValueOnce({ textStream: mockBodyStream });
+    it('should append the revision prompt to the user content of both calls', async () => {
+        aiTextGenerationService.streamText
+            .mockReturnValueOnce(textStreamFrom(['fix: x']))
+            .mockReturnValueOnce(textStreamFrom(['body']));
 
-            const onMessageUpdate = vi.fn();
-            const onBodyUpdate = vi.fn();
-            const onComplete = vi.fn();
+        await service.generate({ diff: 'test diff', revision: 'make it shorter' });
 
-            await service.reviseStreamingCommitMessage({
-                diff: 'test diff',
-                onBodyUpdate,
-                onComplete,
-                onMessageUpdate,
-                userPrompt: 'make it shorter',
+        for (const call of aiTextGenerationService.streamText.mock.calls) {
+            const lastMessage = call[0].messages[call[0].messages.length - 1];
+            expect(lastMessage).toEqual({
+                role: 'user',
+                content: 'test diff\n\nUser revision prompt: make it shorter',
             });
+        }
+    });
 
-            expect(onMessageUpdate).toHaveBeenCalledTimes(3);
-            expect(onBodyUpdate).toHaveBeenCalledTimes(3);
-            const commitMessageCall = aiTextGenerationService.streamText.mock.calls[0][0];
-            expect(commitMessageCall.instructions).toEqual(expect.any(String));
-            expect(commitMessageCall.messages).not.toEqual(
-                expect.arrayContaining([expect.objectContaining({ role: 'system' })]),
-            );
-            expect(aiTextGenerationService.streamText.mock.calls[1][0].instructions).toEqual('generateSummaryPrompt');
-            expect(onComplete).toHaveBeenCalledWith('fix: resolve issue', 'Fixed the issue');
-        });
+    it('should sanitize the subject and trim the body', async () => {
+        aiTextGenerationService.streamText
+            .mockReturnValueOnce(textStreamFrom(['feat: add feature.\n\r']))
+            .mockReturnValueOnce(textStreamFrom(['  Body text  \n']));
 
-        it('should pass reasoning effort to streaming ai calls when configured', async () => {
-            configService.getConfig.mockReturnValue({
-                locale: 'en',
-                maxLength: 50,
-                type: 'conventional',
-                provider: 'openai',
-                model: 'gpt-5',
-                reasoningEffort: 'high',
-            });
+        const result = await service.generate({ diff: 'test diff' });
 
-            const commitParts = ['fix:', ' resolve', ' issue'];
-            const bodyParts = ['Fixed', ' the', ' issue'];
+        expect(result.subject).toBe('feat: add feature');
+        expect(result.body).toBe('Body text');
+    });
 
-            const mockCommitStream = {
-                async *[Symbol.asyncIterator]() {
-                    for (const part of commitParts) {
-                        yield part;
-                    }
-                },
-            };
+    it('should return empty strings for empty streams', async () => {
+        aiTextGenerationService.streamText
+            .mockReturnValueOnce(textStreamFrom([]))
+            .mockReturnValueOnce(textStreamFrom([]));
 
-            const mockBodyStream = {
-                async *[Symbol.asyncIterator]() {
-                    for (const part of bodyParts) {
-                        yield part;
-                    }
-                },
-            };
+        const result = await service.generate({ diff: 'test diff' });
 
-            aiTextGenerationService.streamText
-                .mockReturnValueOnce({ textStream: mockCommitStream })
-                .mockReturnValueOnce({ textStream: mockBodyStream });
+        expect(result).toEqual({ subject: '', body: '' });
+    });
 
-            await service.reviseStreamingCommitMessage({
-                diff: 'test diff',
-                onBodyUpdate: vi.fn(),
-                onComplete: vi.fn(),
-                onMessageUpdate: vi.fn(),
-                userPrompt: 'make it shorter',
-            });
+    it('should emit onDelta events for non-empty parts of both streams and filter whitespace-only parts', async () => {
+        aiTextGenerationService.streamText
+            .mockReturnValueOnce(textStreamFrom(['feat:', ' ', ' add feature']))
+            .mockReturnValueOnce(textStreamFrom(['Body', '  \n', ' text']));
 
-            expect(aiTextGenerationService.streamText.mock.calls[0][0].reasoning).toBe('high');
-            expect(aiTextGenerationService.streamText.mock.calls[1][0].reasoning).toBe('high');
-        });
+        const onDelta = vi.fn();
+        const result = await service.generate({ diff: 'test diff', onDelta });
+
+        expect(result).toEqual({ subject: 'feat:  add feature', body: 'Body  \n text' });
+
+        const subjectDeltas = onDelta.mock.calls.filter((call) => call[0].stream === 'subject');
+        const bodyDeltas = onDelta.mock.calls.filter((call) => call[0].stream === 'body');
+
+        expect(subjectDeltas.map((call) => call[0])).toEqual([
+            { part: 'feat:', stream: 'subject' },
+            { part: ' add feature', stream: 'subject' },
+        ]);
+        expect(bodyDeltas.map((call) => call[0])).toEqual([
+            { part: 'Body', stream: 'body' },
+            { part: ' text', stream: 'body' },
+        ]);
+    });
+
+    it('should reject when a stream throws mid-iteration instead of hanging', async () => {
+        const streamError = new Error('stream exploded');
+        aiTextGenerationService.streamText
+            .mockReturnValueOnce(throwingTextStream(['feat:'], streamError))
+            .mockReturnValueOnce(textStreamFrom(['body']));
+
+        await expect(service.generate({ diff: 'test diff' })).rejects.toThrow('stream exploded');
+    });
+
+    it('should work with onDelta omitted', async () => {
+        aiTextGenerationService.streamText
+            .mockReturnValueOnce(textStreamFrom(['feat: add feature']))
+            .mockReturnValueOnce(textStreamFrom(['Body text']));
+
+        const result = await service.generate({ diff: 'test diff' });
+
+        expect(result).toEqual({ subject: 'feat: add feature', body: 'Body text' });
     });
 });

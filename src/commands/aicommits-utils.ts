@@ -81,33 +81,32 @@ export const streamingReviewAndRevise = async ({
             let messageBuffer = '';
 
             // Use streaming to show revision in real-time
-            await aiCommitMessageService.reviseStreamingCommitMessage({
+            const { subject, body } = await aiCommitMessageService.generate({
                 diff,
-                userPrompt,
-                onMessageUpdate: (content) => {
-                    messageBuffer += content;
+                revision: userPrompt,
+                onDelta: ({ part, stream }) => {
+                    if (stream !== 'subject') {
+                        return;
+                    }
+                    messageBuffer += part;
                     const previewContent =
                         messageBuffer.length > 50 ? messageBuffer.substring(0, 47) + '...' : messageBuffer;
                     reviseSpinner.message(`Revising: ${previewContent}`);
                 },
-                onBodyUpdate: () => {
-                    // Don't show body updates in real-time
-                },
-                onComplete: (updatedMessage, updatedBody) => {
-                    currentMessage = updatedMessage;
-                    currentBody = updatedBody;
-                    reviseSpinner.stop('Revision complete');
-
-                    // Display the updated message and body
-                    promptUI.log.step('Updated commit message:');
-                    promptUI.log.message(green(updatedMessage));
-
-                    if (updatedBody) {
-                        promptUI.log.step('Updated commit body:');
-                        promptUI.log.message(updatedBody);
-                    }
-                },
             });
+            currentMessage = subject;
+            currentBody = body;
+
+            reviseSpinner.stop('Revision complete');
+
+            // Display the updated message and body
+            promptUI.log.step('Updated commit message:');
+            promptUI.log.message(green(subject));
+
+            if (body) {
+                promptUI.log.step('Updated commit body:');
+                promptUI.log.message(body);
+            }
         } else if (confirmed === 'edit') {
             const initial = `${currentMessage}\n\n${currentBody}`.trim();
             const edited = openInEditor(initial, promptUI);

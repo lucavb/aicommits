@@ -19,12 +19,12 @@ export class PrepareCommitMsgHandler {
             return;
         }
 
-        const { commitMessage, body } = await this.aiCommitMessageService.generateCommitMessage({
+        const { subject, body } = await this.aiCommitMessageService.generate({
             diff: staged.diff,
         });
 
-        if (commitMessage && body) {
-            const fullMessage = `${commitMessage}\n\n${body}`.trim();
+        if (subject && body) {
+            const fullMessage = `${subject}\n\n${body}`.trim();
             console.log(fullMessage);
         }
     }

@@ -52,9 +52,7 @@ describe('AiCommitsHandler', () => {
         };
 
         aiCommitMessageService = {
-            generateStreamingCommitMessage: vi.fn().mockImplementation(async ({ onComplete }) => {
-                onComplete('feat: add feature', 'Body text');
-            }),
+            generate: vi.fn().mockResolvedValue({ subject: 'feat: add feature', body: 'Body text' }),
         };
 
         promptUI = {
@@ -89,7 +87,7 @@ describe('AiCommitsHandler', () => {
 
         expect(gitService.assertGitRepo).toHaveBeenCalled();
         expect(gitService.getStagedDiff).toHaveBeenCalled();
-        expect(aiCommitMessageService.generateStreamingCommitMessage).toHaveBeenCalled();
+        expect(aiCommitMessageService.generate).toHaveBeenCalled();
         expect(gitService.commitChanges).toHaveBeenCalledWith('feat: add feature\n\nBody text');
         expect(promptUI.outro).toHaveBeenCalledWith(expect.stringContaining('Successfully committed'));
         expect(exitSpy).not.toHaveBeenCalled();

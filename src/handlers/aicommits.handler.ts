@@ -97,58 +97,52 @@ export class AiCommitsHandler {
             const analyzeSpinner = promptUI.spinner();
             analyzeSpinner.start('The AI is analyzing your changes');
 
-            let commitMessage = '';
-            let commitBody = '';
             let messageBuffer = '';
 
             // Use streaming API to generate and display commit message in real-time
-            await aiCommitMessageService.generateStreamingCommitMessage({
+            const { subject, body } = await aiCommitMessageService.generate({
                 diff: staged.diff,
-                onMessageUpdate: (content: string) => {
-                    messageBuffer += content;
+                onDelta: ({ part, stream }) => {
+                    if (stream !== 'subject') {
+                        return;
+                    }
+                    messageBuffer += part;
                     const previewContent =
                         messageBuffer.length > 50 ? messageBuffer.substring(0, 47) + '...' : messageBuffer;
                     analyzeSpinner.message(`Generating commit message: ${previewContent}`);
-                },
-                onBodyUpdate: () => {
-                    // Don't show body updates in real-time
-                },
-                onComplete: (message: string, body: string) => {
-                    commitMessage = message;
-                    commitBody = body;
                 },
             });
 
             analyzeSpinner.stop('Commit message generated');
 
-            // Display the full message after generation
-            promptUI.log.step('Generated commit message:');
-            promptUI.log.message(green(commitMessage));
-
-            if (commitBody) {
-                promptUI.log.step('Commit body:');
-                promptUI.log.message(commitBody);
+            if (!subject) {
+                throw new KnownError('No commit message was generated. Try again.');
             }
 
-            if (!commitMessage) {
-                throw new KnownError('No commit message was generated. Try again.');
+            // Display the full message after generation
+            promptUI.log.step('Generated commit message:');
+            promptUI.log.message(green(subject));
+
+            if (body) {
+                promptUI.log.step('Commit body:');
+                promptUI.log.message(body);
             }
 
             const result = await streamingReviewAndRevise({
                 aiCommitMessageService,
                 promptUI,
-                message: commitMessage,
-                body: commitBody,
+                message: subject,
+                body,
                 diff: staged.diff,
             });
             if (!result?.accepted) {
                 return;
             }
 
-            const message = result.message ?? '';
-            const body = result.body ?? '';
+            const reviewMessage = result.message ?? '';
+            const reviewBody = result.body ?? '';
 
-            const fullMessage = `${message}\n\n${body}`.trim();
+            const fullMessage = `${reviewMessage}\n\n${reviewBody}`.trim();
             await gitService.commitChanges(fullMessage);
 
             promptUI.outro(`${green('✔')} Successfully committed`);
