@@ -30,7 +30,7 @@ export class AICommitMessageService {
         const [commitMessageResult, commitBodyResult] = await Promise.all([
             this.aiTextGenerationService.generateText({
                 model,
-                system: this.promptService.getCommitMessageSystemPrompt(),
+                instructions: this.promptService.getCommitMessageSystemPrompt(),
                 messages: [
                     {
                         role: 'user',
@@ -46,7 +46,7 @@ export class AICommitMessageService {
             }),
             this.aiTextGenerationService.generateText({
                 model,
-                system: this.promptService.generateSummaryPrompt(locale),
+                instructions: this.promptService.generateSummaryPrompt(locale),
                 messages: [{ role: 'user', content: diff }],
             }),
         ]);
@@ -89,7 +89,7 @@ export class AICommitMessageService {
             (async () => {
                 const { textStream } = this.aiTextGenerationService.streamText({
                     model,
-                    system: this.promptService.getCommitMessageSystemPrompt(),
+                    instructions: this.promptService.getCommitMessageSystemPrompt(),
                     messages: [
                         {
                             role: 'user',
@@ -120,7 +120,7 @@ export class AICommitMessageService {
                 const { textStream } = this.aiTextGenerationService.streamText({
                     messages: [{ role: 'user', content: diff }],
                     model,
-                    system: this.promptService.generateSummaryPrompt(locale),
+                    instructions: this.promptService.generateSummaryPrompt(locale),
                 });
 
                 for await (const textPart of textStream) {
@@ -174,7 +174,7 @@ export class AICommitMessageService {
             (async () => {
                 const { textStream } = this.aiTextGenerationService.streamText({
                     model,
-                    system: this.promptService.getCommitMessageSystemPrompt(),
+                    instructions: this.promptService.getCommitMessageSystemPrompt(),
                     messages: [
                         {
                             role: 'user',
@@ -207,7 +207,7 @@ export class AICommitMessageService {
             (async () => {
                 const { textStream } = this.aiTextGenerationService.streamText({
                     model,
-                    system: this.promptService.generateSummaryPrompt(locale),
+                    instructions: this.promptService.generateSummaryPrompt(locale),
                     messages: [
                         {
                             role: 'user',
