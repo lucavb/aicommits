@@ -22,7 +22,9 @@ export class AICommitMessageService {
     ) {}
 
     async generateCommitMessage({ diff }: { diff: string }): Promise<{ commitMessage: string; body: string }> {
-        const { locale, maxLength, type } = this.configService.getConfig();
+        const config = this.configService.getConfig();
+        const { locale, maxLength, type } = config;
+        const reasoningEffort = 'reasoningEffort' in config ? config.reasoningEffort : undefined;
         const model = this.aiProviderFactory.createModel();
 
         const recentCommits = await this.gitService.getRecentCommitMessages(5);
@@ -30,6 +32,7 @@ export class AICommitMessageService {
         const [commitMessageResult, commitBodyResult] = await Promise.all([
             this.aiTextGenerationService.generateText({
                 model,
+                ...(reasoningEffort ? { reasoning: reasoningEffort } : {}),
                 instructions: this.promptService.getCommitMessageSystemPrompt(),
                 messages: [
                     {
@@ -46,6 +49,7 @@ export class AICommitMessageService {
             }),
             this.aiTextGenerationService.generateText({
                 model,
+                ...(reasoningEffort ? { reasoning: reasoningEffort } : {}),
                 instructions: this.promptService.generateSummaryPrompt(locale),
                 messages: [{ role: 'user', content: diff }],
             }),
@@ -68,7 +72,9 @@ export class AICommitMessageService {
         onBodyUpdate?: (content: string) => void;
         onComplete: (commitMessage: string, body: string) => void;
     }): Promise<void> {
-        const { locale, maxLength, type } = this.configService.getConfig();
+        const config = this.configService.getConfig();
+        const { locale, maxLength, type } = config;
+        const reasoningEffort = 'reasoningEffort' in config ? config.reasoningEffort : undefined;
         const model = this.aiProviderFactory.createModel();
 
         const recentCommits = await this.gitService.getRecentCommitMessages(5);
@@ -89,6 +95,7 @@ export class AICommitMessageService {
             (async () => {
                 const { textStream } = this.aiTextGenerationService.streamText({
                     model,
+                    ...(reasoningEffort ? { reasoning: reasoningEffort } : {}),
                     instructions: this.promptService.getCommitMessageSystemPrompt(),
                     messages: [
                         {
@@ -120,6 +127,7 @@ export class AICommitMessageService {
                 const { textStream } = this.aiTextGenerationService.streamText({
                     messages: [{ role: 'user', content: diff }],
                     model,
+                    ...(reasoningEffort ? { reasoning: reasoningEffort } : {}),
                     instructions: this.promptService.generateSummaryPrompt(locale),
                 });
 
@@ -153,7 +161,9 @@ export class AICommitMessageService {
         onBodyUpdate: (content: string) => void;
         onComplete: (commitMessage: string, body: string) => void;
     }): Promise<void> {
-        const { locale, maxLength, type } = this.configService.getConfig();
+        const config = this.configService.getConfig();
+        const { locale, maxLength, type } = config;
+        const reasoningEffort = 'reasoningEffort' in config ? config.reasoningEffort : undefined;
         const model = this.aiProviderFactory.createModel();
 
         const recentCommits = await this.gitService.getRecentCommitMessages(5);
@@ -174,6 +184,7 @@ export class AICommitMessageService {
             (async () => {
                 const { textStream } = this.aiTextGenerationService.streamText({
                     model,
+                    ...(reasoningEffort ? { reasoning: reasoningEffort } : {}),
                     instructions: this.promptService.getCommitMessageSystemPrompt(),
                     messages: [
                         {
@@ -207,6 +218,7 @@ export class AICommitMessageService {
             (async () => {
                 const { textStream } = this.aiTextGenerationService.streamText({
                     model,
+                    ...(reasoningEffort ? { reasoning: reasoningEffort } : {}),
                     instructions: this.promptService.generateSummaryPrompt(locale),
                     messages: [
                         {

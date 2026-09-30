@@ -11,6 +11,7 @@ export const configKeys = [
     'maxLength',
     'model',
     'provider',
+    'reasoningEffort',
     'type',
 ] as const;
 
@@ -39,6 +40,7 @@ const openAIProfileConfigSchema = baseProfileConfigSchema.extend({
     baseUrl: z.url(),
     model: z.string().min(1),
     provider: z.literal('openai'),
+    reasoningEffort: z.enum(['low', 'medium', 'high', ''] as const).optional(),
     useResponsesApi: z.boolean().optional(),
 });
 
@@ -65,6 +67,7 @@ const openRouterProfileConfigSchema = baseProfileConfigSchema.extend({
     baseUrl: z.url(),
     model: z.string().min(1),
     provider: z.literal('openrouter'),
+    reasoningEffort: z.enum(['low', 'medium', 'high', ''] as const).optional(),
 });
 
 export const profileConfigSchema = z.discriminatedUnion('provider', [

@@ -3,7 +3,7 @@ import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { ConfigService, type CliArguments } from './config.service';
 import { Injectable } from '../utils/inversify';
 import { buildContainer } from '../utils/di';
-import { Config, ProfileConfig } from '../utils/config';
+import { Config, ProfileConfig, profileConfigSchema } from '../utils/config';
 import { parseEnvironment, type Environment } from '../utils/env';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
@@ -281,6 +281,63 @@ describe('ConfigService', () => {
             if (config.provider === 'openai') {
                 expect(config.apiKey).toBe('sk-from-yaml');
             }
+        });
+    });
+
+    describe('profileConfigSchema reasoningEffort', () => {
+        it('should parse an openai config with reasoningEffort', () => {
+            const result = profileConfigSchema.safeParse({
+                provider: 'openai',
+                baseUrl: 'https://api.openai.com/v1',
+                model: 'gpt-5',
+                reasoningEffort: 'high',
+            });
+
+            expect(result.success).toBe(true);
+        });
+
+        it('should parse an openai config with an empty reasoningEffort', () => {
+            const result = profileConfigSchema.safeParse({
+                provider: 'openai',
+                baseUrl: 'https://api.openai.com/v1',
+                model: 'gpt-5',
+                reasoningEffort: '',
+            });
+
+            expect(result.success).toBe(true);
+        });
+
+        it('should reject an invalid reasoningEffort', () => {
+            const result = profileConfigSchema.safeParse({
+                provider: 'openai',
+                baseUrl: 'https://api.openai.com/v1',
+                model: 'gpt-5',
+                reasoningEffort: 'ultra',
+            });
+
+            expect(result.success).toBe(false);
+        });
+
+        it('should parse an openrouter config with reasoningEffort', () => {
+            const result = profileConfigSchema.safeParse({
+                provider: 'openrouter',
+                baseUrl: 'https://openrouter.ai/api/v1',
+                model: 'x',
+                reasoningEffort: 'low',
+            });
+
+            expect(result.success).toBe(true);
+        });
+
+        it('should parse an openrouter config with an empty reasoningEffort', () => {
+            const result = profileConfigSchema.safeParse({
+                provider: 'openrouter',
+                baseUrl: 'https://openrouter.ai/api/v1',
+                model: 'x',
+                reasoningEffort: '',
+            });
+
+            expect(result.success).toBe(true);
         });
     });
 });

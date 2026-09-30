@@ -43,7 +43,7 @@ async function fetchOpenAIModels(baseUrl: string, apiKey: string): Promise<Model
         .filter((model) => {
             const id = model.id.toLowerCase();
             return baseUrl.trim() === BASE_URL
-                ? id.includes('gpt') &&
+                ? (id.includes('gpt') || /^o\d/.test(id)) &&
                       !id.includes('dall-e') &&
                       !id.includes('audio') &&
                       !id.includes('tts') &&
@@ -116,7 +116,7 @@ async function setupOpenAIModel(
         modelChoices = await fetchOpenAIModels(baseUrl.trim(), apiKey);
 
         if (modelChoices.length === 0) {
-            s.stop(red('No GPT models found for your credentials.'));
+            s.stop(red('No models found for your credentials.'));
             return { baseUrl: baseUrl.trim(), apiKey: persistedApiKey, model: null };
         }
 

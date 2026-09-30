@@ -285,7 +285,7 @@ The locale to use for the generated commit messages. Consult the list of codes i
 
 The model to use for generating commit messages. The available models depend on your chosen provider:
 
-- OpenAI: Various GPT models (e.g., `gpt-4`, `gpt-4o`, `gpt-4o-mini`)
+- OpenAI: Various GPT and o-series models (e.g., `gpt-5`, `o3`, `gpt-4o-mini`)
 - Anthropic: Claude models (e.g., `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022`)
 - Ollama: Use your local model names with the OpenAI provider setup (e.g., `llama3.2`, `mistral`)
 
@@ -314,6 +314,26 @@ You can clear this option by setting it to an empty string:
 ```sh
 aicommits config set type ""
 ```
+
+#### reasoning-effort
+
+Controls the reasoning effort used by reasoning models (for example OpenAI o-series and gpt-5 models). Supported values: `low`, `medium`, `high`.
+
+Default: unset (the provider default is used)
+
+```sh
+aicommits config set reasoningEffort high
+```
+
+This option is available for the `openai` and `openrouter` providers.
+
+You can clear this option by setting it to an empty string:
+
+```sh
+aicommits config set reasoningEffort ""
+```
+
+Only set this for models that support reasoning (e.g. o-series and gpt-5 models); other models may reject the request.
 
 ### Environment variables
 

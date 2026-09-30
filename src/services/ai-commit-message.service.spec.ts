@@ -98,10 +98,38 @@ describe('AICommitMessageService', () => {
             expect(commitMessageCall.messages).not.toEqual(
                 expect.arrayContaining([expect.objectContaining({ role: 'system' })]),
             );
+            expect('reasoning' in commitMessageCall).toBe(false);
+            expect('reasoning' in aiTextGenerationService.generateText.mock.calls[1][0]).toBe(false);
+            expect(aiTextGenerationService.generateText.mock.calls[1][0].instructions).toEqual('generateSummaryPrompt');
             expect(result).toEqual({
                 commitMessage: mockCommitText,
                 body: mockBodyText,
             });
+        });
+
+        it('should pass reasoning effort to ai calls when configured', async () => {
+            configService.getConfig.mockReturnValue({
+                locale: 'en',
+                maxLength: 50,
+                type: 'conventional',
+                provider: 'openai',
+                model: 'gpt-5',
+                reasoningEffort: 'high',
+            });
+
+            const mockCommitText = 'feat: add new feature';
+            const mockBodyText = 'Added feature description';
+
+            aiTextGenerationService.generateText
+                .mockResolvedValueOnce({ text: mockCommitText })
+                .mockResolvedValueOnce({ text: mockBodyText });
+
+            await service.generateCommitMessage({
+                diff: 'test diff',
+            });
+
+            expect(aiTextGenerationService.generateText.mock.calls[0][0].reasoning).toBe('high');
+            expect(aiTextGenerationService.generateText.mock.calls[1][0].reasoning).toBe('high');
         });
 
         it('should handle empty responses', async () => {
@@ -178,7 +206,52 @@ describe('AICommitMessageService', () => {
             expect(commitMessageCall.messages).not.toEqual(
                 expect.arrayContaining([expect.objectContaining({ role: 'system' })]),
             );
+            expect(aiTextGenerationService.streamText.mock.calls[1][0].instructions).toEqual('generateSummaryPrompt');
             expect(onComplete).toHaveBeenCalledWith('feat: add feature', 'Added feature description');
+        });
+
+        it('should pass reasoning effort to streaming ai calls when configured', async () => {
+            configService.getConfig.mockReturnValue({
+                locale: 'en',
+                maxLength: 50,
+                type: 'conventional',
+                provider: 'openai',
+                model: 'gpt-5',
+                reasoningEffort: 'high',
+            });
+
+            const commitParts = ['feat:', ' add', ' feature'];
+            const bodyParts = ['Added', ' feature', ' description'];
+
+            const mockCommitStream = {
+                async *[Symbol.asyncIterator]() {
+                    for (const part of commitParts) {
+                        yield part;
+                    }
+                },
+            };
+
+            const mockBodyStream = {
+                async *[Symbol.asyncIterator]() {
+                    for (const part of bodyParts) {
+                        yield part;
+                    }
+                },
+            };
+
+            aiTextGenerationService.streamText
+                .mockReturnValueOnce({ textStream: mockCommitStream })
+                .mockReturnValueOnce({ textStream: mockBodyStream });
+
+            await service.generateStreamingCommitMessage({
+                diff: 'test diff',
+                onMessageUpdate: vi.fn(),
+                onBodyUpdate: vi.fn(),
+                onComplete: vi.fn(),
+            });
+
+            expect(aiTextGenerationService.streamText.mock.calls[0][0].reasoning).toBe('high');
+            expect(aiTextGenerationService.streamText.mock.calls[1][0].reasoning).toBe('high');
         });
     });
 
@@ -226,7 +299,53 @@ describe('AICommitMessageService', () => {
             expect(commitMessageCall.messages).not.toEqual(
                 expect.arrayContaining([expect.objectContaining({ role: 'system' })]),
             );
+            expect(aiTextGenerationService.streamText.mock.calls[1][0].instructions).toEqual('generateSummaryPrompt');
             expect(onComplete).toHaveBeenCalledWith('fix: resolve issue', 'Fixed the issue');
+        });
+
+        it('should pass reasoning effort to streaming ai calls when configured', async () => {
+            configService.getConfig.mockReturnValue({
+                locale: 'en',
+                maxLength: 50,
+                type: 'conventional',
+                provider: 'openai',
+                model: 'gpt-5',
+                reasoningEffort: 'high',
+            });
+
+            const commitParts = ['fix:', ' resolve', ' issue'];
+            const bodyParts = ['Fixed', ' the', ' issue'];
+
+            const mockCommitStream = {
+                async *[Symbol.asyncIterator]() {
+                    for (const part of commitParts) {
+                        yield part;
+                    }
+                },
+            };
+
+            const mockBodyStream = {
+                async *[Symbol.asyncIterator]() {
+                    for (const part of bodyParts) {
+                        yield part;
+                    }
+                },
+            };
+
+            aiTextGenerationService.streamText
+                .mockReturnValueOnce({ textStream: mockCommitStream })
+                .mockReturnValueOnce({ textStream: mockBodyStream });
+
+            await service.reviseStreamingCommitMessage({
+                diff: 'test diff',
+                onBodyUpdate: vi.fn(),
+                onComplete: vi.fn(),
+                onMessageUpdate: vi.fn(),
+                userPrompt: 'make it shorter',
+            });
+
+            expect(aiTextGenerationService.streamText.mock.calls[0][0].reasoning).toBe('high');
+            expect(aiTextGenerationService.streamText.mock.calls[1][0].reasoning).toBe('high');
         });
     });
 });
