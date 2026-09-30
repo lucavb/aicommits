@@ -35,7 +35,7 @@ Example output:
 feat: Add user authentication and update login flow
 ```
 
-> The minimum supported version of Node.js is the latest v14. Check your Node.js version with `node --version`.
+> The minimum supported version of Node.js is 22. Check your Node.js version with `node --version`.
 
 ## Setup
 
