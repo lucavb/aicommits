@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '../utils/inversify';
-import { AICommitMessageService } from './ai-commit-message.service';
+import { AICommitMessageService, stripTerminalControls } from './ai-commit-message.service';
 import { KnownError } from '../utils/error';
 import { REVIEW_PROMPT, type ReviewPrompt } from './review-prompt.interface';
 
@@ -44,7 +44,9 @@ export class ProposalService {
                 messageBuffer += part;
                 const previewContent =
                     messageBuffer.length > 50 ? messageBuffer.substring(0, 47) + '...' : messageBuffer;
-                this.reviewPrompt.updateProgress(`Generating commit message: ${previewContent}`);
+                // strip terminal control bytes so raw stream deltas cannot drive
+                // the terminal while the proposal streams
+                this.reviewPrompt.updateProgress(`Generating commit message: ${stripTerminalControls(previewContent)}`);
             },
         });
 
@@ -93,7 +95,9 @@ export class ProposalService {
                         messageBuffer += part;
                         const previewContent =
                             messageBuffer.length > 50 ? messageBuffer.substring(0, 47) + '...' : messageBuffer;
-                        this.reviewPrompt.updateProgress(`Revising: ${previewContent}`);
+                        // strip terminal control bytes so raw stream deltas cannot
+                        // drive the terminal while the revision streams
+                        this.reviewPrompt.updateProgress(`Revising: ${stripTerminalControls(previewContent)}`);
                     },
                 });
                 currentSubject = subject;

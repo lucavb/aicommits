@@ -215,6 +215,56 @@ describe('ProposalService', () => {
         expect(generatingCall).toBe(`Generating commit message: ${'a'.repeat(47)}...`);
     });
 
+    it('neutralizes terminal control sequences before they reach the generating preview', async () => {
+        const reviewPrompt = new ScriptedReviewPrompt();
+        reviewPrompt.choices = ['accept'];
+        const { service } = createProposalService(reviewPrompt, ({ onDelta }) => {
+            onDelta?.({ part: '\x1b[8mfix\x1b[28m login ', stream: 'subject' });
+            onDelta?.({ part: 'race\x1b]8;;http://127.0.0.1/x\x07', stream: 'subject' });
+            return Promise.resolve(generateResult);
+        });
+
+        await service.review({ diff: 'the diff' });
+
+        expect(reviewPrompt.updateProgressCalls).toEqual([
+            'Generating commit message: fix login ',
+            'Generating commit message: fix login race',
+        ]);
+        for (const text of reviewPrompt.updateProgressCalls) {
+            // eslint-disable-next-line no-control-regex -- intentional control-sequence assertion
+            expect(text).not.toMatch(/\x1b/);
+            // eslint-disable-next-line no-control-regex -- intentional control-sequence assertion
+            expect(text).not.toMatch(/\u0007/);
+        }
+    });
+
+    it('neutralizes terminal control sequences before they reach the revision preview', async () => {
+        const reviewPrompt = new ScriptedReviewPrompt();
+        reviewPrompt.choices = ['revise', 'cancel'];
+        reviewPrompt.revisionPrompts = ['shorter please'];
+        let firstGenerate = true;
+        const { service } = createProposalService(reviewPrompt, ({ onDelta }) => {
+            if (firstGenerate) {
+                firstGenerate = false;
+                return Promise.resolve(generateResult);
+            }
+            onDelta?.({ part: '\x1b[8mfix\x1b[28m login ', stream: 'subject' });
+            onDelta?.({ part: 'race\x1b]8;;http://127.0.0.1/x\x07', stream: 'subject' });
+            return Promise.resolve(generateResult);
+        });
+
+        await service.review({ diff: 'the diff' });
+
+        const revisingMessages = reviewPrompt.updateProgressCalls.filter((call) => call.startsWith('Revising: '));
+        expect(revisingMessages).toEqual(['Revising: fix login ', 'Revising: fix login race']);
+        for (const text of reviewPrompt.updateProgressCalls) {
+            // eslint-disable-next-line no-control-regex -- intentional control-sequence assertion
+            expect(text).not.toMatch(/\x1b/);
+            // eslint-disable-next-line no-control-regex -- intentional control-sequence assertion
+            expect(text).not.toMatch(/\u0007/);
+        }
+    });
+
     it('builds commit messages from subject and body', () => {
         expect(buildCommitMessage('S', 'B')).toBe('S\n\nB');
         expect(buildCommitMessage('S', '')).toBe('S');

@@ -1,6 +1,6 @@
 import { isCancel, log, outro, select, spinner, text } from '@clack/prompts';
 import { cyan, green } from 'kolorist';
-import { readFileSync, unlinkSync, writeFileSync } from 'fs';
+import { mkdtempSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { spawnSync } from 'child_process';
@@ -73,27 +73,36 @@ export class ClackReviewPrompt implements ReviewPrompt {
         outro(message);
     }
 
+    // Opens initialContent in $EDITOR inside a per-run private directory created
+    // with mkdtempSync (exclusive, 0o700 so no other local user can traverse it).
+    // The message file is written with explicit mode 0o600, and file + directory
+    // are cleaned up in every exit path. Never write the message to a predictable
+    // name directly in the shared tmpdir.
     editInEditor(initialContent: string): string | null {
         const editor = process.env.EDITOR || (process.platform === 'win32' ? 'notepad' : 'vi');
-        const tmpFile = join(tmpdir(), `aicommits-msg-${Date.now()}.txt`);
-        writeFileSync(tmpFile, initialContent, { encoding: 'utf8' });
-
-        const child = spawnSync(editor, [tmpFile], { stdio: 'inherit' });
-
-        if (child.error) {
-            outro(`Failed to launch editor: ${child.error.message}`);
-            unlinkSync(tmpFile);
-            return null;
-        }
+        const dir = mkdtempSync(join(tmpdir(), 'aicommits-msg-'));
+        const tmpFile = join(dir, 'message.txt');
+        writeFileSync(tmpFile, initialContent, { encoding: 'utf8', mode: 0o600 });
 
         try {
-            const edited = readFileSync(tmpFile, { encoding: 'utf8' });
-            unlinkSync(tmpFile);
-            return edited;
+            const child = spawnSync(editor, [tmpFile], { stdio: 'inherit' });
+
+            if (child.error) {
+                outro(`Failed to launch editor: ${child.error.message}`);
+                return null;
+            }
+
+            return readFileSync(tmpFile, { encoding: 'utf8' });
         } catch {
-            unlinkSync(tmpFile);
             outro('Could not read edited commit message.');
             return null;
+        } finally {
+            try {
+                unlinkSync(tmpFile);
+            } catch {
+                // the file is already gone or was never created
+            }
+            rmdirSync(dir);
         }
     }
 }

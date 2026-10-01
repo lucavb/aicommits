@@ -5,11 +5,36 @@ import { AIProviderFactory } from './ai-provider.factory';
 import { AITextGenerationService } from './ai-text-generation.service';
 import { GitService } from './git.service';
 
+export const stripTerminalControls = (s: string) =>
+    s
+        // remove ANSI escape sequences (CSI, OSC including OSC-8, and short-form ESC codes)
+        // eslint-disable-next-line no-control-regex -- terminal-control neutralizer: intentional control-sequence matching
+        .replace(/\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-Z\\-_])/g, '')
+        // remove any remaining C0/C1 control bytes
+        // eslint-disable-next-line no-control-regex -- terminal-control neutralizer: intentional control-byte stripping
+        .replace(/[\u0000-\u001f\u007f-\u009f]/g, '');
+
 const sanitizeMessage = (message: string) =>
-    message
+    stripTerminalControls(message)
         .trim()
         .replace(/[\n\r]/g, '')
         .replace(/(\w)\.$/, '$1');
+
+// Redacted, single-line summary of a provider/stream error for the explicit
+// streamText onError handler - replaces ai's default console.error(raw error)
+// render, which would print remote-sourced multi-line bytes unneutralized.
+// Whitespace is collapsed before stripping so newlines turn into spaces
+// instead of being deleted outright.
+const redactErrorForLog = (error: unknown): string => {
+    const message = error instanceof Error ? error.message : String(error);
+    return stripTerminalControls(message.replace(/\s+/g, ' ')).trim().slice(0, 200);
+};
+
+const logStreamError =
+    (stream: 'subject' | 'body') =>
+    ({ error }: { error: unknown }): void => {
+        console.error(`Commit-message ${stream} generation failed: ${redactErrorForLog(error)}`);
+    };
 
 @Injectable()
 export class AICommitMessageService {
@@ -56,6 +81,7 @@ export class AICommitMessageService {
                     model,
                     ...(reasoningEffort ? { reasoning: reasoningEffort } : {}),
                     instructions: this.promptService.getCommitMessageSystemPrompt(),
+                    onError: logStreamError('subject'),
                     messages: [
                         {
                             role: 'user',
@@ -76,9 +102,10 @@ export class AICommitMessageService {
                     model,
                     ...(reasoningEffort ? { reasoning: reasoningEffort } : {}),
                     instructions: this.promptService.generateSummaryPrompt(locale),
+                    onError: logStreamError('body'),
                     messages: [{ role: 'user', content: userContent }],
                 });
-                return (await consumeStream('body', textStream)).trim();
+                return stripTerminalControls(await consumeStream('body', textStream)).trim();
             })(),
         ]);
 

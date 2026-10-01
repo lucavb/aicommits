@@ -184,6 +184,92 @@ describe('AICommitMessageService', () => {
         expect(result.body).toBe('Body text');
     });
 
+    it('should strip SGR conceal and other ANSI sequences from subject and body', async () => {
+        aiTextGenerationService.streamText
+            .mockReturnValueOnce(textStreamFrom(['Fix\x1b[2J\x1b[1;30H login', ' race on token refresh']))
+            .mockReturnValueOnce(
+                textStreamFrom(['AI summary. \x1b[8mSigned-off-by: model-bot <bot@example.com>\x1b[28m']),
+            );
+
+        const result = await service.generate({ diff: 'test diff' });
+
+        // displayed text must equal committed bytes - no concealing SGR pair survives
+        expect(result.subject).toBe('Fix login race on token refresh');
+        expect(result.body).toBe('AI summary. Signed-off-by: model-bot <bot@example.com>');
+        // eslint-disable-next-line no-control-regex -- fixture assertion: ESC bytes must be gone
+        expect(result.body).not.toMatch(/\x1b/);
+    });
+
+    it('should strip OSC-8 hyperlink and BEL-terminated OSC sequences from subject and body', async () => {
+        aiTextGenerationService.streamText
+            .mockReturnValueOnce(textStreamFrom(['\x1b]0;title-spoof\x07feat: add feature']))
+            .mockReturnValueOnce(textStreamFrom(['\x1b]8;;http://127.0.0.1/x\x1b\\click\x1b]8;;\x1b\\ me']));
+
+        const result = await service.generate({ diff: 'test diff' });
+
+        expect(result.subject).toBe('feat: add feature');
+        expect(result.body).toBe('click me');
+    });
+
+    it('should remove C1 control bytes so no escape sequence can be reconstructed', async () => {
+        aiTextGenerationService.streamText
+            .mockReturnValueOnce(textStreamFrom(['feat: add feature']))
+            .mockReturnValueOnce(textStreamFrom(['hidden\u009b8m\u009b28m tail\u009b?25l']));
+
+        const result = await service.generate({ diff: 'test diff' });
+
+        expect(result.subject).toBe('feat: add feature');
+        expect(result.body).toBe('hidden8m28m tail?25l');
+        // eslint-disable-next-line no-control-regex -- fixture assertion: C0/C1 bytes must be gone
+        expect(result.body).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);
+    });
+
+    it('should pass an explicit onError to both streamText calls', async () => {
+        aiTextGenerationService.streamText
+            .mockReturnValueOnce(textStreamFrom(['feat: x']))
+            .mockReturnValueOnce(textStreamFrom(['body']));
+
+        await service.generate({ diff: 'test diff' });
+
+        expect(typeof aiTextGenerationService.streamText.mock.calls[0][0].onError).toBe('function');
+        expect(typeof aiTextGenerationService.streamText.mock.calls[1][0].onError).toBe('function');
+    });
+
+    it('should render a redacted single-line summary for a stubbed provider error via the explicit onError', async () => {
+        aiTextGenerationService.streamText
+            .mockReturnValueOnce(textStreamFrom(['feat: x']))
+            .mockReturnValueOnce(textStreamFrom(['body']));
+        await service.generate({ diff: 'test diff' });
+
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const subjectOnError = aiTextGenerationService.streamText.mock.calls[0][0].onError as ({
+            error,
+        }: {
+            error: unknown;
+        }) => void;
+        const bodyOnError = aiTextGenerationService.streamText.mock.calls[1][0].onError as ({
+            error,
+        }: {
+            error: unknown;
+        }) => void;
+
+        subjectOnError({
+            error: new Error('provider boom\nsecond line\x1b]8;;http://attacker.example\x07\x1b[2K wiped'),
+        });
+        bodyOnError({ error: new Error('remote\x9b8mconceal\u0007') });
+
+        expect(errorSpy).toHaveBeenCalledTimes(2);
+        const rendered = errorSpy.mock.calls.map((call) => String(call[0]));
+        expect(rendered[0]).toBe('Commit-message subject generation failed: provider boom second line wiped');
+        expect(rendered[1]).toBe('Commit-message body generation failed: remote8mconceal');
+        for (const line of rendered) {
+            expect(line).not.toMatch(/\n/);
+            // eslint-disable-next-line no-control-regex -- fixture assertion: C0/C1 bytes must be gone
+            expect(line).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);
+        }
+    });
+
     it('should return empty strings for empty streams', async () => {
         aiTextGenerationService.streamText
             .mockReturnValueOnce(textStreamFrom([]))
@@ -202,7 +288,9 @@ describe('AICommitMessageService', () => {
         const onDelta = vi.fn();
         const result = await service.generate({ diff: 'test diff', onDelta });
 
-        expect(result).toEqual({ subject: 'feat:  add feature', body: 'Body  \n text' });
+        // final body is control-neutralized at the sanitize boundary: the raw
+        // \n of the stream part no longer reaches the returned value
+        expect(result).toEqual({ subject: 'feat:  add feature', body: 'Body   text' });
 
         const subjectDeltas = onDelta.mock.calls.filter((call) => call[0].stream === 'subject');
         const bodyDeltas = onDelta.mock.calls.filter((call) => call[0].stream === 'body');
