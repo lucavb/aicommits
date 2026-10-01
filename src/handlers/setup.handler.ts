@@ -2,6 +2,7 @@ import { green, yellow } from 'kolorist';
 import { Inject, Injectable } from '../utils/inversify';
 import { ConfigService } from '../services/config.service';
 import { ClackPromptService } from '../services/clack-prompt.service';
+import { assertProfileEnvVarUniqueness } from '../utils/resolve-api-key';
 import { setupProvider } from '../commands/setup/provider-setup';
 import { setupModel } from '../commands/setup/model-setup';
 import { setupCommitFormat } from '../commands/setup/format-setup';
@@ -21,6 +22,12 @@ export class SetupHandler {
         promptUI.note(`You are configuring the "${profile}" profile.`);
 
         await configService.readConfig();
+
+        // The derived API key env var must stay unique per profile - saving a
+        // colliding profile would let one profile's credential resolve as the
+        // other profile's key.
+        assertProfileEnvVarUniqueness(configService.getProfileNames(), profile);
+
         const currentConfig = configService.getRawProfile(profile);
 
         // 1. Setup provider

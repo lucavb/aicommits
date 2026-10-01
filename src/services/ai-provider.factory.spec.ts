@@ -37,7 +37,7 @@ describe('AIProviderFactory', () => {
         const factory = container.get(AIProviderFactory);
 
         expect(() => factory.createModel()).toThrow(KnownError);
-        expect(() => factory.createModel()).toThrow('AIC_API_KEY_WORK');
+        expect(() => factory.createModel()).toThrow('AIC_API_KEY_work');
         expect(() => factory.createModel()).toThrow('OPENAI_API_KEY');
     });
 });

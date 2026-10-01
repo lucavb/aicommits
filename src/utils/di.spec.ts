@@ -57,6 +57,11 @@ describe('buildContainer', () => {
                     throw new Error('missing');
                 },
                 writeFile: async () => undefined,
+                // ConfigService#flush persists the credential file atomically
+                // (temp file + rename) with explicit owner-only mode, so the
+                // file system API contract now also carries rename and chmod.
+                rename: async () => undefined,
+                chmod: async () => undefined,
             },
         });
 

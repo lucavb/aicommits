@@ -1,5 +1,6 @@
 import { type ProviderName } from './config';
 import { type Environment } from './env';
+import { KnownError } from './error';
 
 const PROVIDER_API_KEY_ENV_VARS: Partial<Record<ProviderName, string>> = {
     openai: 'OPENAI_API_KEY',
@@ -9,9 +10,42 @@ const PROVIDER_API_KEY_ENV_VARS: Partial<Record<ProviderName, string>> = {
 
 const API_KEY_PROVIDERS = new Set<ProviderName>(['openai', 'anthropic', 'openrouter']);
 
+/**
+ * Maps a profile name onto its API key env var name **injectively**: every
+ * accepted profile name (any non-empty string) derives a distinct env var.
+ *
+ * Alphanumeric characters pass through (case preserved - case-folding would
+ * make case-only profiles collide), everything else - including a literal
+ * uppercase "X", which would otherwise be ambiguous with the escape framing -
+ * is individually hex-escaped. Collapsing non-alphanumeric characters to a
+ * single "_" (the previous behavior) was non-injective: "work.dev",
+ * "work-dev", "work dev", and "work_dev" all resolved to the same
+ * AIC_API_KEY_WORK_DEV, so one profile's credential silently became another
+ * profile's API key.
+ */
 export function getProfileApiKeyEnvVar(profile: string): string {
-    const suffix = profile.toUpperCase().replace(/[^A-Z0-9]/g, '_');
-    return `AIC_API_KEY_${suffix}`;
+    const escaped = Array.from(profile)
+        .map((char) =>
+            /^[A-Z0-9a-z]$/.test(char) && char !== 'X' ? char : `X${char.codePointAt(0)!.toString(16).toUpperCase()}X`,
+        )
+        .join('');
+    return `AIC_API_KEY_${escaped}`;
+}
+
+/**
+ * Guards profile persistence: rejects saving a profile whose derived API key
+ * env var is already claimed by another configured profile, so a credential
+ * env var can never be shared between two profile namespaces.
+ */
+export function assertProfileEnvVarUniqueness(profiles: string[], candidate: string): void {
+    const derived = getProfileApiKeyEnvVar(candidate);
+    for (const existing of profiles) {
+        if (existing !== candidate && getProfileApiKeyEnvVar(existing) === derived) {
+            throw new KnownError(
+                `Profile '${candidate}' collides with profile '${existing}': both derive the API key env var '${derived}'. Choose a profile name that differs by more than case or punctuation.`,
+            );
+        }
+    }
 }
 
 export function getProviderApiKeyEnvVar(provider: ProviderName): string | undefined {
