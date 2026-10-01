@@ -86,9 +86,11 @@ async function setupBedrockModel(
         }
 
         s.stop('Models fetched.');
-    } catch (error) {
+    } catch {
         s.stop(red('Failed to fetch models. Check your AWS credentials and region.'));
-        console.error(error instanceof Error ? error.message : String(error));
+        console.error(
+            'Failed to fetch models. See the message above and check your AWS credentials, region and network.',
+        );
         return { model: null };
     }
 
