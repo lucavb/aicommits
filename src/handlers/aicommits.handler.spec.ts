@@ -2,14 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AiCommitsHandler } from './aicommits.handler';
 import type { ConfigService } from '../services/config.service';
 import type { GitService } from '../services/git.service';
-import type { AICommitMessageService } from '../services/ai-commit-message.service';
+import type { ProposalService } from '../services/proposal.service';
 import type { ClackPromptService } from '../services/clack-prompt.service';
-
-vi.mock('../commands/aicommits-utils', () => ({
-    streamingReviewAndRevise: vi.fn(),
-}));
-
-import { streamingReviewAndRevise } from '../commands/aicommits-utils';
 
 const createSpinner = () => ({ start: vi.fn(), stop: vi.fn(), message: vi.fn() });
 
@@ -20,7 +14,7 @@ const createSpinner = () => ({ start: vi.fn(), stop: vi.fn(), message: vi.fn() }
 describe('AiCommitsHandler', () => {
     let configService: Partial<ConfigService>;
     let gitService: Partial<GitService>;
-    let aiCommitMessageService: Partial<AICommitMessageService>;
+    let proposalService: Partial<ProposalService>;
     let promptUI: Partial<ClackPromptService>;
     let handler: AiCommitsHandler;
     let exitSpy: ReturnType<typeof vi.spyOn>;
@@ -51,23 +45,20 @@ describe('AiCommitsHandler', () => {
             commitChanges: vi.fn().mockResolvedValue(undefined),
         };
 
-        aiCommitMessageService = {
-            generate: vi.fn().mockResolvedValue({ subject: 'feat: add feature', body: 'Body text' }),
+        proposalService = {
+            review: vi.fn().mockResolvedValue({
+                accepted: true,
+                proposal: { subject: 'feat: add feature', body: 'Body text' },
+                commitMessage: 'feat: add feature\n\nBody text',
+            }),
         };
 
         promptUI = {
             intro: vi.fn(),
             note: vi.fn(),
             spinner: vi.fn().mockImplementation(createSpinner) as unknown as ClackPromptService['spinner'],
-            log: { step: vi.fn(), message: vi.fn() } as unknown as ClackPromptService['log'],
             outro: vi.fn(),
         };
-
-        vi.mocked(streamingReviewAndRevise).mockResolvedValue({
-            accepted: true,
-            message: 'feat: add feature',
-            body: 'Body text',
-        });
 
         vi.spyOn(console, 'error').mockImplementation(() => undefined);
         exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
@@ -77,17 +68,17 @@ describe('AiCommitsHandler', () => {
         handler = new AiCommitsHandler(
             configService as ConfigService,
             gitService as GitService,
-            aiCommitMessageService as AICommitMessageService,
+            proposalService as ProposalService,
             promptUI as ClackPromptService,
         );
     });
 
-    it('generates a commit message and commits the staged changes', async () => {
+    it('reviews the proposal and commits the staged changes', async () => {
         await handler.run();
 
         expect(gitService.assertGitRepo).toHaveBeenCalled();
         expect(gitService.getStagedDiff).toHaveBeenCalled();
-        expect(aiCommitMessageService.generate).toHaveBeenCalled();
+        expect(proposalService.review).toHaveBeenCalledWith({ diff: 'diff --git a/a.ts' });
         expect(gitService.commitChanges).toHaveBeenCalledWith('feat: add feature\n\nBody text');
         expect(promptUI.outro).toHaveBeenCalledWith(expect.stringContaining('Successfully committed'));
         expect(exitSpy).not.toHaveBeenCalled();
@@ -118,7 +109,7 @@ describe('AiCommitsHandler', () => {
     });
 
     it('does not commit when the user cancels the review', async () => {
-        vi.mocked(streamingReviewAndRevise).mockResolvedValue({ accepted: false });
+        proposalService.review = vi.fn().mockResolvedValue({ accepted: false });
 
         await handler.run();
 

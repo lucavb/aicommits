@@ -7,6 +7,9 @@ import { ConfigService } from '../services/config.service';
 import { GitService } from '../services/git.service';
 import { PromptService } from '../services/prompt.service';
 import { ClackPromptService } from '../services/clack-prompt.service';
+import { ClackReviewPrompt } from '../services/clack-review-prompt';
+import { REVIEW_PROMPT } from '../services/review-prompt.interface';
+import { ProposalService } from '../services/proposal.service';
 import { AIProviderFactory } from '../services/ai-provider.factory';
 import { AITextGenerationService } from '../services/ai-text-generation.service';
 import { AiCommitsHandler } from '../handlers/aicommits.handler';
@@ -31,6 +34,8 @@ describe('buildContainer', () => {
         GitService,
         PromptService,
         ClackPromptService,
+        ClackReviewPrompt,
+        ProposalService,
         AIProviderFactory,
         AITextGenerationService,
         AiCommitsHandler,
@@ -38,7 +43,11 @@ describe('buildContainer', () => {
         ConfigSetHandler,
         SetupHandler,
         IgnoreHandler,
-    ].map((identifier) => ({ name: identifier.name, identifier }));
+        REVIEW_PROMPT,
+    ].map((identifier) => ({
+        name: typeof identifier === 'symbol' ? identifier.toString() : identifier.name,
+        identifier,
+    }));
 
     it.each(resolvableClasses)('resolves $name without throwing', ({ identifier }) => {
         const container = buildContainer({

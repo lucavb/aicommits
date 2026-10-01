@@ -14,6 +14,9 @@ import {
 import { GitService, SIMPLE_GIT } from '../services/git.service';
 import { PromptService } from '../services/prompt.service';
 import { ClackPromptService } from '../services/clack-prompt.service';
+import { ClackReviewPrompt } from '../services/clack-review-prompt';
+import { REVIEW_PROMPT } from '../services/review-prompt.interface';
+import { ProposalService } from '../services/proposal.service';
 import { AIProviderFactory } from '../services/ai-provider.factory';
 import { AITextGenerationService } from '../services/ai-text-generation.service';
 import { AiCommitsHandler } from '../handlers/aicommits.handler';
@@ -50,6 +53,9 @@ export const buildContainer = (options: ContainerOptions = {}): Container => {
     container.bind(GitService).toSelf();
     container.bind(PromptService).toSelf();
     container.bind(ClackPromptService).toSelf();
+    container.bind(ClackReviewPrompt).toSelf();
+    container.bind(REVIEW_PROMPT).toDynamicValue((context) => context.get(ClackReviewPrompt));
+    container.bind(ProposalService).toSelf();
     container.bind(AIProviderFactory).toSelf();
     container.bind(AITextGenerationService).toSelf();
 

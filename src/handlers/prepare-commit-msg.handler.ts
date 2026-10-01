@@ -2,6 +2,7 @@ import { Inject, Injectable } from '../utils/inversify';
 import { ConfigService } from '../services/config.service';
 import { GitService } from '../services/git.service';
 import { AICommitMessageService } from '../services/ai-commit-message.service';
+import { buildCommitMessage } from '../services/proposal.service';
 
 @Injectable()
 export class PrepareCommitMsgHandler {
@@ -24,7 +25,7 @@ export class PrepareCommitMsgHandler {
         });
 
         if (subject && body) {
-            const fullMessage = `${subject}\n\n${body}`.trim();
+            const fullMessage = buildCommitMessage(subject, body);
             console.log(fullMessage);
         }
     }
