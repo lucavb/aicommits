@@ -23,20 +23,30 @@ jobs:
 
         steps:
             - name: Checkout
-              uses: actions/checkout@v7
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   fetch-depth: 0 # Fetch all history for all tags and branches
 
             - name: Use Node.js
-              uses: actions/setup-node@v7
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
               with:
                   node-version-file: '.nvmrc'
 
-            - name: Update npm
-              run: sudo npm install -g npm@latest
-
             - name: Install dependencies
-              run: npm ci
+              run: npm ci --ignore-scripts
+
+            - name: Run dependency lifecycle scripts explicitly if needed
+              run: npm rebuild
+
+            - name: Build
+              run: npm run build
+
+            - name: Record bundle digest
+              run: sha256sum dist/cli.mjs | tee dist/cli.mjs.sha256
+
+            - name: Verify bundle against committed reference (fail closed)
+              run: |
+                  diff <(sha256sum dist/cli.mjs | cut -d' ' -f1) <(cut -d' ' -f1 dist/cli.mjs.reference.sha256) || exit 1
 
             - name: Code Quality
               run: npm run cq

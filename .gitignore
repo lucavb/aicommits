@@ -20,7 +20,8 @@ lerna-debug.log*
 .env.test
 
 # Distribution
-dist
+dist/*
+!dist/cli.mjs.reference.sha256
 
 # Test coverage
 coverage
