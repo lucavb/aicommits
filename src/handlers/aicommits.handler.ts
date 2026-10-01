@@ -2,6 +2,7 @@ import { bgCyan, black, green, red, yellow } from 'kolorist';
 import { handleCliError, KnownError } from '../utils/error';
 import { isError } from '../utils/typeguards';
 import { Inject, Injectable } from '../utils/inversify';
+import { stripTerminalControls } from '../services/ai-commit-message.service';
 import { GitService } from '../services/git.service';
 import { ConfigService } from '../services/config.service';
 import { ClackPromptService } from '../services/clack-prompt.service';
@@ -78,7 +79,18 @@ export class AiCommitsHandler {
 
             const detectingFiles = promptUI.spinner();
             detectingFiles.start('Detecting staged files');
-            const staged = await gitService.getStagedDiff(config.exclude, config.contextLines);
+            const staged = await gitService.getStagedDiff(config.exclude, config.contextLines, {
+                // Consent-gated first-run initialization of the tool's default
+                // ignore patterns: without explicit consent nothing is hidden
+                // from review and nothing is persisted to the config.
+                requestDefaultIgnoreConsent: async () => {
+                    const confirmed = await promptUI.confirm({
+                        message:
+                            'Initialize default ignore patterns (package-lock.json, pnpm-lock.yaml, *.lock) in your global aicommits config so these files are excluded from review?',
+                    });
+                    return confirmed === true;
+                },
+            });
 
             if (!staged) {
                 detectingFiles.stop('Detecting staged files');
@@ -98,12 +110,34 @@ export class AiCommitsHandler {
                 return;
             }
 
-            await this.gitService.commitChanges(result.commitMessage);
+            const fullMessage = result.commitMessage;
 
-            promptUI.outro(`${green('✔')} Successfully committed`);
+            // Bind the commit to the reviewed file set from the approval artifact.
+            const filesToCommit = [...staged.files];
+            if (staged.filesExcludedFromReview && staged.filesExcludedFromReview.length > 0) {
+                // Disclose any staged files the review artifact filtered out before committing.
+                promptUI.note(
+                    `Staged files excluded from review and not shown above:\n${staged.filesExcludedFromReview.join('\n')}`,
+                );
+                const includeExcluded = await promptUI.confirm({
+                    message: 'Commit these excluded files anyway?',
+                });
+                if (includeExcluded !== true) {
+                    promptUI.outro('Commit cancelled');
+                    return;
+                }
+                filesToCommit.push(...staged.filesExcludedFromReview);
+            }
+
+            const committed = await gitService.commitChanges(fullMessage, filesToCommit);
+
+            // Disclose what actually landed in the commit.
+            promptUI.outro(`${green('✔')} Committed files:\n${committed.files.join('\n')}`);
         } catch (error) {
             if (isError(error)) {
-                promptUI.outro(`${red('✖')} ${error.message}`);
+                // provider/error text can carry remote-sourced bytes: neutralize
+                // terminal control sequences before rendering to the user
+                promptUI.outro(`${red('✖')} ${stripTerminalControls(error.message)}`);
             } else {
                 promptUI.outro(`${red('✖')} An unknown error occurred`);
             }
