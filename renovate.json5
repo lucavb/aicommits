@@ -35,6 +35,14 @@
             reviewers: ['lucavb'],
         },
         {
+            // preset v10+ needs conventional-changelog-writer@9, which
+            // @semantic-release/release-notes-generator@14 does not support
+            // (release bodies silently come out empty); keep pinned to v9
+            matchPackageNames: ['conventional-changelog-conventionalcommits'],
+            matchUpdateTypes: ['major'],
+            enabled: false,
+        },
+        {
             matchDatasources: ['npm'],
             matchUpdateTypes: ['minor', 'patch'],
             vulnerabilityAlerts: {

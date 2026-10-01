@@ -100,6 +100,7 @@
         "@semantic-release/release-notes-generator": "14.1.1",
         "@types/node": "24.19.0",
         "@vitest/coverage-v8": "5.0.2",
+        "conventional-changelog-conventionalcommits": "9.3.1",
         "eslint": "10.11.0",
         "husky": "9.1.7",
         "prettier": "3.9.9",
