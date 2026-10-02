@@ -1,10 +1,11 @@
-import { Command, Option } from '@commander-js/extra-typings';
+import { Command } from '@commander-js/extra-typings';
 import { runWithContainer } from '../../utils/di';
 import { SetupHandler } from '../../handlers/setup.handler';
+import { profileOption } from '../profile-option';
 
 export const setupCommand = new Command('setup')
-    .addOption(new Option('--profile <profile>', 'Configuration profile to use').default('default'))
+    .addOption(profileOption())
     .description('Interactive setup for aicommits')
     .action(async ({ profile }) => {
-        await runWithContainer({ cliArguments: { profile } }, (container) => container.get(SetupHandler).run(profile));
+        await runWithContainer({ cliArguments: { profile } }, (container) => container.get(SetupHandler).run());
     });

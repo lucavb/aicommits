@@ -26,12 +26,6 @@ const baseProfileConfigSchema = z.object({
         .default('en')
         .refine((str: string): str is LanguageCode => iso6391.validate(str)),
     maxLength: z.coerce.number().int().positive().default(50),
-    stageAll: z.boolean().or(
-        z
-            .string()
-            .optional()
-            .transform((str) => str === 'true'),
-    ),
     type: z.enum(['conventional', ''] as const).optional(),
 });
 

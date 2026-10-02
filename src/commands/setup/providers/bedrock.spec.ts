@@ -24,8 +24,11 @@ const EXPECTED_STDERR_MESSAGE =
 
 const setupContext: ModelSetupContext = {
     profile: 'default',
-    resolveApiKey: () => undefined,
-    getApiKeySourceEnvVar: () => undefined,
+    // Bedrock needs no API key; the handler never consults the credential.
+    locateCredential: () => ({
+        required: false,
+        candidates: [],
+    }),
 };
 
 const spinnerStops: string[] = [];

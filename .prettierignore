@@ -1,0 +1,7 @@
+# oh-my-opencode-slim worktrees: environment-owned copies of this repo, not
+# part of the project source. Formatting their duplicate files must never gate
+# this repo's CQ check.
+.slim/
+
+# Local planning documents, not release source.
+docs/plans/

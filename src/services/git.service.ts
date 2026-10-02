@@ -1,30 +1,12 @@
 import type { CommitResult, SimpleGit } from 'simple-git';
 import { Inject, Injectable } from '../utils/inversify';
 import { KnownError } from '../utils/error';
-import { ConfigService } from './config.service';
 
 export const SIMPLE_GIT = Symbol.for('SIMPLE_GIT');
 
-export type GetStagedDiffOptions = {
-    // Callback used to obtain the user's explicit consent before the tool
-    // initializes and persists its default ignore patterns on first run.
-    // When absent, or when it resolves to false, the tool-authored defaults
-    // are neither applied nor persisted.
-    requestDefaultIgnoreConsent?: () => Promise<boolean>;
-};
-
 @Injectable()
 export class GitService {
-    private readonly defaultIgnorePatterns = [
-        'package-lock.json',
-        'pnpm-lock.yaml',
-        '*.lock', // yarn.lock, Cargo.lock, Gemfile.lock, Pipfile.lock, etc.
-    ];
-
-    constructor(
-        @Inject(SIMPLE_GIT) private readonly git: SimpleGit,
-        @Inject(ConfigService) private readonly configService: ConfigService,
-    ) {}
+    constructor(@Inject(SIMPLE_GIT) private readonly git: SimpleGit) {}
 
     async stageAllFiles(): Promise<void> {
         try {
@@ -91,39 +73,16 @@ export class GitService {
         return `:(exclude)${path}`;
     }
 
-    private async getFilesToExclude(requestDefaultIgnoreConsent?: () => Promise<boolean>): Promise<string[]> {
-        await this.configService.readConfig();
-
-        const globalIgnore = this.configService.getGlobalIgnorePatterns();
-        if (globalIgnore.length > 0) {
-            return globalIgnore.map(this.excludeFromDiff);
-        }
-
-        // First run: the tool must never silently initialize and persist its
-        // default ignore patterns. Apply and persist them only after the user
-        // explicitly consented; otherwise show every staged file for review.
-        const consented = (await requestDefaultIgnoreConsent?.()) ?? false;
-        if (!consented) {
-            console.log(
-                'ℹ️  Global ignore patterns not configured. Tool default excludes were NOT applied; every staged file is shown for review.',
-            );
-            return [];
-        }
-
-        this.configService.setGlobalIgnorePatterns(this.defaultIgnorePatterns);
-        await this.configService.flush();
-        console.log('✅ Default ignore patterns added to globalIgnore config');
-        return this.defaultIgnorePatterns.map(this.excludeFromDiff);
-    }
-
+    /**
+     * @param exclude every pattern to leave out of the diff; the resolved profile's
+     *   `exclude` already merges any persisted global ignore, profile, and CLI patterns.
+     */
     async getStagedDiff(
-        excludeFiles: string[] = [],
+        exclude: string[],
         contextLines: number,
-        options: GetStagedDiffOptions = {},
     ): Promise<{ files: string[]; diff: string; filesExcludedFromReview?: string[] } | undefined> {
         const diffCached = ['--cached', '--diff-algorithm=minimal'] as const;
-        const filesToExclude = await this.getFilesToExclude(options.requestDefaultIgnoreConsent);
-        const excludeArgs = [...filesToExclude, ...excludeFiles.map(this.excludeFromDiff)] as const;
+        const excludeArgs = exclude.map(this.excludeFromDiff);
 
         try {
             const stagedFiles = await this.git.diff([...diffCached, '--name-only']);

@@ -89,15 +89,13 @@ async function setupOpenAIModel(
     }
 
     const currentApiKey = currentConfig && 'apiKey' in currentConfig ? currentConfig.apiKey : undefined;
-    const resolvedApiKey = context.resolveApiKey(currentApiKey);
-    const sourceEnvVar = context.getApiKeySourceEnvVar(currentApiKey);
+    const credential = context.locateCredential(currentApiKey);
 
     const apiKeyResult = await collectApiKeyForSetup({
         promptUI,
         providerLabel: 'OpenAI',
         currentApiKey,
-        resolvedApiKey,
-        sourceEnvVar,
+        credential,
     });
 
     if (!apiKeyResult) {

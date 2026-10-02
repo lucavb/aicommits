@@ -6,17 +6,7 @@ import { join } from 'path';
 import { Container } from 'inversify';
 import { simpleGit, type SimpleGit } from 'simple-git';
 import { GitService, SIMPLE_GIT } from './git.service';
-import { ConfigService } from './config.service';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Injectable } from '../utils/inversify';
-
-@Injectable()
-class MockConfigService implements Partial<ConfigService> {
-    readConfig = vi.fn().mockResolvedValue(undefined);
-    getGlobalIgnorePatterns = vi.fn().mockReturnValue([]);
-    setGlobalIgnorePatterns = vi.fn();
-    flush = vi.fn().mockResolvedValue(undefined);
-}
 
 class MockSimpleGit {
     add = vi.fn();
@@ -30,14 +20,11 @@ class MockSimpleGit {
 describe('GitService', () => {
     let gitService: GitService;
     let mockGit: MockSimpleGit;
-    let mockConfigService: MockConfigService;
 
     beforeEach(() => {
         mockGit = new MockSimpleGit();
-        mockConfigService = new MockConfigService();
 
         const container = new Container({ defaultScope: 'Singleton' });
-        container.bind(ConfigService).toConstantValue(mockConfigService as unknown as ConfigService);
         container.bind(SIMPLE_GIT).toConstantValue(mockGit);
         container.bind(GitService).toSelf();
 
@@ -121,6 +108,66 @@ describe('GitService', () => {
         });
     });
 
+    describe('getStagedDiff', () => {
+        it('passes every exclude pattern to both filtered git diff calls', async () => {
+            // getStagedDiff diffs the index three times: once unfiltered for
+            // the full staged list (disclosure), then filtered name-only, then
+            // filtered with context for the artifact.
+            mockGit.diff.mockImplementation((args: readonly string[]) => {
+                if (args.includes('--name-only')) {
+                    // The stand-in list is the same for both entries so the
+                    // disclosed-excluded file set is empty unless real globbing
+                    // happens; the shape of the git invocation is the point.
+                    return Promise.resolve('a.ts\nb.ts\n');
+                }
+                return Promise.resolve('diff --git a/a.ts');
+            });
+
+            const result = await gitService.getStagedDiff(['*.lock', 'dist/**'], 4);
+
+            expect(result).toEqual({ files: ['a.ts', 'b.ts'], diff: 'diff --git a/a.ts', filesExcludedFromReview: [] });
+            // First call: the unfiltered staged list for the disclosure.
+            expect(mockGit.diff).toHaveBeenNthCalledWith(1, ['--cached', '--diff-algorithm=minimal', '--name-only']);
+            expect(mockGit.diff).toHaveBeenNthCalledWith(2, [
+                '--cached',
+                '--diff-algorithm=minimal',
+                '--name-only',
+                ':(exclude)*.lock',
+                ':(exclude)dist/**',
+            ]);
+            expect(mockGit.diff).toHaveBeenNthCalledWith(3, [
+                '-U4',
+                '--cached',
+                '--diff-algorithm=minimal',
+                ':(exclude)*.lock',
+                ':(exclude)dist/**',
+            ]);
+        });
+
+        it('returns undefined when nothing is staged', async () => {
+            mockGit.diff.mockResolvedValue('');
+
+            expect(await gitService.getStagedDiff([], 10)).toBeUndefined();
+            expect(mockGit.diff).toHaveBeenCalledTimes(2);
+        });
+
+        it('writes nothing to stdout, because the hook prints its commit message there', async () => {
+            const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+            mockGit.diff.mockResolvedValueOnce('a.ts').mockResolvedValueOnce('diff');
+
+            await gitService.getStagedDiff([], 10);
+
+            expect(log).not.toHaveBeenCalled();
+            log.mockRestore();
+        });
+
+        it('wraps git failures in a KnownError', async () => {
+            mockGit.diff.mockRejectedValue(new Error('boom'));
+
+            await expect(gitService.getStagedDiff([], 10)).rejects.toThrow('Failed to get staged diff');
+        });
+    });
+
     describe('existing functionality', () => {
         it('should stage all files', async () => {
             mockGit.add.mockResolvedValue(undefined);
@@ -198,7 +245,6 @@ describe('GitService', () => {
 
     describe('getStagedDiff (approval artifact disclosure)', () => {
         it('discloses index files the exclusion pathspecs filtered out of the artifact', async () => {
-            mockConfigService.getGlobalIgnorePatterns = vi.fn().mockReturnValue(['package-lock.json']);
             mockGit.diff.mockImplementation((args: readonly string[]) => {
                 const isNameOnly = args.includes('--name-only');
                 const hasExcludes = args.some((arg) => typeof arg === 'string' && arg.startsWith(':(exclude)'));
@@ -211,7 +257,7 @@ describe('GitService', () => {
                 return Promise.resolve('diff --git a/app.ts');
             });
 
-            const staged = await gitService.getStagedDiff([], 3);
+            const staged = await gitService.getStagedDiff(['package-lock.json'], 3);
 
             expect(staged?.files).toEqual(['app.ts', 'README.md']);
             expect(staged?.filesExcludedFromReview).toEqual(['package-lock.json']);
@@ -232,11 +278,9 @@ describe('GitService', () => {
         });
 
         it('returns undefined when the filtered review list is empty', async () => {
-            // Fail-closed: staging only an ignored artifact leaves nothing to
+            // Fail-closed: staging only an excluded artifact leaves nothing to
             // review, so getStagedDiff must return undefined (no reviewable set,
-            // no commit can proceed). The exclude pathspec only exists when the
-            // ignore patterns are configured.
-            mockConfigService.getGlobalIgnorePatterns = vi.fn().mockReturnValue(['package-lock.json']);
+            // no commit can proceed).
             mockGit.diff.mockImplementation((args: readonly string[]) => {
                 const isNameOnly = args.includes('--name-only');
                 const hasExcludes = args.some((arg) => typeof arg === 'string' && arg.startsWith(':(exclude)'));
@@ -249,59 +293,9 @@ describe('GitService', () => {
                 return Promise.resolve('');
             });
 
-            const staged = await gitService.getStagedDiff([], 3);
+            const staged = await gitService.getStagedDiff(['package-lock.json'], 3);
 
             expect(staged).toBeUndefined();
-        });
-    });
-
-    describe('default ignore patterns consent gate', () => {
-        it('does not auto-initialize or persist tool defaults without a consent callback', async () => {
-            mockConfigService.getGlobalIgnorePatterns = vi.fn().mockReturnValue([]);
-            mockGit.diff.mockResolvedValue('a.ts\n');
-
-            await gitService.getStagedDiff([], 3);
-
-            expect(mockConfigService.setGlobalIgnorePatterns).not.toHaveBeenCalled();
-            expect(mockConfigService.flush).not.toHaveBeenCalled();
-            expect(mockGit.diff).toHaveBeenCalledWith(['--cached', '--diff-algorithm=minimal', '--name-only']);
-        });
-
-        it('does not initialize or persist tool defaults when consent is declined', async () => {
-            mockConfigService.getGlobalIgnorePatterns = vi.fn().mockReturnValue([]);
-            mockGit.diff.mockResolvedValue('a.ts\n');
-
-            await gitService.getStagedDiff([], 3, { requestDefaultIgnoreConsent: async () => false });
-
-            expect(mockConfigService.setGlobalIgnorePatterns).not.toHaveBeenCalled();
-            expect(mockConfigService.flush).not.toHaveBeenCalled();
-        });
-
-        it('initializes and persists the defaults only after explicit consent', async () => {
-            mockConfigService.getGlobalIgnorePatterns = vi.fn().mockReturnValue([]);
-            mockGit.diff.mockResolvedValue('a.ts\n');
-
-            await gitService.getStagedDiff([], 3, { requestDefaultIgnoreConsent: async () => true });
-
-            expect(mockConfigService.setGlobalIgnorePatterns).toHaveBeenCalledWith([
-                'package-lock.json',
-                'pnpm-lock.yaml',
-                '*.lock',
-            ]);
-            expect(mockConfigService.flush).toHaveBeenCalled();
-        });
-
-        it('applies user-configured ignore patterns without any consent round-trip', async () => {
-            mockConfigService.getGlobalIgnorePatterns = vi.fn().mockReturnValue(['package-lock.json']);
-            mockGit.diff.mockResolvedValue('a.ts\n');
-
-            await gitService.getStagedDiff([], 3);
-
-            expect(mockConfigService.setGlobalIgnorePatterns).not.toHaveBeenCalled();
-            expect(mockConfigService.flush).not.toHaveBeenCalled();
-            // First diff call lists the full index; second call applies the exclude pathspecs.
-            const [, filteredCall] = mockGit.diff.mock.calls;
-            expect(filteredCall[0]).toContain(':(exclude)package-lock.json');
         });
     });
 });
@@ -351,14 +345,14 @@ async function createDummyRepo(): Promise<{ dir: string; repo: SimpleGit }> {
     return { dir, repo };
 }
 
-async function buildGitService(repo: SimpleGit, globalIgnore: string[] = []): Promise<GitService> {
-    const mockConfigService = new MockConfigService();
-    mockConfigService.getGlobalIgnorePatterns = vi.fn().mockReturnValue(globalIgnore);
+function buildGitService(repo: SimpleGit): Promise<GitService> {
+    // GitService takes only the SimpleGit dependency; the exclude patterns and
+    // any default-ignore consent flow live with the resolved profile and the
+    // handler, not here.
     const container = new Container({ defaultScope: 'Singleton' });
-    container.bind(ConfigService).toConstantValue(mockConfigService as unknown as ConfigService);
     container.bind(SIMPLE_GIT).toConstantValue(repo);
     container.bind(GitService).toSelf();
-    return container.get(GitService);
+    return Promise.resolve(container.get(GitService));
 }
 
 describe.skipIf(!gitAvailable)('GitService commit binding (real git)', () => {
@@ -402,32 +396,21 @@ describe.skipIf(!gitAvailable)('GitService commit binding (real git)', () => {
         expect((await repo.log({ maxCount: 1 })).latest?.message).toBe('chore: seed');
     });
 
-    it('excludes staged excluded files from the artifact with consent and discloses them as excluded', async () => {
+    it('excludes only via the patterns its caller passes, and keeps declined defaults visible', async () => {
         writeFileSync(join(dir, 'README.md'), 'docs\n', 'utf8');
         writeFileSync(join(dir, 'package-lock.json'), CRAFTED_PACKAGE_LOCK, 'utf8');
         await gitService.stageAllFiles();
 
-        // Consent granted: the tool initializes and persists its defaults.
-        const consentedService = await buildGitService(repo);
-        const consented = await consentedService.getStagedDiff([], 3, {
-            requestDefaultIgnoreConsent: async () => true,
-        });
-
-        expect(consented?.files).toEqual(['README.md']);
-        expect(consented?.filesExcludedFromReview).toEqual(['package-lock.json']);
-        const excluded = consented?.filesExcludedFromReview ?? [];
-        expect(consented?.files.filter((file) => excluded.includes(file))).toEqual([]);
-    });
-
-    it('shows default-exclude-matching staged files for review when consent is declined', async () => {
-        writeFileSync(join(dir, 'README.md'), 'docs\n', 'utf8');
-        writeFileSync(join(dir, 'package-lock.json'), CRAFTED_PACKAGE_LOCK, 'utf8');
-        await gitService.stageAllFiles();
-
+        // Without consent nothing is hidden: no exclusion patterns means the
+        // lockfile is visible for review and nothing is disclosed as excluded.
         const staged = await gitService.getStagedDiff([], 3);
-
-        // Without consent nothing is hidden: the lockfile is visible for review.
         expect(staged?.files).toEqual(['README.md', 'package-lock.json']);
         expect(staged?.filesExcludedFromReview).toEqual([]);
+
+        // Explicitly filtered on the caller's behalf: the lockfile only leaves
+        // the artifact once a pattern excludes it, and then it is disclosed.
+        const filtered = await gitService.getStagedDiff(['package-lock.json'], 3);
+        expect(filtered?.files).toEqual(['README.md']);
+        expect(filtered?.filesExcludedFromReview).toEqual(['package-lock.json']);
     });
 });

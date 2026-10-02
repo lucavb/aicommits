@@ -7,6 +7,7 @@ import { setupCommand } from './commands/setup';
 import { prepareCommitMsgCommand } from './commands/prepare-commit-msg';
 import { ignoreCommand } from './commands/ignore';
 import { runWithContainer } from './utils/di';
+import { profileOption } from './commands/profile-option';
 
 const parsePositiveInteger = (value: string): number => {
     const parsed = Number(value);
@@ -49,13 +50,11 @@ program
         ),
     )
     .addOption(new Option('--model <model>', 'AI model to use for generating commit messages'))
-    .addOption(new Option('--profile <profile>', 'Configuration profile to use').default('default'))
+    .addOption(profileOption())
     .addOption(new Option('--stage-all', 'Stage all modified files before generating commit'))
     .addOption(new Option('--type <type>', 'Commit message format type (conventional or empty)'))
-    .action(async (options) => {
-        await runWithContainer({ cliArguments: options }, (container) =>
-            container.get(AiCommitsHandler).run({ stageAll: options.stageAll }),
-        );
+    .action(async ({ stageAll, ...cliArguments }) => {
+        await runWithContainer({ cliArguments }, (container) => container.get(AiCommitsHandler).run({ stageAll }));
     });
 
 program.parse(process.argv);

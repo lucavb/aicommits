@@ -4,69 +4,58 @@ import { isError } from '../utils/typeguards';
 import { Inject, Injectable } from '../utils/inversify';
 import { stripTerminalControls } from '../services/ai-commit-message.service';
 import { GitService } from '../services/git.service';
-import { ConfigService } from '../services/config.service';
 import { ClackPromptService } from '../services/clack-prompt.service';
 import { ProposalService } from '../services/proposal.service';
+import { ProfileStore } from '../profile/profile-store';
+import { DEFAULT_GLOBAL_IGNORE } from '../profile/config-file';
+import {
+    describeCredentialSource,
+    describeUnusableProfile,
+    RESOLVED_PROFILE,
+    type ReadyProfile,
+    type ResolvedProfile,
+} from '../profile/resolved-profile';
 import { trimLines } from '../utils/string';
+
+const profileNote = ({ name, settings, credential }: ReadyProfile): string => {
+    const endpoint =
+        settings.provider === 'bedrock'
+            ? 'AWS Bedrock'
+            : yellow('baseUrl' in settings && settings.baseUrl ? settings.baseUrl : 'N/A');
+
+    return [
+        `Profile: ${yellow(name)}`,
+        `Provider: ${yellow(settings.provider)}`,
+        `Model: ${yellow(settings.model)}`,
+        `Endpoint: ${endpoint}`,
+        ...(credential.required
+            ? [`API key: ${credential.source ? yellow(describeCredentialSource(credential.source)) : red('not found')}`]
+            : []),
+    ].join('\n');
+};
 
 @Injectable()
 export class AiCommitsHandler {
     constructor(
-        @Inject(ConfigService) private readonly configService: ConfigService,
+        @Inject(RESOLVED_PROFILE) private readonly resolvedProfile: ResolvedProfile,
         @Inject(GitService) private readonly gitService: GitService,
         @Inject(ProposalService) private readonly proposalService: ProposalService,
         @Inject(ClackPromptService) private readonly promptUI: ClackPromptService,
+        @Inject(ProfileStore) private readonly profileStore: ProfileStore,
     ) {}
 
     async run({ stageAll = false }: { stageAll?: boolean } = {}): Promise<void> {
-        const { configService, gitService, promptUI } = this;
+        const { resolvedProfile, gitService, promptUI, profileStore } = this;
 
         try {
-            await configService.readConfig();
-
             promptUI.intro(bgCyan(black(' aicommits ')));
-            const validResult = configService.validConfig();
-            if (!validResult.valid) {
-                promptUI.note(
-                    trimLines(`
-                    It looks like you haven't set up aicommits yet. Let's get you started!
-                    
-                    Run ${yellow('aicommits setup')} to configure your settings.
-                `),
-                );
+
+            if (resolvedProfile.status !== 'ready') {
+                promptUI.note(describeUnusableProfile(resolvedProfile, yellow).join('\n'));
                 process.exit(1);
             }
 
-            const profile = configService.getCurrentProfile();
-            const currentProfile = configService.getProfile(profile);
-            if (!currentProfile) {
-                const config = configService.getProfileNames();
-                promptUI.note(
-                    trimLines(`
-                    Profile "${profile}" not found. Available profiles: ${config.join(', ')}
-                    
-                    Run ${yellow('aicommits setup --profile ' + profile)} to create this profile.
-                `),
-                );
-                process.exit(1);
-            }
-
-            const config = currentProfile;
-
-            // Display provider and model information
-            const endpointInfo =
-                config.provider === 'bedrock'
-                    ? 'Endpoint: AWS Bedrock'
-                    : `Endpoint: ${yellow('baseUrl' in config && config.baseUrl ? config.baseUrl : 'N/A')}`;
-
-            promptUI.note(
-                trimLines(`
-                 Profile: ${yellow(profile)}
-                 Provider: ${yellow(config.provider)}
-                 Model: ${yellow(config.model)}
-                 ${endpointInfo}
-                `),
-            );
+            promptUI.note(profileNote(resolvedProfile));
 
             await gitService.assertGitRepo();
 
@@ -79,18 +68,30 @@ export class AiCommitsHandler {
 
             const detectingFiles = promptUI.spinner();
             detectingFiles.start('Detecting staged files');
-            const staged = await gitService.getStagedDiff(config.exclude, config.contextLines, {
-                // Consent-gated first-run initialization of the tool's default
-                // ignore patterns: without explicit consent nothing is hidden
-                // from review and nothing is persisted to the config.
-                requestDefaultIgnoreConsent: async () => {
-                    const confirmed = await promptUI.confirm({
-                        message:
-                            'Initialize default ignore patterns (package-lock.json, pnpm-lock.yaml, *.lock) in your global aicommits config so these files are excluded from review?',
-                    });
-                    return confirmed === true;
-                },
-            });
+
+            // Consent-gated first-run initialization of the tool's default
+            // ignore patterns: without explicit consent nothing is hidden
+            // from review and nothing is persisted to the config. The
+            // prepare-commit-msg hook cannot prompt, so it never applies
+            // these defaults at all.
+            let exclude = resolvedProfile.exclude;
+            if (resolvedProfile.globalIgnoreUnset) {
+                const confirmed = await promptUI.confirm({
+                    message:
+                        'Initialize default ignore patterns (package-lock.json, pnpm-lock.yaml, *.lock) in your global aicommits config so these files are excluded from review?',
+                });
+                if (confirmed === true) {
+                    profileStore.setGlobalIgnore([...DEFAULT_GLOBAL_IGNORE]);
+                    await profileStore.save();
+                    exclude = [...new Set([...DEFAULT_GLOBAL_IGNORE, ...exclude])];
+                } else {
+                    promptUI.note(
+                        'ℹ️  Global ignore patterns not configured. Tool default excludes were NOT applied; every staged file is shown for review.',
+                    );
+                }
+            }
+
+            const staged = await gitService.getStagedDiff(exclude, resolvedProfile.settings.contextLines);
 
             if (!staged) {
                 detectingFiles.stop('Detecting staged files');

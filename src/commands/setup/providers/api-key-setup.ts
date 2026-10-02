@@ -1,4 +1,5 @@
 import { type ClackPromptService } from '../../../services/clack-prompt.service';
+import { type Credential, describeCredentialSource } from '../../../profile/resolved-profile';
 
 export interface ApiKeySetupResult {
     apiKey: string;
@@ -9,22 +10,19 @@ export async function collectApiKeyForSetup({
     promptUI,
     providerLabel,
     currentApiKey,
-    resolvedApiKey,
-    sourceEnvVar,
+    credential,
 }: {
     promptUI: ClackPromptService;
     providerLabel: string;
     currentApiKey?: string;
-    resolvedApiKey?: string;
-    sourceEnvVar?: string;
+    credential: Credential;
 }): Promise<ApiKeySetupResult | null> {
-    if (resolvedApiKey && !currentApiKey?.trim()) {
-        if (sourceEnvVar) {
-            promptUI.note(`Using API key from ${sourceEnvVar}`);
-        }
+    // With no key stored in the profile, a key found elsewhere (env var or --api-key) is used without being saved.
+    if (credential.value && credential.source && !currentApiKey?.trim()) {
+        promptUI.note(`Using API key from ${describeCredentialSource(credential.source)}`);
 
         return {
-            apiKey: resolvedApiKey,
+            apiKey: credential.value,
             persistApiKey: false,
         };
     }
