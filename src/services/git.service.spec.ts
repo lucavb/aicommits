@@ -1,17 +1,7 @@
 import 'reflect-metadata';
 import { Container } from 'inversify';
 import { GitService, SIMPLE_GIT } from './git.service';
-import { ConfigService } from './config.service';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Injectable } from '../utils/inversify';
-
-@Injectable()
-class MockConfigService implements Partial<ConfigService> {
-    readConfig = vi.fn().mockResolvedValue(undefined);
-    getGlobalIgnorePatterns = vi.fn().mockReturnValue([]);
-    setGlobalIgnorePatterns = vi.fn();
-    flush = vi.fn().mockResolvedValue(undefined);
-}
 
 class MockSimpleGit {
     add = vi.fn();
@@ -29,7 +19,6 @@ describe('GitService', () => {
         mockGit = new MockSimpleGit();
 
         const container = new Container({ defaultScope: 'Singleton' });
-        container.bind(ConfigService).to(MockConfigService as unknown as typeof ConfigService);
         container.bind(SIMPLE_GIT).toConstantValue(mockGit);
         container.bind(GitService).toSelf();
 
@@ -110,6 +99,53 @@ describe('GitService', () => {
             await gitService.getRecentCommitMessages(3);
 
             expect(mockGit.log).toHaveBeenCalledWith({ maxCount: 3, '--no-merges': null });
+        });
+    });
+
+    describe('getStagedDiff', () => {
+        it('passes every exclude pattern to both git diff calls', async () => {
+            mockGit.diff.mockResolvedValueOnce('a.ts\nb.ts\n').mockResolvedValueOnce('diff --git a/a.ts');
+
+            const result = await gitService.getStagedDiff(['*.lock', 'dist/**'], 4);
+
+            expect(result).toEqual({ files: ['a.ts', 'b.ts'], diff: 'diff --git a/a.ts' });
+            expect(mockGit.diff).toHaveBeenNthCalledWith(1, [
+                '--cached',
+                '--diff-algorithm=minimal',
+                '--name-only',
+                ':(exclude)*.lock',
+                ':(exclude)dist/**',
+            ]);
+            expect(mockGit.diff).toHaveBeenNthCalledWith(2, [
+                '-U4',
+                '--cached',
+                '--diff-algorithm=minimal',
+                ':(exclude)*.lock',
+                ':(exclude)dist/**',
+            ]);
+        });
+
+        it('returns undefined when nothing is staged', async () => {
+            mockGit.diff.mockResolvedValueOnce('');
+
+            expect(await gitService.getStagedDiff([], 10)).toBeUndefined();
+            expect(mockGit.diff).toHaveBeenCalledTimes(1);
+        });
+
+        it('writes nothing to stdout, because the hook prints its commit message there', async () => {
+            const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+            mockGit.diff.mockResolvedValueOnce('a.ts').mockResolvedValueOnce('diff');
+
+            await gitService.getStagedDiff([], 10);
+
+            expect(log).not.toHaveBeenCalled();
+            log.mockRestore();
+        });
+
+        it('wraps git failures in a KnownError', async () => {
+            mockGit.diff.mockRejectedValueOnce(new Error('boom'));
+
+            await expect(gitService.getStagedDiff([], 10)).rejects.toThrow('Failed to get staged diff');
         });
     });
 

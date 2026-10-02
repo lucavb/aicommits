@@ -4,13 +4,16 @@ import { promises as fs } from 'fs';
 import { AICommitMessageService } from '../services/ai-commit-message.service';
 import {
     CLI_ARGUMENTS,
-    CONFIG_FILE_PATH,
-    ConfigService,
     ENVIRONMENT_VARIABLES,
-    FILE_SYSTEM_PROMISE_API,
+    READY_PROFILE,
+    RESOLVED_PROFILE,
+    requireReady,
+    resolveProfile,
     type CliArguments,
-    type FileSystemApi,
-} from '../services/config.service';
+    type ReadyProfileAccessor,
+    type ResolvedProfile,
+} from '../profile/resolved-profile';
+import { CONFIG_FILE_PATH, FILE_SYSTEM_PROMISE_API, ProfileStore, type FileSystemApi } from '../profile/profile-store';
 import { GitService, SIMPLE_GIT } from '../services/git.service';
 import { PromptService } from '../services/prompt.service';
 import { ClackPromptService } from '../services/clack-prompt.service';
@@ -36,20 +39,37 @@ export interface ContainerOptions {
 
 /**
  * Composition root: the single place where the dependency graph is assembled.
- * Must be called once all runtime inputs (parsed CLI args, env, etc.) are known,
- * so every binding below is guaranteed to exist before any service resolves it.
+ * Must be called once all runtime inputs (parsed CLI args, env, etc.) are known.
  *
- * Every resolvable class - services and command handlers alike - is bound here,
- * so `container.get(X)` can never fail because a caller forgot to bind X. Binding
- * a class is free until something actually resolves it (Inversify only
- * instantiates on `.get()`), so there's no cost to registering handlers that a
- * given invocation never uses.
+ * The config file is read here, once, and the resolved profile for this run is
+ * bound as an immutable value (see docs/adr/0002). Handlers inject
+ * RESOLVED_PROFILE and decide what to do when it is missing or invalid; services
+ * that only make sense with a usable profile inject READY_PROFILE, an accessor
+ * that throws a KnownError otherwise.
+ *
+ * Every resolvable class is bound here, so `container.get(X)` can never fail
+ * because a caller forgot to bind X. Inversify only instantiates on `.get()`.
  */
-export const buildContainer = (options: ContainerOptions = {}): Container => {
+export const buildContainer = async (options: ContainerOptions = {}): Promise<Container> => {
     const container = new Container({ defaultScope: 'Singleton' });
+    const cliArguments = options.cliArguments ?? {};
+    const environment = options.environment ?? parseEnvironment(process.env);
+
+    container.bind(CLI_ARGUMENTS).toConstantValue(cliArguments);
+    container.bind(ENVIRONMENT_VARIABLES).toConstantValue(environment);
+    container.bind(FILE_SYSTEM_PROMISE_API).toConstantValue(options.fileSystem ?? fs);
+    container.bind(SIMPLE_GIT).toConstantValue(options.git ?? simpleGit());
+    if (options.configFilePath) {
+        container.bind(CONFIG_FILE_PATH).toConstantValue(options.configFilePath);
+    }
+
+    container.bind(ProfileStore).toSelf();
+    const file = await container.get(ProfileStore).load();
+    const resolved = resolveProfile({ file, cliArguments, env: environment });
+    container.bind<ResolvedProfile>(RESOLVED_PROFILE).toConstantValue(resolved);
+    container.bind<ReadyProfileAccessor>(READY_PROFILE).toConstantValue(() => requireReady(resolved));
 
     container.bind(AICommitMessageService).toSelf();
-    container.bind(ConfigService).toSelf();
     container.bind(GitService).toSelf();
     container.bind(PromptService).toSelf();
     container.bind(ClackPromptService).toSelf();
@@ -65,15 +85,6 @@ export const buildContainer = (options: ContainerOptions = {}): Container => {
     container.bind(SetupHandler).toSelf();
     container.bind(IgnoreHandler).toSelf();
 
-    container.bind(CLI_ARGUMENTS).toConstantValue(options.cliArguments ?? {});
-    container.bind(ENVIRONMENT_VARIABLES).toConstantValue(options.environment ?? parseEnvironment(process.env));
-    container.bind(FILE_SYSTEM_PROMISE_API).toConstantValue(options.fileSystem ?? fs);
-    container.bind(SIMPLE_GIT).toConstantValue(options.git ?? simpleGit());
-
-    if (options.configFilePath) {
-        container.bind(CONFIG_FILE_PATH).toConstantValue(options.configFilePath);
-    }
-
     return container;
 };
 
@@ -85,7 +96,4 @@ export const buildContainer = (options: ContainerOptions = {}): Container => {
 export const runWithContainer = async <T>(
     options: ContainerOptions,
     callback: (container: Container) => Promise<T> | T,
-): Promise<T> => {
-    const container = buildContainer(options);
-    return callback(container);
-};
+): Promise<T> => callback(await buildContainer(options));

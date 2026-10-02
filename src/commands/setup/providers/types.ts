@@ -1,5 +1,6 @@
 import { type ClackPromptService } from '../../../services/clack-prompt.service';
 import { type ProfileConfig } from '../../../utils/config';
+import { type Credential } from '../../../profile/resolved-profile';
 
 export interface ModelChoice {
     value: string;
@@ -15,8 +16,8 @@ export interface ModelSetupResult {
 
 export interface ModelSetupContext {
     profile: string;
-    resolveApiKey: (profileApiKey?: string) => string | undefined;
-    getApiKeySourceEnvVar: (profileApiKey?: string) => string | undefined;
+    /** Where this profile's credential would come from, given the API key currently stored in it. */
+    locateCredential: (profileApiKey?: string) => Credential;
 }
 
 export interface ProviderModelHandler {

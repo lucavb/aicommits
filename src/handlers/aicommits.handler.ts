@@ -3,69 +3,81 @@ import { handleCliError, KnownError } from '../utils/error';
 import { isError } from '../utils/typeguards';
 import { Inject, Injectable } from '../utils/inversify';
 import { GitService } from '../services/git.service';
-import { ConfigService } from '../services/config.service';
 import { ClackPromptService } from '../services/clack-prompt.service';
 import { ProposalService } from '../services/proposal.service';
+import {
+    describeCredentialSource,
+    RESOLVED_PROFILE,
+    type ReadyProfile,
+    type ResolvedProfile,
+} from '../profile/resolved-profile';
 import { trimLines } from '../utils/string';
+
+const unusableProfileNote = (resolved: Exclude<ResolvedProfile, ReadyProfile>): string => {
+    const setupHint = `Run ${yellow(`aicommits setup --profile ${resolved.name}`)}`;
+
+    if (resolved.status === 'invalid') {
+        return [
+            `Profile "${resolved.name}" is invalid:`,
+            ...resolved.issues.map((issue) => `  - ${issue}`),
+            '',
+            `${setupHint} to fix it.`,
+        ].join('\n');
+    }
+
+    if (resolved.available.length === 0) {
+        return trimLines(`
+            It looks like you haven't set up aicommits yet. Let's get you started!
+
+            Run ${yellow('aicommits setup')} to configure your settings.
+        `);
+    }
+
+    return [
+        `Profile "${resolved.name}" not found. Available profiles: ${resolved.available.join(', ')}`,
+        '',
+        `${setupHint} to create this profile.`,
+    ].join('\n');
+};
+
+const profileNote = ({ name, settings, credential }: ReadyProfile): string => {
+    const endpoint =
+        settings.provider === 'bedrock'
+            ? 'AWS Bedrock'
+            : yellow('baseUrl' in settings && settings.baseUrl ? settings.baseUrl : 'N/A');
+
+    return [
+        `Profile: ${yellow(name)}`,
+        `Provider: ${yellow(settings.provider)}`,
+        `Model: ${yellow(settings.model)}`,
+        `Endpoint: ${endpoint}`,
+        ...(credential.required
+            ? [`API key: ${credential.source ? yellow(describeCredentialSource(credential.source)) : red('not found')}`]
+            : []),
+    ].join('\n');
+};
 
 @Injectable()
 export class AiCommitsHandler {
     constructor(
-        @Inject(ConfigService) private readonly configService: ConfigService,
+        @Inject(RESOLVED_PROFILE) private readonly resolvedProfile: ResolvedProfile,
         @Inject(GitService) private readonly gitService: GitService,
         @Inject(ProposalService) private readonly proposalService: ProposalService,
         @Inject(ClackPromptService) private readonly promptUI: ClackPromptService,
     ) {}
 
     async run({ stageAll = false }: { stageAll?: boolean } = {}): Promise<void> {
-        const { configService, gitService, promptUI } = this;
+        const { resolvedProfile, gitService, promptUI } = this;
 
         try {
-            await configService.readConfig();
-
             promptUI.intro(bgCyan(black(' aicommits ')));
-            const validResult = configService.validConfig();
-            if (!validResult.valid) {
-                promptUI.note(
-                    trimLines(`
-                    It looks like you haven't set up aicommits yet. Let's get you started!
-                    
-                    Run ${yellow('aicommits setup')} to configure your settings.
-                `),
-                );
+
+            if (resolvedProfile.status !== 'ready') {
+                promptUI.note(unusableProfileNote(resolvedProfile));
                 process.exit(1);
             }
 
-            const profile = configService.getCurrentProfile();
-            const currentProfile = configService.getProfile(profile);
-            if (!currentProfile) {
-                const config = configService.getProfileNames();
-                promptUI.note(
-                    trimLines(`
-                    Profile "${profile}" not found. Available profiles: ${config.join(', ')}
-                    
-                    Run ${yellow('aicommits setup --profile ' + profile)} to create this profile.
-                `),
-                );
-                process.exit(1);
-            }
-
-            const config = currentProfile;
-
-            // Display provider and model information
-            const endpointInfo =
-                config.provider === 'bedrock'
-                    ? 'Endpoint: AWS Bedrock'
-                    : `Endpoint: ${yellow('baseUrl' in config && config.baseUrl ? config.baseUrl : 'N/A')}`;
-
-            promptUI.note(
-                trimLines(`
-                 Profile: ${yellow(profile)}
-                 Provider: ${yellow(config.provider)}
-                 Model: ${yellow(config.model)}
-                 ${endpointInfo}
-                `),
-            );
+            promptUI.note(profileNote(resolvedProfile));
 
             await gitService.assertGitRepo();
 
@@ -78,7 +90,10 @@ export class AiCommitsHandler {
 
             const detectingFiles = promptUI.spinner();
             detectingFiles.start('Detecting staged files');
-            const staged = await gitService.getStagedDiff(config.exclude, config.contextLines);
+            const staged = await gitService.getStagedDiff(
+                resolvedProfile.exclude,
+                resolvedProfile.settings.contextLines,
+            );
 
             if (!staged) {
                 detectingFiles.stop('Detecting staged files');

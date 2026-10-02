@@ -1,5 +1,4 @@
 import { Injectable, Inject } from '../utils/inversify';
-import { ConfigService } from './config.service';
 import { type LanguageModel } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
@@ -7,30 +6,26 @@ import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
 import { fromNodeProviderChain } from '@aws-sdk/credential-providers';
 import { createOllama } from 'ollama-ai-provider-v2';
 import { KnownError } from '../utils/error';
-import { getApiKeyEnvVarCandidates } from '../utils/resolve-api-key';
+import { READY_PROFILE, type ReadyProfileAccessor } from '../profile/resolved-profile';
 
 @Injectable()
 export class AIProviderFactory {
-    constructor(@Inject(ConfigService) private readonly configService: ConfigService) {}
+    constructor(@Inject(READY_PROFILE) private readonly readyProfile: ReadyProfileAccessor) {}
 
     createModel(): LanguageModel {
-        const config = this.configService.getConfig();
+        const { name, settings: config, credential } = this.readyProfile();
+        const apiKey = credential.value;
 
-        if (
-            (config.provider === 'openai' || config.provider === 'anthropic' || config.provider === 'openrouter') &&
-            !config.apiKey
-        ) {
-            const profile = this.configService.getCurrentProfile();
-            const envVarCandidates = getApiKeyEnvVarCandidates(config.provider, profile);
+        if (credential.required && !apiKey) {
             throw new KnownError(
-                `No API key found for profile "${profile}". Set one in your profile config, or export one of: ${envVarCandidates.join(', ')}.`,
+                `No API key found for profile "${name}". Set one in your profile config, or export one of: ${credential.candidates.join(', ')}.`,
             );
         }
 
         switch (config.provider) {
             case 'openai': {
                 const openaiProvider = createOpenAI({
-                    apiKey: config.apiKey,
+                    apiKey,
                     ...(config.baseUrl && { baseURL: config.baseUrl }),
                 });
                 return config.useResponsesApi === true
@@ -39,7 +34,7 @@ export class AIProviderFactory {
             }
             case 'anthropic': {
                 const anthropicProvider = createAnthropic({
-                    apiKey: config.apiKey,
+                    apiKey,
                     ...(config.baseUrl && { baseURL: config.baseUrl }),
                 });
                 return anthropicProvider.chat(config.model);
@@ -75,7 +70,7 @@ export class AIProviderFactory {
             }
             case 'openrouter': {
                 const openrouterProvider = createOpenAI({
-                    apiKey: config.apiKey,
+                    apiKey,
                     baseURL: config.baseUrl,
                 });
                 return openrouterProvider.chat(config.model);

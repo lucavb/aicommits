@@ -1,14 +1,18 @@
 import { Inject, Injectable } from '../utils/inversify';
-import { ConfigService } from '../services/config.service';
+import { ProfileStore } from '../profile/profile-store';
+import { RESOLVED_PROFILE, type ResolvedProfile } from '../profile/resolved-profile';
 
 @Injectable()
 export class ConfigSetHandler {
-    constructor(@Inject(ConfigService) private readonly configService: ConfigService) {}
+    constructor(
+        @Inject(ProfileStore) private readonly profileStore: ProfileStore,
+        @Inject(RESOLVED_PROFILE) private readonly resolvedProfile: ResolvedProfile,
+    ) {}
 
-    async run({ name, value, profile }: { name: string; value: string; profile: string }): Promise<void> {
-        await this.configService.readConfig();
-        this.configService.updateProfileInMemory(profile, { [name]: value });
-        await this.configService.flush();
+    async run({ name, value }: { name: string; value: string }): Promise<void> {
+        const profile = this.resolvedProfile.name;
+        this.profileStore.updateProfile(profile, { [name]: value });
+        await this.profileStore.save();
         console.log(`Configuration property "${name}" set to "${value}" in profile "${profile}".`);
     }
 }

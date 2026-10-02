@@ -2,16 +2,15 @@ import 'reflect-metadata';
 import { Container } from 'inversify';
 import { AICommitMessageService } from './ai-commit-message.service';
 import { PromptService } from './prompt.service';
-import { ConfigService } from './config.service';
 import { Injectable } from '../utils/inversify';
 import { AIProviderFactory } from './ai-provider.factory';
 import { AITextGenerationService } from './ai-text-generation.service';
 import { GitService } from './git.service';
+import { READY_PROFILE } from '../profile/resolved-profile';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-@Injectable()
-class MockConfigService implements Partial<ConfigService> {
-    getConfig = vi.fn();
+class ProfileSettingsStub {
+    get = vi.fn();
 }
 
 @Injectable()
@@ -65,7 +64,7 @@ const throwingTextStream = (partsBeforeError: string[], error: Error) => ({
 describe('AICommitMessageService', () => {
     let aiProviderFactory: MockAIProviderFactory;
     let aiTextGenerationService: MockAITextGenerationService;
-    let configService: MockConfigService;
+    let profileSettings: ProfileSettingsStub;
     let gitService: MockGitService;
     let mockModel: unknown;
     let promptService: MockPromptService;
@@ -76,7 +75,7 @@ describe('AICommitMessageService', () => {
 
         aiProviderFactory = new MockAIProviderFactory();
         aiTextGenerationService = new MockAITextGenerationService();
-        configService = new MockConfigService();
+        profileSettings = new ProfileSettingsStub();
         gitService = new MockGitService();
         promptService = new MockPromptService();
         mockModel = {}; // Mock LanguageModel
@@ -84,7 +83,7 @@ describe('AICommitMessageService', () => {
         aiProviderFactory.createModel.mockReturnValue(mockModel);
         gitService.getRecentCommitMessages.mockResolvedValue(['abc123 initial commit']);
 
-        configService.getConfig.mockReturnValue({
+        profileSettings.get.mockReturnValue({
             locale: 'en',
             maxLength: 50,
             type: 'conventional',
@@ -94,7 +93,7 @@ describe('AICommitMessageService', () => {
         container.bind(AICommitMessageService).toSelf();
         container.bind(AIProviderFactory).toConstantValue(aiProviderFactory as unknown as AIProviderFactory);
         container.bind(AITextGenerationService).toConstantValue(aiTextGenerationService);
-        container.bind(ConfigService).toConstantValue(configService as unknown as ConfigService);
+        container.bind(READY_PROFILE).toConstantValue(() => ({ status: 'ready', settings: profileSettings.get() }));
         container.bind(GitService).toConstantValue(gitService as unknown as GitService);
         container.bind(PromptService).toConstantValue(promptService as PromptService);
 
@@ -127,7 +126,7 @@ describe('AICommitMessageService', () => {
     });
 
     it('should pass reasoning effort to both calls when configured', async () => {
-        configService.getConfig.mockReturnValue({
+        profileSettings.get.mockReturnValue({
             locale: 'en',
             maxLength: 50,
             type: 'conventional',

@@ -1,5 +1,5 @@
 import { inject as Inject, injectable as Injectable } from 'inversify';
-import { ConfigService } from './config.service';
+import { READY_PROFILE, type ReadyProfileAccessor } from '../profile/resolved-profile';
 import { PromptService } from './prompt.service';
 import { AIProviderFactory } from './ai-provider.factory';
 import { AITextGenerationService } from './ai-text-generation.service';
@@ -16,7 +16,7 @@ export class AICommitMessageService {
     constructor(
         @Inject(AIProviderFactory) private readonly aiProviderFactory: AIProviderFactory,
         @Inject(AITextGenerationService) private readonly aiTextGenerationService: AITextGenerationService,
-        @Inject(ConfigService) private readonly configService: ConfigService,
+        @Inject(READY_PROFILE) private readonly readyProfile: ReadyProfileAccessor,
         @Inject(GitService) private readonly gitService: GitService,
         @Inject(PromptService) private readonly promptService: PromptService,
     ) {}
@@ -30,7 +30,7 @@ export class AICommitMessageService {
         revision?: string;
         onDelta?: (delta: { part: string; stream: 'subject' | 'body' }) => void;
     }): Promise<{ subject: string; body: string }> {
-        const config = this.configService.getConfig();
+        const config = this.readyProfile().settings;
         const { locale, maxLength, type } = config;
         const reasoningEffort = 'reasoningEffort' in config ? config.reasoningEffort : undefined;
         const model = this.aiProviderFactory.createModel();

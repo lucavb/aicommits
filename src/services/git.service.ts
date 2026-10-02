@@ -1,22 +1,12 @@
 import type { SimpleGit } from 'simple-git';
 import { Inject, Injectable } from '../utils/inversify';
 import { KnownError } from '../utils/error';
-import { ConfigService } from './config.service';
 
 export const SIMPLE_GIT = Symbol.for('SIMPLE_GIT');
 
 @Injectable()
 export class GitService {
-    private readonly defaultIgnorePatterns = [
-        'package-lock.json',
-        'pnpm-lock.yaml',
-        '*.lock', // yarn.lock, Cargo.lock, Gemfile.lock, Pipfile.lock, etc.
-    ];
-
-    constructor(
-        @Inject(SIMPLE_GIT) private readonly git: SimpleGit,
-        @Inject(ConfigService) private readonly configService: ConfigService,
-    ) {}
+    constructor(@Inject(SIMPLE_GIT) private readonly git: SimpleGit) {}
 
     async stageAllFiles(): Promise<void> {
         try {
@@ -47,30 +37,16 @@ export class GitService {
         return `:(exclude)${path}`;
     }
 
-    private async getFilesToExclude(): Promise<string[]> {
-        await this.configService.readConfig();
-
-        let globalIgnore = this.configService.getGlobalIgnorePatterns();
-
-        // Migration: if globalIgnore is not configured, initialize it with defaults
-        if (globalIgnore.length === 0) {
-            console.log('ℹ️  Global ignore patterns not configured. Adding default patterns to config...');
-            globalIgnore = this.defaultIgnorePatterns;
-            this.configService.setGlobalIgnorePatterns(globalIgnore);
-            await this.configService.flush();
-            console.log('✅ Default ignore patterns added to globalIgnore config');
-        }
-
-        return globalIgnore.map(this.excludeFromDiff);
-    }
-
+    /**
+     * @param exclude every pattern to leave out of the diff; the resolved profile's
+     *   `exclude` already merges global ignore, profile, and CLI patterns.
+     */
     async getStagedDiff(
-        excludeFiles: string[] = [],
+        exclude: string[],
         contextLines: number,
     ): Promise<{ files: string[]; diff: string } | undefined> {
         const diffCached = ['--cached', '--diff-algorithm=minimal'] as const;
-        const filesToExclude = await this.getFilesToExclude();
-        const excludeArgs = [...filesToExclude, ...excludeFiles.map(this.excludeFromDiff)] as const;
+        const excludeArgs = exclude.map(this.excludeFromDiff);
 
         try {
             const files = await this.git.diff([...diffCached, '--name-only', ...excludeArgs]);

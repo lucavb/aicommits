@@ -1,27 +1,41 @@
 import { green, yellow } from 'kolorist';
 import { Inject, Injectable } from '../utils/inversify';
-import { ConfigService } from '../services/config.service';
+import { ProfileStore } from '../profile/profile-store';
+import {
+    CLI_ARGUMENTS,
+    ENVIRONMENT_VARIABLES,
+    locateCredential,
+    RESOLVED_PROFILE,
+    type CliArguments,
+    type ResolvedProfile,
+} from '../profile/resolved-profile';
+import { type Environment } from '../utils/env';
 import { ClackPromptService } from '../services/clack-prompt.service';
 import { setupProvider } from '../commands/setup/provider-setup';
 import { setupModel } from '../commands/setup/model-setup';
 import { setupCommitFormat } from '../commands/setup/format-setup';
 import { setupLanguage } from '../commands/setup/language-setup';
+import { type ModelSetupContext } from '../commands/setup/providers/types';
 
 @Injectable()
 export class SetupHandler {
     constructor(
-        @Inject(ConfigService) private readonly configService: ConfigService,
+        @Inject(ProfileStore) private readonly profileStore: ProfileStore,
+        @Inject(RESOLVED_PROFILE) private readonly resolvedProfile: ResolvedProfile,
+        @Inject(CLI_ARGUMENTS) private readonly cliArguments: CliArguments,
+        @Inject(ENVIRONMENT_VARIABLES) private readonly env: Environment,
         @Inject(ClackPromptService) private readonly promptUI: ClackPromptService,
     ) {}
 
-    async run(profile: string): Promise<void> {
-        const { configService, promptUI } = this;
+    async run(): Promise<void> {
+        const { profileStore, promptUI } = this;
+        // Setup works on the selected profile whether or not it is usable yet.
+        const profile = this.resolvedProfile.name;
 
         promptUI.intro('Welcome to aicommits setup! 🚀');
         promptUI.note(`You are configuring the "${profile}" profile.`);
 
-        await configService.readConfig();
-        const currentConfig = configService.getRawProfile(profile);
+        const currentConfig = profileStore.getRawProfile(profile);
 
         // 1. Setup provider
         const provider = await setupProvider(promptUI, currentConfig);
@@ -29,21 +43,17 @@ export class SetupHandler {
             promptUI.outro('Setup cancelled');
             process.exit(0);
         }
-        configService.updateProfileInMemory(profile, { provider });
+        profileStore.updateProfile(profile, { provider });
 
-        const modelSetupContext = {
+        const modelSetupContext: ModelSetupContext = {
             profile,
-            resolveApiKey: (profileApiKey?: string) =>
-                configService.resolveApiKeyFor({
-                    profile,
+            locateCredential: (profileApiKey?: string) =>
+                locateCredential({
+                    profileName: profile,
                     provider,
                     profileApiKey,
-                }),
-            getApiKeySourceEnvVar: (profileApiKey?: string) =>
-                configService.getApiKeySourceEnvVarFor({
-                    profile,
-                    provider,
-                    profileApiKey,
+                    cliApiKey: this.cliArguments.apiKey,
+                    env: this.env,
                 }),
         };
 
@@ -55,13 +65,13 @@ export class SetupHandler {
         }
 
         if (provider === 'bedrock') {
-            configService.updateProfileInMemory(profile, { model: modelSetupResult.model });
+            profileStore.updateProfile(profile, { model: modelSetupResult.model });
         } else {
             if (!('baseUrl' in modelSetupResult) || !modelSetupResult.baseUrl || !modelSetupResult.model) {
                 promptUI.outro('Setup cancelled');
                 process.exit(0);
             }
-            configService.updateProfileInMemory(profile, {
+            profileStore.updateProfile(profile, {
                 baseUrl: modelSetupResult.baseUrl,
                 model: modelSetupResult.model,
                 ...(modelSetupResult.apiKey !== undefined && { apiKey: modelSetupResult.apiKey }),
@@ -78,7 +88,7 @@ export class SetupHandler {
             promptUI.outro('Setup cancelled');
             process.exit(0);
         }
-        configService.updateProfileInMemory(profile, { type: commitFormat === 'simple' ? '' : 'conventional' });
+        profileStore.updateProfile(profile, { type: commitFormat === 'simple' ? '' : 'conventional' });
 
         // 4. Setup language preference
         const locale = await setupLanguage(promptUI, currentConfig);
@@ -86,13 +96,13 @@ export class SetupHandler {
             promptUI.outro('Setup cancelled');
             process.exit(0);
         }
-        configService.updateProfileInMemory(profile, { locale });
+        profileStore.updateProfile(profile, { locale });
 
         // Save configuration
-        await configService.flush();
+        await profileStore.save();
 
         promptUI.note(
-            `Configuration saved to ${yellow(configService.getConfigFilePath())}\n\n` +
+            `Configuration saved to ${yellow(profileStore.filePath)}\n\n` +
                 'You can now use aicommits! Try it with:\n' +
                 `${green('git add .')}\n` +
                 `${green('aicommits')}\n\n` +
