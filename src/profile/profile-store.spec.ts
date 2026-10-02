@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
 import { parseEnvironment } from '../utils/env';
-import { type FileSystemApi, migrateLegacyConfig, ProfileStore } from './profile-store';
+import { type FileSystemApi, ProfileStore } from './profile-store';
 
 const openai = { provider: 'openai', model: 'gpt-4', baseUrl: 'https://api.openai.com/v1' };
 
@@ -67,37 +67,18 @@ describe('ProfileStore', () => {
         expect(written().globalIgnore).toEqual([]);
     });
 
+    it('refuses to read the file a second time in one run', async () => {
+        const { store, fs } = createStore({ contents: yamlStringify({ profiles: { default: openai } }) });
+        await store.load();
+
+        await expect(store.load()).rejects.toThrow('read once per run');
+        expect(fs.readFile).toHaveBeenCalledTimes(1);
+    });
+
     it('hands out snapshots that cannot mutate the store', async () => {
         const { store } = createStore({ contents: yamlStringify({ profiles: { default: openai } }) });
         const snapshot = await store.load();
         snapshot.profiles.default.model = 'mutated';
         expect(store.getRawProfile('default')?.model).toBe('gpt-4');
-    });
-});
-
-describe('migrateLegacyConfig', () => {
-    it('turns a single-profile file into the default profile', () => {
-        expect(migrateLegacyConfig(openai)).toMatchObject({
-            currentProfile: 'default',
-            profiles: { default: openai },
-        });
-    });
-
-    it('moves a profile-level globalIgnore to the top level', () => {
-        const migrated = migrateLegacyConfig({ profiles: { default: { ...openai, globalIgnore: ['dist'] } } });
-        expect(migrated.globalIgnore).toEqual(['dist']);
-        expect(migrated.profiles.default).not.toHaveProperty('globalIgnore');
-    });
-
-    it('prefers a top-level globalIgnore', () => {
-        const migrated = migrateLegacyConfig({
-            globalIgnore: ['top'],
-            profiles: { default: { ...openai, globalIgnore: ['nested'] } },
-        });
-        expect(migrated.globalIgnore).toEqual(['top']);
-    });
-
-    it('falls back to an empty file for garbage', () => {
-        expect(migrateLegacyConfig('nonsense')).toEqual({ profiles: {}, currentProfile: 'default' });
     });
 });

@@ -121,7 +121,12 @@ describe('AiCommitsHandler', () => {
 
     it('explains what is wrong with an invalid profile', async () => {
         await expect(
-            handlerFor({ status: 'invalid', name: 'work', issues: ['useResponsesApi: expected boolean'] }).run(),
+            handlerFor({
+                status: 'invalid',
+                name: 'work',
+                cause: 'profile',
+                issues: ['useResponsesApi: expected boolean'],
+            }).run(),
         ).rejects.toThrow(processExitError);
 
         expect(notes()[0]).toContain('Profile "work" is invalid');

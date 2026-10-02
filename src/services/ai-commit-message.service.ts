@@ -30,9 +30,9 @@ export class AICommitMessageService {
         revision?: string;
         onDelta?: (delta: { part: string; stream: 'subject' | 'body' }) => void;
     }): Promise<{ subject: string; body: string }> {
-        const config = this.readyProfile().settings;
-        const { locale, maxLength, type } = config;
-        const reasoningEffort = 'reasoningEffort' in config ? config.reasoningEffort : undefined;
+        const { settings } = this.readyProfile();
+        const { locale, maxLength, type } = settings;
+        const reasoningEffort = 'reasoningEffort' in settings ? settings.reasoningEffort : undefined;
         const model = this.aiProviderFactory.createModel();
 
         const recentCommits = await this.gitService.getRecentCommitMessages(5);

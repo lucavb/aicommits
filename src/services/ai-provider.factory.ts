@@ -13,7 +13,7 @@ export class AIProviderFactory {
     constructor(@Inject(READY_PROFILE) private readonly readyProfile: ReadyProfileAccessor) {}
 
     createModel(): LanguageModel {
-        const { name, settings: config, credential } = this.readyProfile();
+        const { name, settings, credential } = this.readyProfile();
         const apiKey = credential.value;
 
         if (credential.required && !apiKey) {
@@ -22,29 +22,29 @@ export class AIProviderFactory {
             );
         }
 
-        switch (config.provider) {
+        switch (settings.provider) {
             case 'openai': {
                 const openaiProvider = createOpenAI({
                     apiKey,
-                    ...(config.baseUrl && { baseURL: config.baseUrl }),
+                    ...(settings.baseUrl && { baseURL: settings.baseUrl }),
                 });
-                return config.useResponsesApi === true
-                    ? openaiProvider.responses(config.model)
-                    : openaiProvider.chat(config.model);
+                return settings.useResponsesApi === true
+                    ? openaiProvider.responses(settings.model)
+                    : openaiProvider.chat(settings.model);
             }
             case 'anthropic': {
                 const anthropicProvider = createAnthropic({
                     apiKey,
-                    ...(config.baseUrl && { baseURL: config.baseUrl }),
+                    ...(settings.baseUrl && { baseURL: settings.baseUrl }),
                 });
-                return anthropicProvider.chat(config.model);
+                return anthropicProvider.chat(settings.model);
             }
             case 'bedrock': {
                 try {
                     const bedrockProvider = createAmazonBedrock({
                         credentialProvider: fromNodeProviderChain(),
                     });
-                    return bedrockProvider(config.model);
+                    return bedrockProvider(settings.model);
                 } catch (error) {
                     throw new Error(
                         'AWS Bedrock authentication failed. Please configure AWS credentials:\n\n' +
@@ -64,19 +64,19 @@ export class AIProviderFactory {
             }
             case 'ollama': {
                 const ollamaProvider = createOllama({
-                    ...(config.baseUrl && { baseURL: config.baseUrl }),
+                    ...(settings.baseUrl && { baseURL: settings.baseUrl }),
                 });
-                return ollamaProvider(config.model);
+                return ollamaProvider(settings.model);
             }
             case 'openrouter': {
                 const openrouterProvider = createOpenAI({
                     apiKey,
-                    baseURL: config.baseUrl,
+                    baseURL: settings.baseUrl,
                 });
-                return openrouterProvider.chat(config.model);
+                return openrouterProvider.chat(settings.model);
             }
             default: {
-                const exhaustiveCheck: never = config;
+                const exhaustiveCheck: never = settings;
                 throw new Error(`Unknown provider: ${JSON.stringify(exhaustiveCheck)}`);
             }
         }

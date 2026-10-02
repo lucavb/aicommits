@@ -1,7 +1,7 @@
 import ignore from 'ignore';
 import { Inject, Injectable } from '../utils/inversify';
 import { ProfileStore } from '../profile/profile-store';
-import { effectiveGlobalIgnore } from '../profile/resolved-profile';
+import { globalIgnoreInEffect } from '../profile/config-file';
 
 /**
  * Manages global ignore. When the user has never set it, the built-in defaults
@@ -12,13 +12,13 @@ import { effectiveGlobalIgnore } from '../profile/resolved-profile';
 export class IgnoreHandler {
     constructor(@Inject(ProfileStore) private readonly profileStore: ProfileStore) {}
 
-    private current(): { patterns: string[]; usingDefaults: boolean } {
+    private patternsInEffect(): { patterns: string[]; usingDefaults: boolean } {
         const stored = this.profileStore.getGlobalIgnore();
-        return { patterns: effectiveGlobalIgnore({ globalIgnore: stored }), usingDefaults: stored === undefined };
+        return { patterns: globalIgnoreInEffect({ globalIgnore: stored }), usingDefaults: stored === undefined };
     }
 
     async list(): Promise<void> {
-        const { patterns, usingDefaults } = this.current();
+        const { patterns, usingDefaults } = this.patternsInEffect();
 
         if (patterns.length === 0) {
             console.log('No global ignore patterns configured.');
@@ -32,7 +32,7 @@ export class IgnoreHandler {
     }
 
     async add(pattern: string): Promise<void> {
-        const { patterns } = this.current();
+        const { patterns } = this.patternsInEffect();
 
         if (patterns.includes(pattern)) {
             console.log(`Pattern "${pattern}" is already in the ignore list.`);
@@ -46,7 +46,7 @@ export class IgnoreHandler {
     }
 
     async remove(pattern: string): Promise<void> {
-        const { patterns } = this.current();
+        const { patterns } = this.patternsInEffect();
 
         if (!patterns.includes(pattern)) {
             console.log(`Pattern "${pattern}" not found in the ignore list.`);
@@ -60,7 +60,7 @@ export class IgnoreHandler {
     }
 
     async test(file: string): Promise<void> {
-        const { patterns } = this.current();
+        const { patterns } = this.patternsInEffect();
 
         if (patterns.length === 0) {
             console.log('ℹ️  No global ignore patterns configured.');

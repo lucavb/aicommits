@@ -7,38 +7,12 @@ import { ClackPromptService } from '../services/clack-prompt.service';
 import { ProposalService } from '../services/proposal.service';
 import {
     describeCredentialSource,
+    describeUnusableProfile,
     RESOLVED_PROFILE,
     type ReadyProfile,
     type ResolvedProfile,
 } from '../profile/resolved-profile';
 import { trimLines } from '../utils/string';
-
-const unusableProfileNote = (resolved: Exclude<ResolvedProfile, ReadyProfile>): string => {
-    const setupHint = `Run ${yellow(`aicommits setup --profile ${resolved.name}`)}`;
-
-    if (resolved.status === 'invalid') {
-        return [
-            `Profile "${resolved.name}" is invalid:`,
-            ...resolved.issues.map((issue) => `  - ${issue}`),
-            '',
-            `${setupHint} to fix it.`,
-        ].join('\n');
-    }
-
-    if (resolved.available.length === 0) {
-        return trimLines(`
-            It looks like you haven't set up aicommits yet. Let's get you started!
-
-            Run ${yellow('aicommits setup')} to configure your settings.
-        `);
-    }
-
-    return [
-        `Profile "${resolved.name}" not found. Available profiles: ${resolved.available.join(', ')}`,
-        '',
-        `${setupHint} to create this profile.`,
-    ].join('\n');
-};
 
 const profileNote = ({ name, settings, credential }: ReadyProfile): string => {
     const endpoint =
@@ -73,7 +47,7 @@ export class AiCommitsHandler {
             promptUI.intro(bgCyan(black(' aicommits ')));
 
             if (resolvedProfile.status !== 'ready') {
-                promptUI.note(unusableProfileNote(resolvedProfile));
+                promptUI.note(describeUnusableProfile(resolvedProfile, yellow).join('\n'));
                 process.exit(1);
             }
 

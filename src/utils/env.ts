@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export const ENVIRONMENT_VARIABLES = Symbol.for('ENVIRONMENT_VARIABLES');
+
 const optionalNonEmptyString = z
     .string()
     .optional()

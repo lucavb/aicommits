@@ -47,13 +47,28 @@ describe('PrepareCommitMsgHandler', () => {
     });
 
     it.each<ResolvedProfile>([
-        { status: 'missing', name: 'work', available: [] },
-        { status: 'invalid', name: 'work', issues: ['model: required'] },
+        { status: 'missing', name: 'work', available: ['home'] },
+        { status: 'invalid', name: 'work', cause: 'profile', issues: ['model: required'] },
     ])('warns on stderr, keeps stdout clean, and does not throw when the profile is $status', async (resolved) => {
         await expect(handlerFor(resolved).run()).resolves.toBeUndefined();
 
         expect(stdout).not.toHaveBeenCalled();
-        expect(stderr).toHaveBeenCalledWith(expect.stringContaining('profile "work"'));
+        expect(stderr).toHaveBeenCalledWith(expect.stringContaining('aicommits setup'));
         expect(gitService.getStagedDiff).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['generation fails', () => (generation.generate = vi.fn().mockRejectedValue(new Error('No API key found')))],
+        [
+            'reading the diff fails',
+            () => (gitService.getStagedDiff = vi.fn().mockRejectedValue(new Error('not a repo'))),
+        ],
+    ])('warns on stderr, keeps stdout clean, and does not throw when %s', async (_case, breakIt) => {
+        breakIt();
+
+        await expect(handlerFor(ready).run()).resolves.toBeUndefined();
+
+        expect(stdout).not.toHaveBeenCalled();
+        expect(stderr).toHaveBeenCalledWith(expect.stringMatching(/No API key found|not a repo/));
     });
 });

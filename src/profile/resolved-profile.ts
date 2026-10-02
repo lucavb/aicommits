@@ -1,10 +1,11 @@
 import { shake } from 'radash';
+import { type z } from 'zod';
 import { KnownError } from '../utils/error';
 import { type ProfileConfig, profileConfigSchema, type ProviderName } from '../utils/config';
 import { type Environment } from '../utils/env';
+import { type ConfigFile, globalIgnoreInEffect } from './config-file';
 
 export const CLI_ARGUMENTS = Symbol.for('CLI_ARGUMENTS');
-export const ENVIRONMENT_VARIABLES = Symbol.for('ENVIRONMENT_VARIABLES');
 export const RESOLVED_PROFILE = Symbol.for('RESOLVED_PROFILE');
 export const READY_PROFILE = Symbol.for('READY_PROFILE');
 
@@ -24,23 +25,6 @@ export type CliArguments = {
     model?: string;
     type?: string;
 };
-
-/** The user's config file as stored on disk (after legacy migration), unvalidated. */
-export interface ConfigFile {
-    profiles: Record<string, Partial<ProfileConfig>>;
-    currentProfile?: string;
-    globalIgnore?: string[];
-}
-
-export const DEFAULT_GLOBAL_IGNORE: readonly string[] = [
-    'package-lock.json',
-    'pnpm-lock.yaml',
-    '*.lock', // yarn.lock, Cargo.lock, Gemfile.lock, Pipfile.lock, etc.
-];
-
-/** Global ignore in effect: the user's patterns if they ever set them (even to `[]`), built-in defaults otherwise. */
-export const effectiveGlobalIgnore = (file: Pick<ConfigFile, 'globalIgnore'>): string[] =>
-    file.globalIgnore === undefined ? [...DEFAULT_GLOBAL_IGNORE] : [...file.globalIgnore];
 
 export type CredentialSource = { kind: 'cli' } | { kind: 'profile' } | { kind: 'environment'; variable: string };
 
@@ -64,6 +48,15 @@ const PROVIDER_API_KEY_ENV_VARS = {
 export const getProfileApiKeyEnvVar = (profile: string): string =>
     `AIC_API_KEY_${profile.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
 
+/** Everything the credential precedence looks at. */
+export interface CredentialLookup {
+    profileName: string;
+    provider: ProviderName;
+    profileApiKey?: string;
+    cliApiKey?: string;
+    env: Environment;
+}
+
 /**
  * The one place the credential precedence lives:
  * `--api-key` > profile `apiKey` > `AIC_API_KEY_<PROFILE>` > provider env var > `AIC_API_KEY`.
@@ -74,13 +67,7 @@ export function locateCredential({
     profileApiKey,
     cliApiKey,
     env,
-}: {
-    profileName: string;
-    provider: ProviderName;
-    profileApiKey?: string;
-    cliApiKey?: string;
-    env: Environment;
-}): Credential {
+}: CredentialLookup): Credential {
     const providerEnvVar: string | undefined = PROVIDER_API_KEY_ENV_VARS[provider];
     if (!providerEnvVar) {
         return { required: false, candidates: [] };
@@ -130,15 +117,36 @@ export type ResolvedProfile =
           credential: Credential;
       }
     | { status: 'missing'; name: string; available: string[] }
-    | { status: 'invalid'; name: string; issues: string[] };
+    | {
+          status: 'invalid';
+          name: string;
+          /** Whether the stored profile is broken, or only the command-line overrides applied to it. */
+          cause: 'profile' | 'command-line';
+          issues: string[];
+      };
 
 export type ReadyProfile = Extract<ResolvedProfile, { status: 'ready' }>;
+export type UnusableProfile = Exclude<ResolvedProfile, ReadyProfile>;
 
 /** Injected under READY_PROFILE: call it at use time; throws a KnownError unless the profile is ready. */
 export type ReadyProfileAccessor = () => ReadyProfile;
 
 const selectProfileName = (cli: CliArguments, env: Environment, file: ConfigFile): string =>
     cli.profile?.trim() || env.AIC_PROFILE || file.currentProfile || 'default';
+
+/** Only some providers' settings carry an `apiKey`; the credential holds it instead of the settings. */
+const splitOffApiKey = (
+    settingsWithKey: DistributiveOmit<ProfileConfig, 'exclude'>,
+): { profileApiKey?: string; settings: ProfileSettings } => {
+    if (!('apiKey' in settingsWithKey)) {
+        return { settings: settingsWithKey };
+    }
+    const { apiKey: profileApiKey, ...settings } = settingsWithKey;
+    return { profileApiKey, settings };
+};
+
+const describeIssues = (error: z.ZodError): string[] =>
+    error.issues.map((issue) => `${issue.path.join('.') || 'profile'}: ${issue.message}`);
 
 export function resolveProfile({
     file,
@@ -155,9 +163,14 @@ export function resolveProfile({
         return { status: 'missing', name, available: Object.keys(file.profiles) };
     }
 
+    const storedResult = profileConfigSchema.safeParse(stored);
+    if (!storedResult.success) {
+        return { status: 'invalid', name, cause: 'profile', issues: describeIssues(storedResult.error) };
+    }
+
     const {
         apiKey: cliApiKey,
-        exclude: cliExclude = [],
+        exclude: cliExclude,
         baseUrl,
         contextLines,
         locale,
@@ -166,45 +179,65 @@ export function resolveProfile({
         type,
     } = cliArguments;
     const overrides = shake({ baseUrl, contextLines, locale, maxLength, model, type });
-    const parsed = profileConfigSchema.safeParse({ ...stored, ...overrides });
-    if (!parsed.success) {
-        return {
-            status: 'invalid',
-            name,
-            issues: parsed.error.issues.map((issue) => `${issue.path.join('.') || 'profile'}: ${issue.message}`),
-        };
+    // CLI excludes are appended to the profile's so the schema validates them too.
+    const exclude = cliExclude?.length ? [...(storedResult.data.exclude ?? []), ...cliExclude] : undefined;
+    const merged = profileConfigSchema.safeParse({ ...stored, ...overrides, ...(exclude && { exclude }) });
+    if (!merged.success) {
+        return { status: 'invalid', name, cause: 'command-line', issues: describeIssues(merged.error) };
     }
 
-    const { exclude: profileExclude = [], ...withKey } = parsed.data;
-    const { apiKey: profileApiKey, ...rest } = withKey as typeof withKey & { apiKey?: string };
-    const settings = rest as ProfileSettings;
+    const { exclude: profileAndCliExclude = [], ...settingsWithKey } = merged.data;
+    const { profileApiKey, settings } = splitOffApiKey(settingsWithKey);
 
     return {
         status: 'ready',
         name,
         settings,
-        exclude: [...effectiveGlobalIgnore(file), ...profileExclude, ...cliExclude],
-        credential: locateCredential({
-            profileName: name,
-            provider: settings.provider,
-            profileApiKey,
-            cliApiKey,
-            env,
-        }),
+        exclude: [...new Set([...globalIgnoreInEffect(file), ...profileAndCliExclude])],
+        credential: locateCredential({ profileName: name, provider: settings.provider, profileApiKey, cliApiKey, env }),
     };
 }
 
-export function requireReady(resolved: ResolvedProfile): ReadyProfile {
-    switch (resolved.status) {
-        case 'ready':
-            return resolved;
-        case 'missing':
-            throw new KnownError(
-                `Profile "${resolved.name}" not found. Run \`aicommits setup --profile ${resolved.name}\` to create it.`,
-            );
-        case 'invalid':
-            throw new KnownError(
-                `Profile "${resolved.name}" is invalid:\n  ${resolved.issues.join('\n  ')}\nRun \`aicommits setup --profile ${resolved.name}\` to fix it.`,
-            );
+/**
+ * What is wrong with an unusable profile and how to fix it, as lines of text.
+ * `highlight` styles the commands the user should run.
+ */
+export function describeUnusableProfile(
+    resolved: UnusableProfile,
+    highlight: (command: string) => string = (command) => command,
+): string[] {
+    const setup = highlight(`aicommits setup --profile ${resolved.name}`);
+
+    if (resolved.status === 'missing') {
+        if (resolved.available.length === 0) {
+            return [
+                "It looks like you haven't set up aicommits yet. Let's get you started!",
+                '',
+                `Run ${highlight('aicommits setup')} to configure your settings.`,
+            ];
+        }
+        return [
+            `Profile "${resolved.name}" not found. Available profiles: ${resolved.available.join(', ')}`,
+            '',
+            `Run ${setup} to create it.`,
+        ];
     }
+
+    const issues = resolved.issues.map((issue) => `  - ${issue}`);
+    if (resolved.cause === 'command-line') {
+        return [
+            `The command-line options are invalid for profile "${resolved.name}":`,
+            ...issues,
+            '',
+            'The stored profile is fine; correct those options and try again.',
+        ];
+    }
+    return [`Profile "${resolved.name}" is invalid:`, ...issues, '', `Run ${setup} to fix it.`];
+}
+
+export function requireReady(resolved: ResolvedProfile): ReadyProfile {
+    if (resolved.status === 'ready') {
+        return resolved;
+    }
+    throw new KnownError(describeUnusableProfile(resolved).join('\n'));
 }

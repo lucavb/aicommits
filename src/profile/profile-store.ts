@@ -1,9 +1,9 @@
 import { join } from 'path';
 import { parse as yamlParse, stringify as yamlStringify } from 'yaml';
 import { Inject, Injectable, Optional } from '../utils/inversify';
-import { type ProfileConfig, profileConfigSchema } from '../utils/config';
-import { type Environment } from '../utils/env';
-import { type ConfigFile, ENVIRONMENT_VARIABLES } from './resolved-profile';
+import { type ProfileConfig } from '../utils/config';
+import { type Environment, ENVIRONMENT_VARIABLES } from '../utils/env';
+import { type ConfigFile, emptyConfigFile, migrateLegacyConfig } from './config-file';
 
 export const CONFIG_FILE_PATH = Symbol.for('CONFIG_FILE_PATH');
 export const FILE_SYSTEM_PROMISE_API = Symbol.for('FILE_SYSTEM_PROMISE_API');
@@ -12,52 +12,6 @@ export const FILE_SYSTEM_PROMISE_API = Symbol.for('FILE_SYSTEM_PROMISE_API');
 export interface FileSystemApi {
     readFile(path: string, encoding: 'utf8'): Promise<string>;
     writeFile(path: string, data: string, encoding: 'utf8'): Promise<void>;
-}
-
-const emptyConfigFile = (): ConfigFile => ({ profiles: {}, currentProfile: 'default' });
-
-/**
- * Turns whatever is on disk into the current `ConfigFile` shape:
- * - a bare single-profile file (legacy) becomes the `default` profile;
- * - a `globalIgnore` stored inside a profile (legacy) moves to the top level.
- */
-export function migrateLegacyConfig(parsed: unknown): ConfigFile {
-    const legacySingleProfile = profileConfigSchema.safeParse(parsed);
-    if (legacySingleProfile.success) {
-        return { profiles: { default: legacySingleProfile.data }, currentProfile: 'default' };
-    }
-
-    if (
-        typeof parsed !== 'object' ||
-        parsed === null ||
-        !('profiles' in parsed) ||
-        typeof parsed.profiles !== 'object' ||
-        parsed.profiles === null
-    ) {
-        return emptyConfigFile();
-    }
-
-    const config = parsed as Record<string, unknown>;
-    const profiles = config.profiles as Record<string, Record<string, unknown>>;
-
-    let globalIgnore: string[] | undefined;
-    if (Array.isArray(config.globalIgnore)) {
-        globalIgnore = config.globalIgnore as string[];
-    } else {
-        for (const profileConfig of Object.values(profiles)) {
-            if (Array.isArray(profileConfig?.globalIgnore)) {
-                globalIgnore = profileConfig.globalIgnore as string[];
-                delete profileConfig.globalIgnore;
-                break;
-            }
-        }
-    }
-
-    return {
-        currentProfile: typeof config.currentProfile === 'string' ? config.currentProfile : 'default',
-        globalIgnore,
-        profiles: profiles as Record<string, Partial<ProfileConfig>>,
-    };
 }
 
 /**
@@ -69,6 +23,7 @@ export function migrateLegacyConfig(parsed: unknown): ConfigFile {
 export class ProfileStore {
     private readonly configFilePath: string;
     private file: ConfigFile = emptyConfigFile();
+    private loaded = false;
 
     constructor(
         @Optional() @Inject(CONFIG_FILE_PATH) configFilePath: string | undefined,
@@ -82,8 +37,16 @@ export class ProfileStore {
         return this.configFilePath;
     }
 
-    /** Reads the file; a missing or unreadable file counts as empty. */
+    /**
+     * Reads the file; a missing or unreadable file counts as empty. Only the
+     * composition root calls this, once per run (docs/adr/0002): a second call
+     * throws rather than silently re-reading the file.
+     */
     async load(): Promise<ConfigFile> {
+        if (this.loaded) {
+            throw new Error('ProfileStore.load() was called twice; the config file is read once per run.');
+        }
+        this.loaded = true;
         try {
             const contents = await this.fs.readFile(this.configFilePath, 'utf8');
             this.file = migrateLegacyConfig(yamlParse(contents));
@@ -93,7 +56,7 @@ export class ProfileStore {
         return this.snapshot();
     }
 
-    snapshot(): ConfigFile {
+    private snapshot(): ConfigFile {
         return structuredClone(this.file);
     }
 

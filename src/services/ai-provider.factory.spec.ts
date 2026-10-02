@@ -47,6 +47,6 @@ describe('AIProviderFactory', () => {
         const factory = (await containerWithFile({ profiles: {} })).get(AIProviderFactory);
 
         expect(() => factory.createModel()).toThrow(KnownError);
-        expect(() => factory.createModel()).toThrow('Profile "default" not found');
+        expect(() => factory.createModel()).toThrow("haven't set up aicommits yet");
     });
 });

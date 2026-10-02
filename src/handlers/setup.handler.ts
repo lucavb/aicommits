@@ -1,15 +1,8 @@
 import { green, yellow } from 'kolorist';
 import { Inject, Injectable } from '../utils/inversify';
 import { ProfileStore } from '../profile/profile-store';
-import {
-    CLI_ARGUMENTS,
-    ENVIRONMENT_VARIABLES,
-    locateCredential,
-    RESOLVED_PROFILE,
-    type CliArguments,
-    type ResolvedProfile,
-} from '../profile/resolved-profile';
-import { type Environment } from '../utils/env';
+import { locateCredential, RESOLVED_PROFILE, type ResolvedProfile } from '../profile/resolved-profile';
+import { ENVIRONMENT_VARIABLES, type Environment } from '../utils/env';
 import { ClackPromptService } from '../services/clack-prompt.service';
 import { setupProvider } from '../commands/setup/provider-setup';
 import { setupModel } from '../commands/setup/model-setup';
@@ -22,7 +15,6 @@ export class SetupHandler {
     constructor(
         @Inject(ProfileStore) private readonly profileStore: ProfileStore,
         @Inject(RESOLVED_PROFILE) private readonly resolvedProfile: ResolvedProfile,
-        @Inject(CLI_ARGUMENTS) private readonly cliArguments: CliArguments,
         @Inject(ENVIRONMENT_VARIABLES) private readonly env: Environment,
         @Inject(ClackPromptService) private readonly promptUI: ClackPromptService,
     ) {}
@@ -35,30 +27,27 @@ export class SetupHandler {
         promptUI.intro('Welcome to aicommits setup! 🚀');
         promptUI.note(`You are configuring the "${profile}" profile.`);
 
-        const currentConfig = profileStore.getRawProfile(profile);
+        const storedProfile = profileStore.getRawProfile(profile);
 
         // 1. Setup provider
-        const provider = await setupProvider(promptUI, currentConfig);
+        const provider = await setupProvider(promptUI, storedProfile);
         if (provider === null) {
             promptUI.outro('Setup cancelled');
             process.exit(0);
         }
         profileStore.updateProfile(profile, { provider });
 
+        // The resolved profile located its credential for the provider stored before setup;
+        // setup may switch providers, so it locates the credential again for the chosen one
+        // (see docs/adr/0002). `setup` takes no --api-key, so the CLI is not a source here.
         const modelSetupContext: ModelSetupContext = {
             profile,
             locateCredential: (profileApiKey?: string) =>
-                locateCredential({
-                    profileName: profile,
-                    provider,
-                    profileApiKey,
-                    cliApiKey: this.cliArguments.apiKey,
-                    env: this.env,
-                }),
+                locateCredential({ profileName: profile, provider, profileApiKey, env: this.env }),
         };
 
         // 2. Setup model
-        const modelSetupResult = await setupModel(promptUI, provider, modelSetupContext, currentConfig);
+        const modelSetupResult = await setupModel(promptUI, provider, modelSetupContext, storedProfile);
         if (!modelSetupResult.model) {
             promptUI.outro('Setup cancelled');
             process.exit(0);
@@ -83,7 +72,7 @@ export class SetupHandler {
         }
 
         // 3. Setup commit message format
-        const commitFormat = await setupCommitFormat(promptUI, currentConfig);
+        const commitFormat = await setupCommitFormat(promptUI, storedProfile);
         if (commitFormat === null) {
             promptUI.outro('Setup cancelled');
             process.exit(0);
@@ -91,7 +80,7 @@ export class SetupHandler {
         profileStore.updateProfile(profile, { type: commitFormat === 'simple' ? '' : 'conventional' });
 
         // 4. Setup language preference
-        const locale = await setupLanguage(promptUI, currentConfig);
+        const locale = await setupLanguage(promptUI, storedProfile);
         if (locale === null) {
             promptUI.outro('Setup cancelled');
             process.exit(0);

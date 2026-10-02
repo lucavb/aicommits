@@ -4,7 +4,6 @@ import { promises as fs } from 'fs';
 import { AICommitMessageService } from '../services/ai-commit-message.service';
 import {
     CLI_ARGUMENTS,
-    ENVIRONMENT_VARIABLES,
     READY_PROFILE,
     RESOLVED_PROFILE,
     requireReady,
@@ -27,7 +26,7 @@ import { PrepareCommitMsgHandler } from '../handlers/prepare-commit-msg.handler'
 import { ConfigSetHandler } from '../handlers/config-set.handler';
 import { SetupHandler } from '../handlers/setup.handler';
 import { IgnoreHandler } from '../handlers/ignore.handler';
-import { parseEnvironment, type Environment } from './env';
+import { ENVIRONMENT_VARIABLES, parseEnvironment, type Environment } from './env';
 
 export interface ContainerOptions {
     cliArguments?: CliArguments;

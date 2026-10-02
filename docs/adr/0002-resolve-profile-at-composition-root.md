@@ -8,4 +8,5 @@ We chose this over a lazily-loading `ConfigService` that every caller had to rem
 
 - `buildContainer` is async.
 - Commands that edit the file (`setup`, `config set`, `ignore`) go through `ProfileStore`, which is separate from the resolved profile.
-- Nothing may re-read the config file after startup. A change made while the command runs doesn't affect the rest of that run.
+- Nothing may re-read the config file after startup. A change made while the command runs doesn't affect the rest of that run. `ProfileStore.load()` throws if it is called a second time.
+- `setup` is the one handler that calls `locateCredential` itself. It may switch the profile to a different provider partway through, so the credential in the resolved profile (located for the old provider) no longer applies. It still uses the same precedence function, so the order is still written once.

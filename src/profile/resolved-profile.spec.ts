@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { parseEnvironment } from '../utils/env';
 import { KnownError } from '../utils/error';
+import { type ConfigFile, DEFAULT_GLOBAL_IGNORE } from './config-file';
 import {
-    type ConfigFile,
-    DEFAULT_GLOBAL_IGNORE,
+    describeUnusableProfile,
     getProfileApiKeyEnvVar,
     locateCredential,
     requireReady,
@@ -88,8 +88,12 @@ describe('resolveProfile', () => {
                 cliArguments: {},
                 env: parseEnvironment({}),
             });
-            expect(resolved.status).toBe('invalid');
-            expect(resolved).toMatchObject({ name: 'default', issues: [expect.stringContaining('useResponsesApi')] });
+            expect(resolved).toMatchObject({
+                status: 'invalid',
+                name: 'default',
+                cause: 'profile',
+                issues: [expect.stringContaining('useResponsesApi')],
+            });
         });
 
         it('is invalid when a CLI override is invalid', () => {
@@ -98,7 +102,16 @@ describe('resolveProfile', () => {
                 cliArguments: { locale: 'not-a-locale' },
                 env: parseEnvironment({}),
             });
-            expect(resolved.status).toBe('invalid');
+            expect(resolved).toMatchObject({ status: 'invalid', cause: 'command-line' });
+        });
+
+        it('blames the stored profile, not the overrides, when both are invalid', () => {
+            const resolved = resolveProfile({
+                file: fileWith({ profiles: { default: { ...openai, model: '' } } }),
+                cliArguments: { locale: 'not-a-locale' },
+                env: parseEnvironment({}),
+            });
+            expect(resolved).toMatchObject({ status: 'invalid', cause: 'profile' });
         });
 
         it('is ready with schema defaults applied', () => {
@@ -170,6 +183,33 @@ describe('resolveProfile', () => {
                 }),
             );
             expect(exclude).toEqual(['dist/**', '*.snap', 'docs/**']);
+        });
+
+        it('drop duplicates, keeping the first occurrence', () => {
+            const { exclude } = expectReady(
+                resolveProfile({
+                    file: fileWith({
+                        globalIgnore: ['*.lock'],
+                        profiles: { default: { ...openai, exclude: ['*.snap'] } },
+                    }),
+                    cliArguments: { exclude: ['*.lock', '*.snap', 'docs/**'] },
+                    env: parseEnvironment({}),
+                }),
+            );
+            expect(exclude).toEqual(['*.lock', '*.snap', 'docs/**']);
+        });
+
+        it('validate CLI excludes like stored ones', () => {
+            const resolved = resolveProfile({
+                file: fileWith(),
+                cliArguments: { exclude: [''] },
+                env: parseEnvironment({}),
+            });
+            expect(resolved).toMatchObject({
+                status: 'invalid',
+                cause: 'command-line',
+                issues: [expect.stringContaining('exclude')],
+            });
         });
 
         it('use the built-in global ignore when the user never set one', () => {
@@ -291,8 +331,54 @@ describe('requireReady', () => {
     });
 
     it('throws a KnownError naming the issues for an invalid profile', () => {
-        expect(() => requireReady({ status: 'invalid', name: 'work', issues: ['model: required'] })).toThrow(
-            /model: required/,
-        );
+        expect(() =>
+            requireReady({ status: 'invalid', name: 'work', cause: 'profile', issues: ['model: required'] }),
+        ).toThrow(/model: required/);
+    });
+});
+
+describe('describeUnusableProfile', () => {
+    it('asks a new user to run setup when no profiles exist', () => {
+        const text = describeUnusableProfile({ status: 'missing', name: 'default', available: [] }).join('\n');
+        expect(text).toContain("haven't set up aicommits yet");
+        expect(text).toContain('aicommits setup');
+    });
+
+    it('lists the available profiles and how to create the missing one', () => {
+        const text = describeUnusableProfile({ status: 'missing', name: 'work', available: ['home'] }).join('\n');
+        expect(text).toContain('Profile "work" not found. Available profiles: home');
+        expect(text).toContain('aicommits setup --profile work');
+    });
+
+    it('sends the user to setup when the stored profile is invalid', () => {
+        const text = describeUnusableProfile({
+            status: 'invalid',
+            name: 'work',
+            cause: 'profile',
+            issues: ['model: required'],
+        }).join('\n');
+        expect(text).toContain('Profile "work" is invalid');
+        expect(text).toContain('model: required');
+        expect(text).toContain('aicommits setup --profile work');
+    });
+
+    it('does not send the user to setup when only the command-line options are invalid', () => {
+        const text = describeUnusableProfile({
+            status: 'invalid',
+            name: 'work',
+            cause: 'command-line',
+            issues: ['locale: invalid'],
+        }).join('\n');
+        expect(text).toContain('command-line options are invalid');
+        expect(text).toContain('locale: invalid');
+        expect(text).not.toContain('aicommits setup');
+    });
+
+    it('styles the commands with the given highlighter', () => {
+        const text = describeUnusableProfile(
+            { status: 'missing', name: 'work', available: ['home'] },
+            (command) => `<${command}>`,
+        ).join('\n');
+        expect(text).toContain('<aicommits setup --profile work>');
     });
 });
