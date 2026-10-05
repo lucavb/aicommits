@@ -8,6 +8,12 @@ on:
             - alpha
     workflow_dispatch:
 
+# One release run per ref at a time: parallel runs could double-publish, and
+# parallel digest refreshes would fight over the branch tip.
+concurrency:
+    group: release-${{ github.ref }}
+    cancel-in-progress: false
+
 permissions:
     contents: write # to be able to publish a GitHub release
     issues: write # to be able to comment on released issues
@@ -41,12 +47,8 @@ jobs:
             - name: Build
               run: npm run build
 
-            - name: Record bundle digest
-              run: sha256sum dist/cli.mjs | tee dist/cli.mjs.sha256
-
-            - name: Verify bundle against committed reference (fail closed)
-              run: |
-                  diff <(sha256sum dist/cli.mjs | cut -d' ' -f1) <(cut -d' ' -f1 dist/cli.mjs.reference.sha256) || exit 1
+            - name: Verify bundle against committed reference (auto-refresh explained drift, fail closed on unexplained drift)
+              run: BUNDLE_REFRESH_PUSH=1 bash scripts/verify-bundle.sh
 
             - name: Code Quality
               run: npm run cq
