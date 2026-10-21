@@ -103,7 +103,7 @@
         "@vitest/coverage-v8": "5.0.5",
         "conventional-changelog-conventionalcommits": "9.3.1",
         "eslint": "10.13.0",
-        "execa": "10.1.1",
+        "execa": "10.2.0",
         "husky": "9.1.7",
         "prettier": "3.9.10",
         "rollup": "4.64.10",
