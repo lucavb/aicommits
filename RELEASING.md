@@ -14,7 +14,7 @@ This project uses [semantic-release](https://github.com/semantic-release/semanti
 The Release workflow verifies the freshly built `dist/cli.mjs` against the committed reference digest in `dist/cli.mjs.reference.sha256` (see `scripts/verify-bundle.sh`):
 
 - **Match** — the run proceeds.
-- **Explained drift** — a tracked build input (`src/`, `rollup.config.ts`, `tsconfig.json`, `package.json`, `package-lock.json`, `.nvmrc`) changed since the reference was last refreshed. CI commits and pushes the new digest as a `[skip ci]` commit; nothing to do manually. Note: after such a run, pull before your next push — the refresh commit lands directly on the branch.
+- **Explained drift** — a tracked build input (`src/`, `rollup.config.ts`, `tsconfig.json`, `package.json`, `package-lock.json`, `.nvmrc`) changed since the reference was last refreshed. CI fails with instructions to refresh the digest and include the updated reference in a PR. Locally, the script rewrites the reference file so you can commit it with your change.
 - **Unexplained drift** — the bundle changed while no tracked input changed. The run fails closed; find the cause before shipping (this is the tamper tripwire). If you have verified the change is legitimate, refresh manually: `npm run build && sha256sum dist/cli.mjs > dist/cli.mjs.reference.sha256`, then commit the result.
 
 ## Commit Message Format

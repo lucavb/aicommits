@@ -8,8 +8,7 @@ on:
             - alpha
     workflow_dispatch:
 
-# One release run per ref at a time: parallel runs could double-publish, and
-# parallel digest refreshes would fight over the branch tip.
+# One release run per ref at a time to prevent parallel runs from double-publishing.
 concurrency:
     group: release-${{ github.ref }}
     cancel-in-progress: false
@@ -47,8 +46,8 @@ jobs:
             - name: Build
               run: npm run build
 
-            - name: Verify bundle against committed reference (auto-refresh explained drift, fail closed on unexplained drift)
-              run: BUNDLE_REFRESH_PUSH=1 bash scripts/verify-bundle.sh
+            - name: Verify bundle against committed reference
+              run: bash scripts/verify-bundle.sh
 
             - name: Code Quality
               run: npm run cq

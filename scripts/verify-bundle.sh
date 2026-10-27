@@ -10,9 +10,9 @@
 #     package.json, package-lock.json, .nvmrc) changed since the reference
 #     was last refreshed, compared against the working tree so local
 #     uncommitted changes count (brand-new untracked files do not — commit
-#     them first). The reference is refreshed: in CI (BUNDLE_REFRESH_PUSH=1)
-#     it is committed and pushed as a [skip ci] commit; locally the file is
-#     rewritten for the developer to commit.
+#     them first). CI fails with instructions to refresh the digest and
+#     include it in a PR; locally the file is rewritten for the developer to
+#     commit.
 #
 #   unexplained — the bundle changed with no tracked input changing. That is
 #     artifact drift (dependency or toolchain tampering, poisoned build
@@ -49,7 +49,7 @@ echo "verify-bundle: digest mismatch — built $built, committed $committed."
 
 last_refresh=$(git log -1 --format=%H -- "$reference")
 if [[ -z "$last_refresh" ]]; then
-    echo "::error::verify-bundle: no commit in history touches $reference; refusing to auto-refresh."
+    echo "::error::verify-bundle: no commit in history touches $reference; refusing to rewrite it."
     exit 1
 fi
 
@@ -58,18 +58,10 @@ if git diff --quiet "$last_refresh" -- "${inputs[@]}"; then
     exit 1
 fi
 
-printf '%s  %s\n' "$built" "$bundle" > "$reference"
-
-if [[ "${BUNDLE_REFRESH_PUSH:-}" == "1" ]]; then
-    git config user.name 'github-actions[bot]'
-    git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-    git add "$reference"
-    git commit -m "chore(ci): auto-refresh bundle reference digest [skip ci]"
-    if ! git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"; then
-        echo "::error::verify-bundle: lost the push race (the branch moved while this run refreshed the reference); the newer commit's run will retry."
-        exit 1
-    fi
-    echo "verify-bundle: reference auto-refreshed to $built and pushed."
-else
-    echo "verify-bundle: reference rewritten locally to $built — commit it together with your change."
+if [[ "${CI:-}" == "true" ]]; then
+    echo "::error::verify-bundle: explained bundle drift detected. Refresh the digest with 'npm run build && sha256sum $bundle > $reference' and include the updated reference in a PR."
+    exit 1
 fi
+
+printf '%s  %s\n' "$built" "$bundle" > "$reference"
+echo "verify-bundle: reference rewritten locally to $built — commit it together with your change."
