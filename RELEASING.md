@@ -5,13 +5,13 @@ This project uses [semantic-release](https://github.com/semantic-release/semanti
 ## How it works
 
 - **Automated Versioning**: Version numbers are automatically determined based on commit messages
-- **Automated Publishing**: Packages are automatically published to npm when code is pushed to `main` or `develop`
+- **Automated Publishing**: Packages are published to npm for qualifying commits on `main`, `beta`, or `alpha`
 - **Automated Changelog**: Release notes are automatically generated based on commit messages
-- **GitHub Releases**: GitHub releases are automatically created with assets
+- **GitHub Releases**: GitHub releases and tags are created without committing generated files to the repository
 
 ## Bundle Verification
 
-The Release workflow verifies the freshly built `dist/cli.mjs` against the committed reference digest in `dist/cli.mjs.reference.sha256` (see `scripts/verify-bundle.sh`):
+The Test and Release workflows verify the freshly built `dist/cli.mjs` against the committed reference digest in `dist/cli.mjs.reference.sha256` (see `scripts/verify-bundle.sh`). Refresh the reference in the same PR as any change that alters the bundle; release automation does not commit it:
 
 - **Match** — the run proceeds.
 - **Explained drift** — a tracked build input (`src/`, `rollup.config.ts`, `tsconfig.json`, `package.json`, `package-lock.json`, `.nvmrc`) changed since the reference was last refreshed. CI fails with instructions to refresh the digest and include the updated reference in a PR. Locally, the script rewrites the reference file so you can commit it with your change.
