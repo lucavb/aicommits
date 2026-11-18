@@ -105,7 +105,7 @@
         "eslint": "10.15.0",
         "execa": "10.2.1",
         "husky": "9.1.7",
-        "prettier": "3.9.10",
+        "prettier": "3.10.1",
         "rollup": "4.66.0",
         "semantic-release": "25.0.9",
         "ts-node": "10.9.2",
