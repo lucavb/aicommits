@@ -67,7 +67,7 @@
     "dependencies": {
         "@ai-sdk/amazon-bedrock": "5.0.145",
         "@ai-sdk/anthropic": "4.0.106",
-        "@ai-sdk/openai": "4.0.118",
+        "@ai-sdk/openai": "4.0.121",
         "@aws-sdk/client-bedrock": "3.1170.0",
         "@aws-sdk/credential-providers": "3.1170.0",
         "@clack/prompts": "1.9.0",
