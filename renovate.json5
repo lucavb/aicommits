@@ -43,11 +43,15 @@
             enabled: false,
         },
         {
+            // extra-typings peers a specific commander minor. Ungrouped, each
+            // PR breaks npm ci with ERESOLVE because the new package cannot
+            // satisfy the old peer range, so Renovate raises both in one branch.
+            matchPackageNames: ['commander', '@commander-js/extra-typings'],
+            groupName: 'commander monorepo',
+        },
+        {
             matchDatasources: ['npm'],
             matchUpdateTypes: ['minor', 'patch'],
-            vulnerabilityAlerts: {
-                enabled: true,
-            },
             matchCurrentAge: '0 days',
             automerge: true,
             addLabels: ['security-update'],
@@ -56,4 +60,9 @@
     ],
     timezone: 'Europe/Berlin',
     minimumReleaseAge: '2 days',
+    // Top-level only: inside packageRules Renovate ignores this and reports a
+    // config warning.
+    vulnerabilityAlerts: {
+        enabled: true,
+    },
 }
