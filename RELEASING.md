@@ -2,6 +2,10 @@
 
 This project uses [semantic-release](https://github.com/semantic-release/semantic-release) to automate version management and package publishing.
 
+## Requirements
+
+Release tooling requires Node.js >= 26.13 (semantic-release v26). Use the version pinned in [`.nvmrc`](.nvmrc); the Release workflow reads it through `actions/setup-node`. This does not change the runtime support of the published CLI, which stays at `engines.node >= 22.12.0`.
+
 ## How it works
 
 - **Automated Versioning**: Version numbers are automatically determined based on commit messages
